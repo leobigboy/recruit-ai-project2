@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
-  SelectItem,
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
@@ -51,7 +50,7 @@ interface Candidate {
   email: string;
   status: string;
   source: string;
-  jobs: {
+  cv_jobs: {
     title: string;
     level: string;
   } | null;
@@ -65,12 +64,12 @@ export function CandidatesPage() {
     async function getCandidates() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('candidates')
-        .select(`*, jobs ( title, level )`)
+        .from('cv_candidates')
+        .select(`*, cv_jobs ( title, level )`)
         .order('created_at', { ascending: false });
 
       if (data) {
-        setCandidates(data);
+        setCandidates(data as Candidate[]);
       }
       if (error) {
         console.error('Error fetching candidates:', error);
@@ -143,18 +142,7 @@ export function CandidatesPage() {
                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                <Input placeholder="Tìm kiếm ứng viên..." className="pl-10" />
              </div>
-             <Select>
-               <SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả trạng thái" /></SelectTrigger>
-               <SelectContent>{/* Các item trạng thái */}</SelectContent>
-             </Select>
-             <Select>
-               <SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả vị trí" /></SelectTrigger>
-               <SelectContent>{/* Các item vị trí */}</SelectContent>
-             </Select>
-             <Select>
-               <SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả cấp độ" /></SelectTrigger>
-               <SelectContent>{/* Các item cấp độ */}</SelectContent>
-             </Select>
+             {/* Các bộ lọc sẽ được làm sau */}
           </div>
         </CardContent>
       </Card>
@@ -199,9 +187,9 @@ export function CandidatesPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{candidate.jobs?.title || 'N/A'}</TableCell>
+                  <TableCell>{candidate.cv_jobs?.title || 'N/A'}</TableCell>
                   <TableCell>{getStatusBadge(candidate.status)}</TableCell>
-                  <TableCell>{candidate.jobs?.level || 'N/A'}</TableCell>
+                  <TableCell>{candidate.cv_jobs?.level || 'N/A'}</TableCell>
                   <TableCell>
                       <div>{new Date(candidate.created_at).toLocaleDateString('vi-VN')}</div>
                       <div className="text-sm text-muted-foreground">{candidate.source}</div>

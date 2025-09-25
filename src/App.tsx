@@ -5,7 +5,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JobsPage } from "./pages/JobsPage";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewsPage } from "./pages/InterviewsPage";
-import { ReviewsPage } from "./pages/ReviewsPage";
+//import { ReviewsPage } from "./pages/ReviewsPage";//
 
 const router = createBrowserRouter([
   {
@@ -28,10 +28,10 @@ const router = createBrowserRouter([
         path: "lich-phong-van", 
         element: <InterviewsPage /> 
       },
-      { 
-        path: "danh-gia",
-        element: <ReviewsPage />
-      },
+      //{ 
+      //  path: "danh-gia",
+      //  element: <ReviewsPage />
+      //},
       // Thêm các trang khác vào đây trong tương lai
     ],
   },

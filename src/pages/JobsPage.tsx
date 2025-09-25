@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Plus, Users, Eye, MoreHorizontal, FileText, CheckCircle } from 'lucide-react'
+import { Search, Plus, Building2, Users, Eye, MoreHorizontal, Calendar, FileText, CheckCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,6 +49,7 @@ interface Job {
   title: string;
   department: string;
   status: string;
+  cv_candidates: { count: number }[];
 }
 
 export function JobsPage() {
@@ -59,12 +60,12 @@ export function JobsPage() {
     async function getJobs() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
+        .from('cv_jobs')
+        .select('*, cv_candidates(count)')
         .order('created_at', { ascending: false });
-
+      
       if (data) {
-        setJobs(data);
+        setJobs(data as Job[]);
       }
       if (error) {
         console.error('Error fetching jobs:', error);
@@ -73,6 +74,9 @@ export function JobsPage() {
     }
     getJobs();
   }, []);
+
+  const totalJobs = jobs.length;
+  const openJobs = jobs.filter(job => job.status === 'Đã đăng').length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -94,7 +98,7 @@ export function JobsPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">{totalJobs}</div>
             <p className="text-xs text-muted-foreground">+0 từ tháng trước</p>
           </CardContent>
         </Card>
@@ -104,7 +108,7 @@ export function JobsPage() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">5</div>
+            <div className="text-2xl font-bold">{openJobs}</div>
             <p className="text-xs text-muted-foreground">Vị trí đang mở</p>
           </CardContent>
         </Card>
@@ -114,8 +118,8 @@ export function JobsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">78</div>
-            <p className="text-xs text-muted-foreground">Tổng tất cả JD</p>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Sẽ cập nhật sau</p>
           </CardContent>
         </Card>
         <Card>
@@ -124,8 +128,8 @@ export function JobsPage() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">691</div>
-            <p className="text-xs text-muted-foreground">Tổng lượt xem</p>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Sẽ cập nhật sau</p>
           </CardContent>
         </Card>
       </div>
@@ -175,12 +179,16 @@ export function JobsPage() {
               <TableRow>
                 <TableCell colSpan={7} className="text-center h-24">Đang tải dữ liệu...</TableCell>
               </TableRow>
+            ) : jobs.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">Chưa có dữ liệu</TableCell>
+                </TableRow>
             ) : (
               jobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell className="font-medium">{job.title}</TableCell>
                   <TableCell>{job.department}</TableCell>
-                  <TableCell>0</TableCell>
+                  <TableCell>{job.cv_candidates[0]?.count || 0}</TableCell>
                   <TableCell>0</TableCell>
                   <TableCell>{new Date(job.created_at).toLocaleDateString('vi-VN')}</TableCell>
                   <TableCell>{getStatusBadge(job.status)}</TableCell>
