@@ -43,7 +43,7 @@ export function InterviewsPage() {
     async function getInterviews() {
       setLoading(true);
       const { data, error } = await supabase
-        .from('interviews')
+        .from('cv_interviews')
         .select(`
           *,
           candidates (
