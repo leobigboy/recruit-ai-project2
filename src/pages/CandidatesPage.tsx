@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert } from 'lucide-react'
+import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -77,7 +77,7 @@ export function CandidatesPage() {
         </div>
         <div className="flex items-center gap-2">
             <Button variant="outline">Làm mới</Button>
-            <Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 <Plus className="mr-2 h-4 w-4" />
                 Thêm ứng viên
             </Button>
@@ -85,17 +85,67 @@ export function CandidatesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng ứng viên</CardTitle><div className="bg-blue-100 p-2 rounded-full"><Users className="h-4 w-4 text-blue-600" /></div></CardHeader><CardContent><div className="text-2xl font-bold">{candidates.length}</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Đang phỏng vấn</CardTitle><div className="bg-purple-100 p-2 rounded-full"><UserCheck className="h-4 w-4 text-purple-600" /></div></CardHeader><CardContent><div className="text-2xl font-bold">0</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Đã qua sàng lọc</CardTitle><div className="bg-green-100 p-2 rounded-full"><Filter className="h-4 w-4 text-green-600" /></div></CardHeader><CardContent><div className="text-2xl font-bold">0</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tỷ lệ thành công</CardTitle><div className="bg-red-100 p-2 rounded-full"><TrendingUp className="h-4 w-4 text-red-600" /></div></CardHeader><CardContent><div className="text-2xl font-bold">0%</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tổng ứng viên</CardTitle>
+              <div className="bg-blue-100 p-2 rounded-full">
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{candidates.length}</div>
+              <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Đang phỏng vấn</CardTitle>
+              <div className="bg-purple-100 p-2 rounded-full">
+                <UserCheck className="h-4 w-4 text-purple-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Đã qua sàng lọc</CardTitle>
+              <div className="bg-green-100 p-2 rounded-full">
+                <Filter className="h-4 w-4 text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tỷ lệ thành công</CardTitle>
+              <div className="bg-red-100 p-2 rounded-full">
+                <TrendingUp className="h-4 w-4 text-red-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0%</div>
+              <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
+            </CardContent>
+          </Card>
       </div>
       
       <div className="flex items-center text-sm text-muted-foreground gap-4 bg-white p-4 rounded-lg border">
         <span>Hiển thị {candidates.length} / {candidates.length} ứng viên</span>
         <span>•</span>
         <span>Cập nhật lần cuối: {new Date().toLocaleTimeString('vi-VN')}</span>
-        <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-500"></div>Đã đồng bộ</span>
+        <span className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          Đã đồng bộ
+        </span>
       </div>
 
       <Card>
@@ -105,9 +155,24 @@ export function CandidatesPage() {
                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                <Input placeholder="Tìm kiếm theo tên, email hoặc vị trí..." className="pl-10" />
              </div>
-             <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả trạng thái" /></SelectTrigger><SelectContent></SelectContent></Select>
-             <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả vị trí" /></SelectTrigger><SelectContent></SelectContent></Select>
-             <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả cấp độ" /></SelectTrigger><SelectContent></SelectContent></Select>
+             <Select>
+               <SelectTrigger className="w-full md:w-[160px]">
+                 <SelectValue placeholder="Tất cả trạng thái" />
+               </SelectTrigger>
+               <SelectContent></SelectContent>
+             </Select>
+             <Select>
+               <SelectTrigger className="w-full md:w-[160px]">
+                 <SelectValue placeholder="Tất cả vị trí" />
+               </SelectTrigger>
+               <SelectContent></SelectContent>
+             </Select>
+             <Select>
+               <SelectTrigger className="w-full md:w-[160px]">
+                 <SelectValue placeholder="Tất cả cấp độ" />
+               </SelectTrigger>
+               <SelectContent></SelectContent>
+             </Select>
           </div>
         </CardContent>
       </Card>
@@ -126,9 +191,18 @@ export function CandidatesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-                <TableRow><TableCell colSpan={6} className="h-24 text-center">Đang tải dữ liệu...</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Đang tải dữ liệu...
+                  </TableCell>
+                </TableRow>
             ) : candidates.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="h-24 text-center"><p className="font-medium">Chưa có ứng viên nào</p><p className="text-sm text-muted-foreground">Hãy bắt đầu bằng cách thêm ứng viên đầu tiên!</p></TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    <p className="font-medium">Chưa có ứng viên nào</p>
+                    <p className="text-sm text-muted-foreground">Hãy bắt đầu bằng cách thêm ứng viên đầu tiên!</p>
+                  </TableCell>
+                </TableRow>
             ) : (
               candidates.map((candidate) => (
                 <TableRow key={candidate.id}>
@@ -155,13 +229,19 @@ export function CandidatesPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-800">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Xem thông tin ứng viên">
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-800">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50" title="Chỉnh sửa">
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-800">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" title="Xem CV">
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50" title="Phân tích CV">
+                        <Brain className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" title="Xóa">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -176,10 +256,53 @@ export function CandidatesPage() {
       <div>
         <h3 className="text-lg font-semibold mb-4">Thao tác nhanh</h3>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer"><CardContent className="pt-6 flex items-center gap-4"><div className="bg-blue-100 p-3 rounded-full"><Bot className="h-6 w-6 text-blue-600" /></div><div><p className="font-semibold">AI Analysis</p><p className="text-sm text-muted-foreground">Phân tích tất cả CV</p></div></CardContent></Card>
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer"><CardContent className="pt-6 flex items-center gap-4"><div className="bg-green-100 p-3 rounded-full"><Download className="h-6 w-6 text-green-600" /></div><div><p className="font-semibold">Xuất dữ liệu</p><p className="text-sm text-muted-foreground">Tải xuống Excel</p></div></CardContent></Card>
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer"><CardContent className="pt-6 flex items-center gap-4"><div className="bg-purple-100 p-3 rounded-full"><ListChecks className="h-6 w-6 text-purple-600" /></div><div><p className="font-semibold">Hành động hàng loạt</p><p className="text-sm text-muted-foreground">Cập nhật nhiều ứng viên</p></div></CardContent></Card>
-            <Card className="hover:border-primary/50 transition-colors cursor-pointer"><CardContent className="pt-6 flex items-center gap-4"><div className="bg-orange-100 p-3 rounded-full"><TriangleAlert className="h-6 w-6 text-orange-600" /></div><div><p className="font-semibold">Báo cáo</p><p className="text-sm text-muted-foreground">Thông kê chi tiết</p></div></CardContent></Card>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="bg-blue-100 p-3 rounded-full">
+                  <Bot className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">AI Analysis</p>
+                  <p className="text-sm text-muted-foreground">Phân tích tất cả CV</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <Download className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">Xuất dữ liệu</p>
+                  <p className="text-sm text-muted-foreground">Tải xuống Excel</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="bg-purple-100 p-3 rounded-full">
+                  <ListChecks className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">Hành động hàng loạt</p>
+                  <p className="text-sm text-muted-foreground">Cập nhật nhiều ứng viên</p>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="pt-6 flex items-center gap-4">
+                <div className="bg-orange-100 p-3 rounded-full">
+                  <TriangleAlert className="h-6 w-6 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">Báo cáo</p>
+                  <p className="text-sm text-muted-foreground">Thống kê chi tiết</p>
+                </div>
+              </CardContent>
+            </Card>
         </div>
       </div>
     </div>
