@@ -1,69 +1,77 @@
-# React + TypeScript + Vite
+Recruit AI - Hệ thống Quản lý CV
+Đây là dự án frontend cho hệ thống quản lý tuyển dụng và CV, được xây dựng với React, TypeScript và kết nối với backend Supabase.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Công nghệ sử dụng
+Framework: Vite + React + TypeScript
 
-Currently, two official plugins are available:
+Thư viện UI: Tailwind CSS + shadcn/ui
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Biểu đồ: Recharts
 
-## Expanding the ESLint configuration
+Backend & Database: Supabase
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Icons: Lucide React
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Cài đặt và Chạy dự án
+Để chạy dự án này, bạn cần làm theo các bước sau.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Lấy mã nguồn
+Clone repository này về máy của bạn:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Bash
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+git clone [URL_REPOSITORY_CUA_BAN]
+2. Môi trường phát triển (Khuyến khích dùng Codespaces)
+Cách dễ dàng và nhanh nhất để bắt đầu là sử dụng GitHub Codespaces để tránh các vấn đề cài đặt trên máy cá nhân.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Truy cập repository trên GitHub.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Nhấn vào nút màu xanh lá < > Code.
+
+Chuyển sang tab "Codespaces".
+
+Nhấn "Create codespace on main" để khởi tạo môi trường.
+
+3. Cấu hình kết nối Supabase (Quan trọng)
+Dự án cần kết nối đến Supabase để lấy dữ liệu. Các khóa API này là bí mật và sẽ không được lưu trên Git.
+
+Trong thư mục gốc của dự án, hãy tạo một file mới tên là .env.local.
+
+Copy và dán nội dung sau vào file .env.local vừa tạo:
+
+Đoạn mã
+
+VITE_SUPABASE_URL="DÁN_URL_DỰ_ÁN_SUPABASE_CỦA_BẠN_VÀO_ĐÂY"
+VITE_SUPABASE_ANON_KEY="DÁN_ANON_KEY_DỰ_ÁN_SUPABASE_CỦA_BẠN_VÀO_ĐÂY"
+Lấy Keys: Bạn có thể tìm thấy URL và ANON_KEY trong dashboard Supabase tại Project Settings -> API.
+
+Quan trọng: File .env.local đã được thêm vào .gitignore để đảm bảo các khóa bí mật của bạn không bị đưa lên GitHub.
+
+4. Cập nhật file supabaseClient.ts
+Để sử dụng các biến môi trường vừa tạo, hãy đảm bảo file src/lib/supabaseClient.ts có nội dung sau:
+
+TypeScript
+
+// src/lib/supabaseClient.ts
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Supabase URL and Anon Key are required.");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+5. Cài đặt các gói phụ thuộc
+Mở terminal trong Codespaces (hoặc trên máy local) và chạy lệnh sau:
+
+Bash
+
+npm install
+6. Chạy dự án
+Sau khi cài đặt thành công, chạy lệnh sau để khởi động server phát triển:
+
+Bash
+
+npm run dev

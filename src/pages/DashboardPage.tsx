@@ -7,25 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Database } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Dữ liệu mẫu
-const topJobsData = [
-    { rank: 1, title: 'Frontend Developer', candidates: 12, status: 'Hot' },
-    { rank: 2, title: 'Backend Developer', candidates: 8, status: 'Bình thường' },
-    { rank: 3, title: 'Full Stack Developer', candidates: 6, status: 'Bình thường' },
-    { rank: 4, title: 'UI/UX Designer', candidates: 4, status: 'Bình thường' },
-];
+// Dữ liệu mẫu cho các phần chưa kết nối
 const recentActivitiesData = [
     { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
 ];
 
 export function DashboardPage() {
   const [stats, setStats] = useState({ totalCV: 0, openJobs: 0, interviewingCV: 0 });
-  // Dữ liệu cho các biểu đồ và danh sách sẽ được kết nối sau
-  // const [trendData, setTrendData] = useState([]);
-  // const [sourceData, setSourceData] = useState([]);
-  // const [topJobs, setTopJobs] = useState<any[]>([]);
+  const [trendData, setTrendData] = useState([]);
+  const [topJobs, setTopJobs] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchDashboardData() {
@@ -39,9 +31,19 @@ export function DashboardPage() {
         interviewingCV: interviewingCV || 0 
       });
 
-      // CÁC LỆNH GỌI HÀM SẼ ĐƯỢC KÍCH HOẠT SAU
-      // const { data: trend } = await supabase.rpc('get_monthly_cv_trend');
-      // if (trend) setTrendData(trend);
+      // Lấy dữ liệu cho "Xu hướng CV theo thời gian"
+      const { data: trend } = await supabase.rpc('get_monthly_cv_trend');
+      if (trend) setTrendData(trend);
+      
+      // Lấy dữ liệu cho "Top vị trí tuyển dụng"
+      const { data: jobs, error: jobsError } = await supabase
+        .from('cv_jobs')
+        .select('title, cv_candidates(count)')
+        .order('count', { foreignTable: 'cv_candidates', ascending: false })
+        .limit(4); // Lấy 4 vị trí hàng đầu
+      
+      if (jobsError) console.error("Error fetching top jobs:", jobsError);
+      if (jobs) setTopJobs(jobs);
     }
 
     fetchDashboardData();
@@ -69,10 +71,19 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white shadow-sm">
           <CardHeader><CardTitle>Xu hướng CV theo thời gian</CardTitle></CardHeader>
-          <CardContent className="h-[350px]">
-            <div className="flex items-center justify-center h-full text-muted-foreground"><Database className="w-8 h-8 mr-2"/>Chưa có dữ liệu</div>
+          <CardContent className="h-[350px] p-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e0e0e0', borderRadius: '0.5rem' }} />
+                <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} name="Số CV" />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
+        
         <Card className="bg-white shadow-sm">
           <CardHeader><CardTitle>Nguồn ứng viên</CardTitle></CardHeader>
           <CardContent className="h-[350px]">
@@ -81,24 +92,24 @@ export function DashboardPage() {
         </Card>
       </div>
 
-      {/* Top vị trí và Hoạt động gần đây (dữ liệu mẫu) */}
+      {/* Top vị trí và Hoạt động gần đây */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white shadow-sm">
             <CardHeader><CardTitle>Top vị trí tuyển dụng</CardTitle></CardHeader>
             <CardContent>
                 <ul className="space-y-4">
-                    {topJobsData.map((job) => (
-                        <li key={job.rank} className="flex items-center justify-between gap-4">
+                    {topJobs.length > 0 ? topJobs.map((job, index) => (
+                        <li key={job.title} className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-bold text-gray-600">{job.rank}</span>
+                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-bold text-gray-600">{index + 1}</span>
                                 <div>
                                     <p className="font-semibold">{job.title}</p>
-                                    <p className="text-sm text-muted-foreground">{job.candidates} ứng viên</p>
+                                    <p className="text-sm text-muted-foreground">{job.cv_candidates[0]?.count || 0} ứng viên</p>
                                 </div>
                             </div>
-                            <Badge variant={job.status === 'Hot' ? "destructive" : "secondary"}>{job.status}</Badge>
+                            <Badge variant={index === 0 ? "destructive" : "secondary"}>{index === 0 ? "Hot" : "Bình thường"}</Badge>
                         </li>
-                    ))}
+                    )) : <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>}
                 </ul>
             </CardContent>
         </Card>
