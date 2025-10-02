@@ -2,34 +2,27 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Calendar, Clock, CheckCircle, XCircle, MoreHorizontal, Search } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Clock, CheckCircle, XCircle, MoreHorizontal, Search } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { supabase } from "@/lib/supabaseClient"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// Định nghĩa kiểu dữ liệu cho một 'interview' từ database
+// Định nghĩa kiểu dữ liệu
 interface Interview {
   id: string;
   interview_date: string;
   interviewer: string;
   round: string;
-  format: string;
   status: string;
-  candidates: { // Dữ liệu từ bảng 'candidates'
+  format: string;
+  cv_candidates: { 
     full_name: string;
-    jobs: { // Dữ liệu từ bảng 'jobs'
+    cv_jobs: { 
       title: string;
     } | null;
   } | null;
@@ -37,31 +30,55 @@ interface Interview {
 
 export function InterviewsPage() {
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [stats, setStats] = useState({ totalThisMonth: 0, growth: 0, pending: 0, completed: 0, cancelled: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function getInterviews() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('cv_interviews')
-        .select(`
-          *,
-          candidates (
-            full_name,
-            jobs ( title )
-          )
-        `)
-        .order('interview_date', { ascending: false });
+  const fetchAllData = async () => {
+    setLoading(true);
+    
+    // Lấy danh sách phỏng vấn
+    const { data: interviewData, error: interviewError } = await supabase
+      .from('cv_interviews')
+      .select(`
+        *,
+        cv_candidates (
+          full_name,
+          cv_jobs ( title )
+        )
+      `)
+      .order('interview_date', { ascending: false });
 
-      if (data) {
-        setInterviews(data as Interview[]);
+    if (interviewData) setInterviews(interviewData as Interview[]);
+    if (interviewError) console.error('Error fetching interviews:', interviewError);
+
+    // Lấy dữ liệu thống kê cho thẻ
+    const { data: statsData, error: statsError } = await supabase.rpc('get_interview_stats');
+    
+    if (statsData && statsData.length > 0) {
+      const { this_month_count, last_month_count, pending_count, completed_count, cancelled_count } = statsData[0];
+      
+      let growthPercentage = 0;
+      if (last_month_count > 0) {
+        growthPercentage = ((this_month_count - last_month_count) / last_month_count) * 100;
+      } else if (this_month_count > 0) {
+        growthPercentage = 100;
       }
-      if (error) {
-        console.error('Error fetching interviews:', error);
-      }
-      setLoading(false);
+
+      setStats({
+        totalThisMonth: this_month_count,
+        growth: Math.round(growthPercentage),
+        pending: pending_count,
+        completed: completed_count,
+        cancelled: cancelled_count
+      });
     }
-    getInterviews();
+    if (statsError) console.error('Error fetching interview stats:', statsError);
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchAllData();
   }, []);
 
   return (
@@ -71,7 +88,7 @@ export function InterviewsPage() {
           <h1 className="text-2xl font-bold">Lịch phỏng vấn</h1>
           <p className="text-sm text-muted-foreground">Quản lý và theo dõi lịch phỏng vấn</p>
         </div>
-        <Button>
+        <Button onClick={fetchAllData}>
           <Plus className="w-4 h-4 mr-2" />
           Tạo lịch phỏng vấn
         </Button>
@@ -80,12 +97,14 @@ export function InterviewsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tổng số</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Tổng số (tháng này)</CardTitle>
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">+0%</p>
+                <div className="text-2xl font-bold">{stats.totalThisMonth}</div>
+                <p className={`text-xs ${stats.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.growth >= 0 ? '+' : ''}{stats.growth}% so với tháng trước
+                </p>
             </CardContent>
         </Card>
         <Card>
@@ -94,8 +113,7 @@ export function InterviewsPage() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">+0%</p>
+                <div className="text-2xl font-bold">{stats.pending}</div>
             </CardContent>
         </Card>
         <Card>
@@ -104,8 +122,7 @@ export function InterviewsPage() {
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">+0%</p>
+                <div className="text-2xl font-bold">{stats.completed}</div>
             </CardContent>
         </Card>
         <Card>
@@ -114,19 +131,9 @@ export function InterviewsPage() {
                 <XCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">0</div>
-                <p className="text-xs text-muted-foreground">+0%</p>
+                <div className="text-2xl font-bold">{stats.cancelled}</div>
             </CardContent>
         </Card>
-      </div>
-      
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Tìm kiếm theo tên ứng viên, vị trí..." className="pl-10" />
-        </div>
-        <Select><SelectTrigger className="w-[180px]"><SelectValue placeholder="Tất cả vị trí" /></SelectTrigger><SelectContent></SelectContent></Select>
-        <Select><SelectTrigger className="w-[180px]"><SelectValue placeholder="Tất cả trạng thái" /></SelectTrigger><SelectContent></SelectContent></Select>
       </div>
 
       <Card>
@@ -148,33 +155,22 @@ export function InterviewsPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">Đang tải dữ liệu...</TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24">Đang tải dữ liệu...</TableCell></TableRow>
               ) : interviews.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">
-                    <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium">Chưa có lịch phỏng vấn nào</h3>
-                  </TableCell>
-                </TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24">Chưa có lịch phỏng vấn nào</TableCell></TableRow>
               ) : (
                 interviews.map((interview) => (
                   <TableRow key={interview.id}>
-                    <TableCell className="font-medium">{interview.candidates?.full_name || 'N/A'}</TableCell>
-                    <TableCell>{interview.candidates?.jobs?.title || 'N/A'}</TableCell>
+                    <TableCell className="font-medium">{interview.cv_candidates?.full_name || 'N/A'}</TableCell>
+                    <TableCell>{interview.cv_candidates?.cv_jobs?.title || 'N/A'}</TableCell>
                     <TableCell>{interview.round}</TableCell>
                     <TableCell>{new Date(interview.interview_date).toLocaleString('vi-VN')}</TableCell>
                     <TableCell>{interview.interviewer}</TableCell>
                     <TableCell><Badge>{interview.status}</Badge></TableCell>
                     <TableCell>
                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuItem>Xem chi tiết</DropdownMenuItem>
-                          </DropdownMenuContent>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end"><DropdownMenuItem>Xem chi tiết</DropdownMenuItem></DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
