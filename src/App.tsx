@@ -5,8 +5,8 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JobsPage } from "./pages/JobsPage";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewsPage } from "./pages/InterviewsPage";
-import { ReviewsPage } from "./pages/ReviewsPage";//
-
+import { ReviewsPage } from "./pages/ReviewsPage";
+import { SettingsPage } from "./pages/SettingsPage";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -32,7 +32,10 @@ const router = createBrowserRouter([
         path: "danh-gia",
         element: <ReviewsPage />
       },
-      // Thêm các trang khác vào đây trong tương lai
+      {
+        path: "cai-dat",
+        element: <SettingsPage />
+      }
     ],
   },
 ]);
