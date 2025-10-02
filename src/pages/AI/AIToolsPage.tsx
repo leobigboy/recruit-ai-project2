@@ -1,6 +1,5 @@
 // src/pages/ai/AIToolsPage.tsx
 import React, { useState, useEffect } from "react";
-import { createClient } from '@supabase/supabase-js';
 import { 
   Bot, 
   FileText, 
@@ -11,14 +10,8 @@ import {
   Eye,
   EyeOff,
   Check,
-  AlertCircle,
-  Loader2
+  AlertCircle
 } from "lucide-react";
-
-// Khởi tạo Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * AIToolsPage - Trang chứa 5 tools AI với quản lý API key
@@ -58,6 +51,7 @@ export default function AIToolsPage() {
     if (tempKey.trim()) {
       setSaveStatus("saving");
       
+      // Simulate API call
       setTimeout(() => {
         setApiKey(tempKey);
         localStorage.setItem("ai_api_key", tempKey);
@@ -270,6 +264,9 @@ export default function AIToolsPage() {
                   aistudio.google.com
                 </a>
               </p>
+              <p className="text-xs text-blue-700 mt-1">
+                ⚠️ <strong>CORS Issue:</strong> Nếu gặp lỗi CORS khi gọi API, bạn cần chạy qua backend server hoặc sử dụng proxy.
+              </p>
             </div>
           </div>
         </div>
@@ -278,152 +275,70 @@ export default function AIToolsPage() {
   );
 }
 
-/* ------------------ Tab UIs với API Key prop và Supabase ------------------ */
+/* ------------------ Tab UIs với API Key prop ------------------ */
 
 interface TabUIProps {
   apiKey: string;
 }
 
-interface Candidate {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  skills: string[];
-  experience_years: number;
-  education: string;
-  position_applied: string;
-  status: string;
-  cv_url?: string;
-  created_at: string;
-}
-
 function CandidateMatchUI({ apiKey }: TabUIProps) {
   const [loading, setLoading] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [results, setResults] = useState<any[]>([]);
-  const [jobDescription, setJobDescription] = useState("");
-  const [selectedPosition, setSelectedPosition] = useState("");
-
-  // Load candidates từ Supabase
-  useEffect(() => {
-    loadCandidates();
-  }, []);
-
-  const loadCandidates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCandidates(data || []);
-    } catch (error) {
-      console.error('Error loading candidates:', error);
-    }
-  };
 
   const handleRunMatch = async () => {
     setLoading(true);
-    try {
-      // Gọi backend để match candidates với job description
-      const response = await fetch('http://localhost:5000/api/ai/match-candidates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobDescription: jobDescription || selectedPosition,
-          candidates: candidates.map(c => ({
-            name: c.name,
-            skills: c.skills,
-            experience: c.experience_years,
-            education: c.education,
-            position: c.position_applied
-          }))
-        })
-      });
-
-      const data = await response.json();
-      setResults(data.matches || []);
-    } catch (error) {
-      console.error('Error matching candidates:', error);
-      // Fallback với kết quả mẫu
-      setResults(
-        candidates.slice(0, 3).map(c => ({
-          name: c.name,
-          score: Math.floor(Math.random() * 30) + 70,
-          skills: c.skills.join(', '),
-          id: c.id
-        }))
-      );
-    } finally {
+    // Simulate API call với apiKey
+    setTimeout(() => {
+      setResults([
+        { name: "Nguyễn A", score: 92, skills: "Frontend" },
+        { name: "Trần B", score: 86, skills: "React/TS" },
+      ]);
       setLoading(false);
-    }
+    }, 1500);
   };
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-2">AI — Gợi ý ứng viên</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Chọn vị trí hoặc nhập Job Description để AI gợi ý ứng viên phù hợp nhất.
+        Chọn 1 job hoặc paste Job Description để AI trả về top ứng viên phù hợp.
       </p>
 
       <div className="space-y-3">
-        <select 
-          className="w-full border rounded px-3 py-2"
-          value={selectedPosition}
-          onChange={(e) => setSelectedPosition(e.target.value)}
-        >
-          <option value="">Chọn vị trí tuyển dụng</option>
-          {[...new Set(candidates.map(c => c.position_applied))].map(pos => (
-            <option key={pos} value={pos}>{pos}</option>
-          ))}
+        <select className="w-full border rounded px-3 py-2">
+          <option>Chọn job (ví dụ: Frontend)</option>
+          <option>Backend</option>
+          <option>Product Manager</option>
         </select>
 
         <textarea 
           className="w-full border rounded p-3 h-28" 
-          placeholder="Hoặc nhập Job Description chi tiết..." 
-          value={jobDescription}
-          onChange={(e) => setJobDescription(e.target.value)}
+          placeholder="Hoặc paste Job Description..." 
         />
 
         <div className="flex gap-2">
           <button 
             onClick={handleRunMatch}
-            disabled={loading || (!selectedPosition && !jobDescription)}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+            disabled={loading}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
           >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {loading ? "Đang phân tích..." : "Chạy gợi ý"}
+            {loading ? "Đang xử lý..." : "Chạy gợi ý"}
           </button>
           <button 
             onClick={() => setResults([])}
             className="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200"
           >
-            Xóa kết quả
+            Xóa
           </button>
         </div>
 
         {results.length > 0 && (
           <div className="mt-4 p-4 border rounded bg-gray-50">
-            <div className="text-sm font-medium text-gray-700 mb-3">
-              Top {results.length} ứng viên phù hợp nhất:
-            </div>
-            <ul className="space-y-2">
+            <div className="text-sm text-gray-500">Kết quả:</div>
+            <ul className="mt-2 space-y-2">
               {results.map((r, i) => (
-                <li key={i} className="p-3 bg-white rounded shadow-sm">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium text-gray-900">#{i + 1}. {r.name}</div>
-                      <div className="text-sm text-gray-600 mt-1">Kỹ năng: {r.skills}</div>
-                    </div>
-                    <div className={`text-lg font-bold ${
-                      r.score >= 85 ? "text-green-600" : 
-                      r.score >= 70 ? "text-blue-600" : "text-amber-600"
-                    }`}>
-                      {r.score}%
-                    </div>
-                  </div>
+                <li key={i} className="p-2 bg-white rounded shadow-sm">
+                  {r.name} — Score: {r.score} — match kỹ năng {r.skills}
                 </li>
               ))}
             </ul>
@@ -437,110 +352,48 @@ function CandidateMatchUI({ apiKey }: TabUIProps) {
 function SummarizeCVUI({ apiKey }: TabUIProps) {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<string[]>([]);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState("");
-
-  useEffect(() => {
-    loadCandidates();
-  }, []);
-
-  const loadCandidates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCandidates(data || []);
-    } catch (error) {
-      console.error('Error loading candidates:', error);
-    }
-  };
 
   const handleSummarize = async () => {
-    if (!selectedCandidate) return;
-    
     setLoading(true);
-    try {
-      const candidate = candidates.find(c => c.id === selectedCandidate);
-      if (!candidate) return;
-
-      // Gọi AI để tóm tắt CV
-      const response = await fetch('http://localhost:5000/api/ai/summarize-cv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          candidate: {
-            name: candidate.name,
-            skills: candidate.skills,
-            experience: candidate.experience_years,
-            education: candidate.education,
-            position: candidate.position_applied
-          }
-        })
-      });
-
-      const data = await response.json();
-      setSummary(data.summary || []);
-    } catch (error) {
-      console.error('Error summarizing CV:', error);
-      // Fallback
-      const candidate = candidates.find(c => c.id === selectedCandidate);
-      if (candidate) {
-        setSummary([
-          `${candidate.name} - Ứng tuyển vị trí ${candidate.position_applied}`,
-          `${candidate.experience_years} năm kinh nghiệm trong lĩnh vực`,
-          `Kỹ năng chính: ${candidate.skills.join(', ')}`,
-          `Học vấn: ${candidate.education}`
-        ]);
-      }
-    } finally {
+    // Simulate API call với apiKey
+    setTimeout(() => {
+      setSummary([
+        "Frontend engineer — 4 năm kinh nghiệm React/TypeScript.",
+        "Tham gia dự án X với tối ưu performance, cải thiện 30% speed.",
+        "Kỹ năng: React, Redux, Testing, CI/CD.",
+      ]);
       setLoading(false);
-    }
+    }, 1500);
   };
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-2">AI — Tóm tắt CV</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Chọn ứng viên để AI tóm tắt thông tin CV thành các điểm chính.
+        Upload CV (PDF/Doc) hoặc paste nội dung — AI sẽ tóm tắt thành bullet.
       </p>
 
-      <div className="space-y-3">
-        <select 
-          className="w-full border rounded px-3 py-2"
-          value={selectedCandidate}
-          onChange={(e) => setSelectedCandidate(e.target.value)}
-        >
-          <option value="">Chọn ứng viên</option>
-          {candidates.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name} - {c.position_applied}
-            </option>
-          ))}
-        </select>
-
+      <div className="flex gap-3 items-center">
+        <input type="file" accept=".pdf,.doc,.docx,.txt" className="text-sm" />
         <button 
           onClick={handleSummarize}
-          disabled={loading || !selectedCandidate}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
+          disabled={loading}
+          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {loading ? "Đang tóm tắt..." : "Tóm tắt CV"}
+          {loading ? "Đang tóm tắt..." : "Tóm tắt"}
         </button>
-
-        {summary.length > 0 && (
-          <div className="mt-4 p-4 border rounded bg-gray-50">
-            <div className="text-sm font-medium text-gray-700 mb-2">Tóm tắt:</div>
-            <ul className="list-disc pl-5 space-y-1">
-              {summary.map((s, i) => (
-                <li key={i} className="text-sm text-gray-800">{s}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
+
+      {summary.length > 0 && (
+        <div className="mt-4 p-4 border rounded bg-gray-50">
+          <div className="text-sm text-gray-500">Tóm tắt:</div>
+          <ul className="list-disc pl-5 mt-2 space-y-1">
+            {summary.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -548,111 +401,47 @@ function SummarizeCVUI({ apiKey }: TabUIProps) {
 function InterviewAnalysisUI({ apiKey }: TabUIProps) {
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState("");
-
-  useEffect(() => {
-    loadCandidates();
-  }, []);
-
-  const loadCandidates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .eq('status', 'Interview')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCandidates(data || []);
-    } catch (error) {
-      console.error('Error loading candidates:', error);
-    }
-  };
 
   const handleAnalyze = async () => {
-    if (!selectedCandidate) return;
-    
     setLoading(true);
-    try {
-      const candidate = candidates.find(c => c.id === selectedCandidate);
-      
-      // Simulate analysis
-      setTimeout(() => {
-        setAnalysis({
-          candidate: candidate?.name,
-          confidence: Math.floor(Math.random() * 3) + 7,
-          sentiment: ["Positive", "Neutral", "Professional"][Math.floor(Math.random() * 3)],
-          keywords: candidate?.skills?.slice(0, 3) || ["communication", "problem-solving", "teamwork"],
-          recommendation: "Recommended for next round"
-        });
-        setLoading(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Error analyzing interview:', error);
+    // Simulate API call với apiKey
+    setTimeout(() => {
+      setAnalysis({
+        confidence: 7,
+        sentiment: "Neutral → Positive",
+        keywords: ["teamwork", "deadline", "leadership"],
+      });
       setLoading(false);
-    }
+    }, 1500);
   };
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-2">AI — Phân tích phỏng vấn</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Phân tích thông tin ứng viên đã phỏng vấn để đánh giá confidence và sentiment.
+        Upload transcript hoặc audio — AI phân tích tone, confidence, sentiment.
       </p>
 
       <div className="space-y-3">
-        <select 
-          className="w-full border rounded px-3 py-2"
-          value={selectedCandidate}
-          onChange={(e) => setSelectedCandidate(e.target.value)}
-        >
-          <option value="">Chọn ứng viên đã phỏng vấn</option>
-          {candidates.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name} - {c.position_applied}
-            </option>
-          ))}
-        </select>
-
-        <button 
-          onClick={handleAnalyze}
-          disabled={loading || !selectedCandidate}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
-        >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {loading ? "Đang phân tích..." : "Phân tích"}
-        </button>
+        <input type="file" accept="audio/*,text/plain" className="text-sm" />
+        <div className="mt-2">
+          <button 
+            onClick={handleAnalyze}
+            disabled={loading}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {loading ? "Đang phân tích..." : "Phân tích"}
+          </button>
+        </div>
 
         {analysis && (
           <div className="mt-4 p-4 border rounded bg-gray-50">
-            <div className="text-sm font-medium text-gray-700 mb-3">
-              Báo cáo phân tích - {analysis.candidate}:
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-2 bg-white rounded">
-                <span className="text-sm text-gray-600">Confidence:</span>
-                <span className="font-medium">{analysis.confidence}/10</span>
-              </div>
-              <div className="flex justify-between items-center p-2 bg-white rounded">
-                <span className="text-sm text-gray-600">Sentiment:</span>
-                <span className="font-medium">{analysis.sentiment}</span>
-              </div>
-              <div className="p-2 bg-white rounded">
-                <span className="text-sm text-gray-600">Key phrases:</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {analysis.keywords.map((k: string, i: number) => (
-                    <span key={i} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                      {k}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="p-2 bg-white rounded">
-                <span className="text-sm text-gray-600">Recommendation:</span>
-                <p className="text-sm font-medium mt-1">{analysis.recommendation}</p>
-              </div>
-            </div>
+            <div className="text-sm text-gray-500">Báo cáo:</div>
+            <ul className="mt-2 space-y-1">
+              <li>Confidence: {analysis.confidence}/10</li>
+              <li>Sentiment: {analysis.sentiment}</li>
+              <li>Key phrases: {analysis.keywords.join(", ")}</li>
+            </ul>
           </div>
         )}
       </div>
@@ -678,9 +467,12 @@ function ChatbotUI({ apiKey }: TabUIProps) {
     setError("");
 
     try {
+      // Gọi backend server để proxy đến Gemini API
       const response = await fetch('http://localhost:5000/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           messages: [
             {
@@ -702,15 +494,21 @@ function ChatbotUI({ apiKey }: TabUIProps) {
       }
 
       const data = await response.json();
-      const botMsg = { role: "bot", content: data.reply };
+      const botResponse = data.reply;
+      
+      const botMsg = { 
+        role: "bot", 
+        content: botResponse 
+      };
       setMessages(prev => [...prev, botMsg]);
     } catch (err: any) {
       console.error('Error calling backend for Gemini:', err);
       setError(err.message || 'Có lỗi xảy ra khi kết nối với AI');
       
+      // Fallback message
       const errorMsg = { 
         role: "bot", 
-        content: `⚠️ Không thể kết nối với AI. Lỗi: ${err.message}` 
+        content: `⚠️ Không thể kết nối với AI. Lỗi: ${err.message}. Vui lòng kiểm tra API key của bạn.` 
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -777,162 +575,63 @@ function ChatbotUI({ apiKey }: TabUIProps) {
 
 function RecruitPredictUI({ apiKey }: TabUIProps) {
   const [loading, setLoading] = useState(false);
-  const [prediction, setPrediction] = useState<any>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState("");
-
-  useEffect(() => {
-    loadCandidates();
-  }, []);
-
-  const loadCandidates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('candidates')
-        .select('*')
-        .in('status', ['Applied', 'Screening', 'Interview'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setCandidates(data || []);
-    } catch (error) {
-      console.error('Error loading candidates:', error);
-    }
-  };
+  const [prediction, setPrediction] = useState<number | null>(null);
 
   const handlePredict = async () => {
-    if (!selectedCandidate) return;
-    
     setLoading(true);
-    try {
-      const candidate = candidates.find(c => c.id === selectedCandidate);
-      if (!candidate) return;
-
-      // Simulate prediction based on candidate data
-      const baseScore = 50;
-      const experienceBonus = Math.min(candidate.experience_years * 5, 20);
-      const skillsBonus = Math.min(candidate.skills.length * 3, 15);
-      const educationBonus = candidate.education.toLowerCase().includes('university') ? 10 : 5;
-      const randomFactor = Math.floor(Math.random() * 10);
-      
-      const successRate = Math.min(baseScore + experienceBonus + skillsBonus + educationBonus + randomFactor, 95);
-      const retentionRate = Math.min(successRate - 5 + Math.floor(Math.random() * 10), 90);
-
-      setTimeout(() => {
-        setPrediction({
-          candidate: candidate.name,
-          position: candidate.position_applied,
-          successRate,
-          retentionRate,
-          factors: {
-            experience: candidate.experience_years,
-            skills: candidate.skills.length,
-            education: candidate.education
-          }
-        });
-        setLoading(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Error predicting:', error);
+    // Simulate API call với apiKey
+    setTimeout(() => {
+      setPrediction(72);
       setLoading(false);
-    }
+    }, 1500);
   };
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-2">AI — Dự đoán tuyển dụng</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Dự đoán xác suất tuyển thành công và retention dựa trên dữ liệu ứng viên.
+        Dự đoán xác suất tuyển thành công / retention dựa trên dữ liệu lịch sử.
       </p>
 
-      <div className="space-y-3">
-        <select 
-          className="w-full border rounded px-3 py-2"
-          value={selectedCandidate}
-          onChange={(e) => setSelectedCandidate(e.target.value)}
-        >
-          <option value="">Chọn ứng viên để dự đoán</option>
-          {candidates.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name} - {c.position_applied} ({c.status})
-            </option>
-          ))}
-        </select>
+      <div className="p-4 border rounded bg-gray-50">
+        <div className="text-sm text-gray-500">Chọn ứng viên để dự đoán</div>
+        <div className="mt-3 flex gap-2">
+          <select className="border rounded px-3 py-2">
+            <option>Nguyễn Văn A - Frontend Dev</option>
+            <option>Trần Thị B - Backend Dev</option>
+            <option>Lê Văn C - Product Manager</option>
+          </select>
+          <button 
+            onClick={handlePredict}
+            disabled={loading}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {loading ? "Đang dự đoán..." : "Chạy dự đoán"}
+          </button>
+        </div>
 
-        <button 
-          onClick={handlePredict}
-          disabled={loading || !selectedCandidate}
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 flex items-center gap-2"
-        >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {loading ? "Đang dự đoán..." : "Chạy dự đoán"}
-        </button>
-
-        {prediction && (
-          <div className="mt-4 p-4 border rounded bg-gray-50">
-            <div className="text-sm font-medium text-gray-700 mb-3">
-              Kết quả dự đoán - {prediction.candidate}:
-            </div>
-            
-            {/* Success Rate */}
-            <div className="mb-4 p-3 bg-white rounded shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Xác suất tuyển dụng thành công:</span>
-                <strong className={`text-lg ${
-                  prediction.successRate >= 70 ? "text-green-600" : 
-                  prediction.successRate >= 50 ? "text-yellow-600" : "text-red-600"
-                }`}>
-                  {prediction.successRate}%
-                </strong>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all ${
-                    prediction.successRate >= 70 ? "bg-green-500" : 
-                    prediction.successRate >= 50 ? "bg-yellow-500" : "bg-red-500"
-                  }`}
-                  style={{ width: `${prediction.successRate}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Retention Rate */}
-            <div className="mb-4 p-3 bg-white rounded shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Dự đoán retention (giữ chân):</span>
-                <strong className={`text-lg ${
-                  prediction.retentionRate >= 70 ? "text-green-600" : 
-                  prediction.retentionRate >= 50 ? "text-yellow-600" : "text-red-600"
-                }`}>
-                  {prediction.retentionRate}%
-                </strong>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all ${
-                    prediction.retentionRate >= 70 ? "bg-green-500" : 
-                    prediction.retentionRate >= 50 ? "bg-yellow-500" : "bg-red-500"
-                  }`}
-                  style={{ width: `${prediction.retentionRate}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Factors */}
+        {prediction !== null && (
+          <div className="mt-4">
+            <div className="text-sm mb-2">Kết quả dự đoán:</div>
             <div className="p-3 bg-white rounded shadow-sm">
-              <div className="text-xs font-medium text-gray-600 mb-2">Các yếu tố ảnh hưởng:</div>
-              <div className="space-y-1 text-xs text-gray-700">
-                <div className="flex justify-between">
-                  <span>Kinh nghiệm:</span>
-                  <span className="font-medium">{prediction.factors.experience} năm</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Số kỹ năng:</span>
-                  <span className="font-medium">{prediction.factors.skills}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Học vấn:</span>
-                  <span className="font-medium">{prediction.factors.education}</span>
+              <div className="flex items-center justify-between">
+                <span>Xác suất tuyển dụng thành công:</span>
+                <strong className={`text-lg ${
+                  prediction >= 70 ? "text-green-600" : 
+                  prediction >= 50 ? "text-yellow-600" : "text-red-600"
+                }`}>
+                  {prediction}%
+                </strong>
+              </div>
+              <div className="mt-2">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all ${
+                      prediction >= 70 ? "bg-green-500" : 
+                      prediction >= 50 ? "bg-yellow-500" : "bg-red-500"
+                    }`}
+                    style={{ width: `${prediction}%` }}
+                  />
                 </div>
               </div>
             </div>

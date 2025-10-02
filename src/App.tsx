@@ -8,7 +8,31 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { JobsPage } from "./pages/JobsPage";
 import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewsPage } from "./pages/InterviewsPage";
-import { ReviewsPage } from "./pages/ReviewsPage";//
+import CVFilterPage from "./pages/CV-filter-page";
+import LoginPage from "./pages/login";
+import SignupPage from "./pages/signup";
+import ForgotPasswordPage from "./pages/forgot-password";
+
+// Additional pages
+import { ReviewsPage } from "./pages/ReviewsPage";
+import EmailManagementPage from "./pages/EmailManagementPage";
+import { SettingsPage } from "./pages/SettingsPage";
+
+// New pages
+import AIToolsPage from "./pages/AI/AIToolsPage";
+import OffersPage from "./pages/OffersPage";
+
+// RequireAuth wrapper
+const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const isAuthenticated =
+    typeof window !== "undefined" && localStorage.getItem("isAuthenticated") === "true";
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children ?? <Outlet />}</>;
+};
 
 const router = createBrowserRouter([
   // Root redirect -> login
@@ -31,27 +55,18 @@ const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      {
-        index: true,
-        element: <DashboardPage />,
-      },
-      {
-        path: "mo-ta-cong-viec",
-        element: <JobsPage />,
-      },
-      { 
-        path: "ung-vien", 
-        element: <CandidatesPage />
-      },
-      { 
-        path: "lich-phong-van", 
-        element: <InterviewsPage /> 
-      },
-      { 
-        path: "danh-gia",
-        element: <ReviewsPage />
-      },
-      // Thêm các trang khác vào đây trong tương lai
+      { index: true, element: <DashboardPage /> }, // /app
+      { path: "mo-ta-cong-viec", element: <JobsPage /> },
+      { path: "ung-vien", element: <CandidatesPage /> },
+      { path: "lich-phong-van", element: <InterviewsPage /> },
+      { path: "loc-cv", element: <CVFilterPage /> },
+      { path: "danh-gia", element: <ReviewsPage /> },
+      { path: "quan-ly-email", element: <EmailManagementPage /> },
+      { path: "cai-dat", element: <SettingsPage /> },
+
+      // ✅ New pages
+      { path: "ai", element: <AIToolsPage /> },       // /app/ai
+      { path: "offers", element: <OffersPage /> },   // /app/offers
     ],
   },
 
