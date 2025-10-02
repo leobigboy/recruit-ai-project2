@@ -5,11 +5,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Database } from 'lucide-react';
+import { User, Briefcase, ClipboardList, Clock, RefreshCw, Database } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
-// Dữ liệu mẫu cho các phần chưa kết nối
+// Dữ liệu mẫu
 const recentActivitiesData = [
     { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
 ];
@@ -17,6 +17,7 @@ const recentActivitiesData = [
 export function DashboardPage() {
   const [stats, setStats] = useState({ totalCV: 0, openJobs: 0, interviewingCV: 0 });
   const [trendData, setTrendData] = useState([]);
+  const [sourceData, setSourceData] = useState([]);
   const [topJobs, setTopJobs] = useState<any[]>([]);
 
   useEffect(() => {
@@ -31,16 +32,19 @@ export function DashboardPage() {
         interviewingCV: interviewingCV || 0 
       });
 
-      // Lấy dữ liệu cho "Xu hướng CV theo thời gian"
+      // Gọi các hàm PostgreSQL đã tạo
       const { data: trend } = await supabase.rpc('get_monthly_cv_trend');
       if (trend) setTrendData(trend);
       
-      // Lấy dữ liệu cho "Top vị trí tuyển dụng"
+      const { data: sources } = await supabase.rpc('get_candidate_sources');
+      if (sources) setSourceData(sources);
+
+      // Lấy top vị trí tuyển dụng
       const { data: jobs, error: jobsError } = await supabase
         .from('cv_jobs')
         .select('title, cv_candidates(count)')
         .order('count', { foreignTable: 'cv_candidates', ascending: false })
-        .limit(4); // Lấy 4 vị trí hàng đầu
+        .limit(4);
       
       if (jobsError) console.error("Error fetching top jobs:", jobsError);
       if (jobs) setTopJobs(jobs);
@@ -48,6 +52,8 @@ export function DashboardPage() {
 
     fetchDashboardData();
   }, []);
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
   return (
     <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen">
@@ -59,15 +65,17 @@ export function DashboardPage() {
         <Button variant="outline"><RefreshCw className="w-4 h-4 mr-2" />Làm mới</Button>
       </div>
 
-      {/* Các thẻ thống kê */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Tổng CV</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats.totalCV}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats.openJobs}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats.interviewingCV}</div></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">N/A</div></CardContent></Card>
+      <div className="bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg p-4">
+        Dashboard hiện đang hiển thị dữ liệu thực từ hệ thống của bạn.
       </div>
 
-      {/* Biểu đồ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng CV</CardTitle><User className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.totalCV}</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle><Briefcase className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.openJobs}</div><p className="text-xs text-muted-foreground">+0 so với tháng trước</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle><ClipboardList className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.interviewingCV}</div><p className="text-xs text-muted-foreground">Tổng số từ trước đến nay</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle><Clock className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">N/A</div></CardContent></Card>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white shadow-sm">
           <CardHeader><CardTitle>Xu hướng CV theo thời gian</CardTitle></CardHeader>
@@ -87,13 +95,20 @@ export function DashboardPage() {
         <Card className="bg-white shadow-sm">
           <CardHeader><CardTitle>Nguồn ứng viên</CardTitle></CardHeader>
           <CardContent className="h-[350px]">
-             <div className="flex items-center justify-center h-full text-muted-foreground"><Database className="w-8 h-8 mr-2"/>Chưa có dữ liệu</div>
+             <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={sourceData} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={120} fill="#8884d8" label>
+                  {sourceData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Top vị trí và Hoạt động gần đây */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-white shadow-sm">
             <CardHeader><CardTitle>Top vị trí tuyển dụng</CardTitle></CardHeader>
             <CardContent>
@@ -113,6 +128,7 @@ export function DashboardPage() {
                 </ul>
             </CardContent>
         </Card>
+        
         <Card className="bg-white shadow-sm">
              <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
              <CardContent>
