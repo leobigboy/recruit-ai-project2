@@ -15,7 +15,7 @@ import ForgotPasswordPage from "./pages/forgot-password";
 
 // Additional pages
 import { ReviewsPage } from "./pages/ReviewsPage";
-import EmailManagementPage from "./pages/EmailManagementPage";
+import { EmailManagementPage } from "./pages/EmailManagementPage"
 import { SettingsPage } from "./pages/SettingsPage";
 
 // New pages
