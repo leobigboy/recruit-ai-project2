@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Building2, Bot, Mail, Bell, FolderTree, Users, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CompanySettings } from "@/components/settings/CompanySettings"
-import { AiSettings } from "@/components/settings/AiSettings"
+import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
 
 const tabs = [
