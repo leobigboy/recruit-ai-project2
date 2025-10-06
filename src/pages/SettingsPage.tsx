@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { CompanySettings } from "@/components/settings/CompanySettings"
 import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
-
+import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { EmailSettings } from "@/components/settings/EmailSettings";
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
   { id: "ai", label: "AI", icon: Bot },
@@ -91,6 +92,8 @@ export function SettingsPage() {
         <div>
           {activeTab === "company" && <CompanySettings profile={profile} handleInputChange={handleInputChange} />}
           {activeTab === "ai" && <AiSettings />}
+          {activeTab === "notifications" && <NotificationSettings />}
+          {activeTab === "email" && <EmailSettings />}
         </div>
         
         <div className="flex justify-end pt-4">
