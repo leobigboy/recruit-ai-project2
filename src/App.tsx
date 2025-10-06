@@ -7,6 +7,7 @@ import { CandidatesPage } from "./pages/CandidatesPage";
 import { InterviewsPage } from "./pages/InterviewsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { EmailPage } from "./pages/EmailPage"
 const router = createBrowserRouter([
   {
     path: "/",
@@ -33,9 +34,14 @@ const router = createBrowserRouter([
         element: <ReviewsPage />
       },
       {
+        path: "quan-ly-email",
+        element: <EmailPage />
+      },
+      {
         path: "cai-dat",
         element: <SettingsPage />
-      }
+      },
+      
     ],
   },
 ]);
