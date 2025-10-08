@@ -211,7 +211,7 @@ const AiSettings = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="bg-white border-blue-300 text-blue-700 hover:bg-blue-100 whitespace-nowrap"
+                className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50 whitespace-nowrap"
                 onClick={() => {
                   setConfig(prev => ({
                     ...prev,
@@ -224,34 +224,36 @@ const AiSettings = () => {
             </div>
           </div>
 
-          {/* Enable Gemini AI */}
-          <div className="flex items-center justify-between py-2">
-            <div className="space-y-0.5">
-              <Label htmlFor="gemini_enabled" className="text-sm font-semibold">
-                Kích hoạt Gemini AI
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Bật/tắt tính năng AI Job Matching với Gemini
-              </p>
-            </div>
-            <Switch
-              id="gemini_enabled"
-              checked={config.gemini_enabled || false}
-              onCheckedChange={(checked) => handleInputChange('gemini_enabled', checked)}
-              className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
-            />
-          </div>
         </div>
       </div>
 
-      {/* Enable OpenAI */}
-      <div className="space-y-2 pb-6">
-        <div className="flex items-center justify-between py-2">
-          <div className="space-y-0.5">
-            <Label htmlFor="openai_enabled" className="text-sm font-semibold">
+      {/* Enable/Disable Switches */}
+      <div className="space-y-6 pt-6">
+        {/* Enable Gemini AI */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <Label htmlFor="gemini_enabled" className="text-base font-semibold">
+              Kích hoạt Gemini AI
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Bật/tắt tính năng AI Job Matching với Gemini
+            </p>
+          </div>
+          <Switch
+            id="gemini_enabled"
+            checked={config.gemini_enabled || false}
+            onCheckedChange={(checked) => handleInputChange('gemini_enabled', checked)}
+            className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300"
+          />
+        </div>
+
+        {/* Enable OpenAI */}
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <Label htmlFor="openai_enabled" className="text-base font-semibold">
               Kích hoạt OpenAI
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Bật/tắt các tính năng OpenAI trong hệ thống
             </p>
           </div>
@@ -259,7 +261,7 @@ const AiSettings = () => {
             id="openai_enabled"
             checked={config.openai_enabled || false}
             onCheckedChange={(checked) => handleInputChange('openai_enabled', checked)}
-            className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-gray-300"
+            className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300"
           />
         </div>
       </div>
@@ -274,6 +276,139 @@ const AiSettings = () => {
           <Sparkles className="h-4 w-4 mr-2" />
           {saving ? 'Đang lưu...' : 'Lưu cài đặt AI'}
         </Button>
+      </div>
+
+      {/* AI Services Status */}
+      <div className="mt-8 space-y-4">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="h-5 w-5 text-green-600" />
+          <h3 className="text-lg font-semibold">Trạng thái AI Services</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Tổng quan tình trạng cấu hình các dịch vụ AI
+        </p>
+
+        {/* Service Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          {/* OpenAI Card */}
+          <div className="border rounded-lg p-4 bg-white">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <Sparkles className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">OpenAI</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    AI Evaluation, Phân tích CV, Tạo câu hỏi phỏng vấn
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground bg-gray-100 px-2 py-1 rounded">
+                Chưa cấu hình
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-3">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-xs text-muted-foreground">Đã kích hoạt</span>
+            </div>
+          </div>
+
+          {/* Gemini AI Card */}
+          <div className="border rounded-lg p-4 bg-white">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="text-white font-semibold text-sm">G</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold">Gemini AI</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    AI Job Matching, Phân tích độ phù hợp CV-JD
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-medium">
+                Đã cấu hình
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-3">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-xs text-muted-foreground">Đã kích hoạt</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Test Features */}
+        <div className="mt-6 space-y-3">
+          <h4 className="font-semibold">Test tính năng</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Button 
+              variant="outline" 
+              className="justify-center"
+              disabled={!config.openai_api_key}
+            >
+              <Sparkles className="h-4 w-4 mr-2 text-gray-400" />
+              Test OpenAI
+            </Button>
+            <Button 
+              variant="outline" 
+              className="justify-center text-blue-600 border-blue-200 hover:bg-blue-50"
+              disabled={!config.gemini_api_key}
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2 text-blue-600" />
+              Test Gemini AI
+            </Button>
+          </div>
+        </div>
+
+        {/* Configuration Details */}
+        <div className="mt-6 space-y-3">
+          <h4 className="font-semibold">Chi tiết cấu hình</h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-muted-foreground">OpenAI API Key:</span>
+              <span className="text-muted-foreground">
+                {config.openai_api_key ? config.openai_api_key.substring(0, 7) + '...' : 'Chưa cấu hình'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-muted-foreground">Gemini API Key:</span>
+              <span className="text-blue-600">
+                {config.gemini_api_key ? config.gemini_api_key.substring(0, 4) + '••••••••••••••••••••••••••••' + config.gemini_api_key.substring(config.gemini_api_key.length - 4) : 'Chưa cấu hình'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Available AI Features */}
+        <div className="mt-8 space-y-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <h3 className="text-lg font-semibold">Tính năng AI có sẵn</h3>
+          </div>
+
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center justify-between py-3 border-b">
+              <span className="font-medium">Đánh giá ứng viên với AI</span>
+              <span className="text-xs text-muted-foreground bg-gray-100 px-3 py-1 rounded">
+                Chưa cấu hình
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b">
+              <span className="font-medium">Phân tích CV tự động</span>
+              <span className="text-xs text-muted-foreground bg-gray-100 px-3 py-1 rounded">
+                Chưa cấu hình
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b">
+              <span className="font-medium">Gợi ý JD thông minh</span>
+              <span className="text-xs text-muted-foreground bg-gray-100 px-3 py-1 rounded">
+                Chưa cấu hình
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
