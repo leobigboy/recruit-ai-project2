@@ -28,3 +28,37 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
+
+/* Style cho Switch */
+.switch[data-state="checked"] {
+  background-color: #22c55e; /* Màu xanh lá (bg-green-500) */
+}
+
+.switch[data-state="unchecked"] {
+  background-color: #d1d5db; /* Màu xám nhạt (bg-gray-300) */
+}
+
+/* Style cho thumb (nút trượt) */
+.switch[data-state="checked"] [data-radix-switch-thumb] {
+  background-color: #ffffff; /* Màu trắng cho thumb khi bật */
+}
+
+.switch[data-state="unchecked"] [data-radix-switch-thumb] {
+  background-color: #9ca3af; /* Màu xám đậm (gray-400) cho thumb khi tắt */
+}
+
+/* Đảm bảo switch có kích thước và hình dạng rõ ràng */
+.switch {
+  width: 42px;
+  height: 24px;
+  border-radius: 9999px; /* Bo góc tròn */
+  position: relative;
+}
+
+/* Đảm bảo thumb có kích thước và chuyển động mượt mà */
+.switch [data-radix-switch-thumb] {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  transition: transform 0.2s ease-in-out;
+}
