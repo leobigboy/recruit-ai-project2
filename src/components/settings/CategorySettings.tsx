@@ -55,9 +55,10 @@ type Category = {
 type CategoryItem = {
   id: string
   category_id: string
-  items: string
-  created_at?: string
-  updated_at?: string
+  name: string
+  slug: string
+  sort_order?: number
+  is_active?: boolean
 }
 
 export default function CategorySettingsPage() {
@@ -88,6 +89,7 @@ export default function CategorySettingsPage() {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('cv_categories')
         .select('*')
+        .eq('is_active', true)
         .order('sort_order', { ascending: true })
 
       if (categoriesError) throw categoriesError
@@ -95,25 +97,21 @@ export default function CategorySettingsPage() {
       const validCats = cats.filter((c) => c && c.id)
       setCategories(validCats)
 
-      // fetch items only for valid ids
-      const categoryIds = validCats.map(c => c.id).filter(Boolean)
-      let itemsData: CategoryItem[] = []
-      if (categoryIds.length > 0) {
-        const { data: itemsRes, error: itemsError } = await supabase
-          .from('cv_categories_with_items')
-          .select('*')
-          .in('category_id', categoryIds)
+      // fetch items from cv_items table
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('cv_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
 
-        if (itemsError) throw itemsError
-        itemsData = (itemsRes || []) as CategoryItem[]
-      }
+      if (itemsError) throw itemsError
 
       // group items by category_id
       const grouped: Record<string, CategoryItem[]> = {}
-      for (const it of itemsData) {
-        if (!it || !it.category_id) continue
-        if (!grouped[it.category_id]) grouped[it.category_id] = []
-        grouped[it.category_id].push(it)
+      for (const item of (itemsData || [])) {
+        if (!item || !item.category_id) continue
+        if (!grouped[item.category_id]) grouped[item.category_id] = []
+        grouped[item.category_id].push(item as CategoryItem)
       }
       setItemsByCategory(grouped)
 
@@ -146,23 +144,36 @@ export default function CategorySettingsPage() {
     setSaving(true)
     setError(null)
     try {
+      // Generate slug from name
+      const slug = name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+
       const payload = {
         category_id: selectedCategory.id,
-        items: name,
+        name: name,
+        slug: slug,
+        sort_order: items.length + 1,
       }
 
       const { data, error } = await supabase
-        .from('cv_categories_with_items')
+        .from('cv_items')
         .insert([payload])
         .select()
 
       if (error) throw error
       const inserted = (data && data[0]) ? (data[0] as CategoryItem) : null
 
-      setItemsByCategory(prev => {
-        const prevList = prev[selectedCategory.id] || []
-        return { ...prev, [selectedCategory.id]: inserted ? [...prevList, inserted] : prevList }
-      })
+      if (inserted) {
+        setItemsByCategory(prev => {
+          const prevList = prev[selectedCategory.id] || []
+          return { ...prev, [selectedCategory.id]: [...prevList, inserted] }
+        })
+      }
       setNewItemName("")
     } catch (err: any) {
       console.error("Add item error:", err)
@@ -181,7 +192,7 @@ export default function CategorySettingsPage() {
     setError(null)
     try {
       const { error } = await supabase
-        .from('cv_categories_with_items')
+        .from('cv_items')
         .delete()
         .eq('id', itemId)
 
@@ -202,14 +213,14 @@ export default function CategorySettingsPage() {
   // export CSV
   const handleExport = async () => {
     try {
-      const rows: string[] = ["category_id,category_name,item_id,item_value"]
+      const rows: string[] = ["category_id,category_name,item_id,item_name,item_slug"]
       for (const cat of categories) {
         const list = itemsByCategory[cat.id] || []
         if (list.length === 0) {
-          rows.push(`${cat.id},"${cat.name}",,`)
+          rows.push(`${cat.id},"${cat.name}",,,`)
         } else {
           for (const it of list) {
-            rows.push(`${cat.id},"${cat.name}",${it.id},"${(it.items || '').replace(/"/g, '""')}"`)
+            rows.push(`${cat.id},"${cat.name}",${it.id},"${(it.name || '').replace(/"/g, '""')}","${it.slug}"`)
           }
         }
       }
@@ -245,7 +256,7 @@ export default function CategorySettingsPage() {
 
           {/* Error message */}
           {error && (
-            <div className="mb-4 text-sm text-red-600">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
               {error}
             </div>
           )}
@@ -258,17 +269,11 @@ export default function CategorySettingsPage() {
                 <SelectValue placeholder={loading ? "Đang tải..." : "Chọn danh mục"} />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((category) => {
-                  const Icon = iconMap[category.icon || ""]
-                  return (
-                    <SelectItem key={category.id} value={category.id}>
-                      <div className="flex items-center gap-2">
-                        {Icon && <Icon className="h-4 w-4" />}
-                        <span>{category.name}</span>
-                      </div>
-                    </SelectItem>
-                  )
-                })}
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -328,14 +333,17 @@ export default function CategorySettingsPage() {
                 items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-2 border-b border-gray-200"
+                    className="flex items-center justify-between py-2 px-3 border border-gray-200 rounded-lg hover:bg-gray-50"
                   >
-                    <span className="text-sm text-gray-900">{item.items}</span>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">({item.slug})</span>
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteItem(item.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
                       disabled={saving || loading}
                     >
                       <Trash2 className="h-4 w-4" />
