@@ -9,6 +9,7 @@ import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
+
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
   { id: "ai", label: "AI", icon: Bot },
@@ -30,8 +31,6 @@ interface CompanyProfile {
 
 export function SettingsPage() {
   const [activeTab, setActiveTab] = useState("company");
-  
-  // --- BỔ SUNG PHẦN CÒN THIẾU ---
   const [profile, setProfile] = useState<CompanyProfile>({});
   const [loading, setLoading] = useState(true);
 
@@ -52,13 +51,17 @@ export function SettingsPage() {
   };
 
   const handleSave = async () => {
+    // Chỉ lưu cho tab Company, các tab khác có nút lưu riêng
+    if (activeTab !== "company") {
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.from('cv_company_profile').upsert({ ...profile, id: profile.id || undefined });
     setLoading(false);
     if (error) alert("Lỗi! Không thể lưu thay đổi.");
     else alert("Đã lưu thay đổi thành công!");
   };
-  // --- KẾT THÚC PHẦN BỔ SUNG ---
   
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8">
@@ -96,11 +99,14 @@ export function SettingsPage() {
           {activeTab === "email" && <EmailSettings />}
         </div>
         
-        <div className="flex justify-end pt-4">
-          <Button size="lg" onClick={handleSave} disabled={loading}>
-            {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
-          </Button>
-        </div>
+        {/* Chỉ hiển thị nút Save cho tab Company */}
+        {activeTab === "company" && (
+          <div className="flex justify-end pt-4">
+            <Button size="lg" onClick={handleSave} disabled={loading}>
+              {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
