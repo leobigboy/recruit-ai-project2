@@ -52,7 +52,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 h-screen bg-white shadow-md flex flex-col p-4 fixed">
+    <aside className="w-64 h-screen bg-white shadow-md flex flex-col p-4 fixed z-10">
       <div className="px-4 py-2 mb-4">
         <h1 className="text-xl font-bold text-blue-600">Recruit AI</h1>
         <p className="text-xs text-gray-500">Hệ thống quản lý tuyển dụng</p>
