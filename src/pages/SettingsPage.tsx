@@ -9,12 +9,14 @@ import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
+import { CategoryPage } from "@/components/settings/CategorySettings";
+
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
   { id: "ai", label: "AI", icon: Bot },
   { id: "email", label: "Email", icon: Mail },
   { id: "notifications", label: "Thông báo", icon: Bell },
-  { id: "categories", label: "Danh mục", icon: FolderTree },
+  { id: "category", label: "Danh mục", icon: FolderTree }, // changed id to `category`
   { id: "users", label: "Người dùng", icon: Users },
   { id: "permissions", label: "Phân quyền", icon: Shield },
 ]
@@ -94,6 +96,8 @@ export function SettingsPage() {
           {activeTab === "ai" && <AiSettings />}
           {activeTab === "notifications" && <NotificationSettings />}
           {activeTab === "email" && <EmailSettings />}
+          {activeTab === "category" && <CategoryPage />} {/* render CategoryPage when tab is `category` */}
+
         </div>
         
         <div className="flex justify-end pt-4">
@@ -105,3 +109,5 @@ export function SettingsPage() {
     </div>
   )
 }
+
+export default SettingsPage

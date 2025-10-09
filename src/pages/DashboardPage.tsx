@@ -12,7 +12,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // Dữ liệu mẫu
 const recentActivitiesData = [
-    { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
+  { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
 ];
 
 export function DashboardPage() {
@@ -39,17 +39,17 @@ export function DashboardPage() {
       const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
       const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
       const { count: interviewingCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true }).eq('status', 'Phỏng vấn');
-      setStats({ 
-        totalCV: totalCV || 0, 
-        openJobs: openJobs || 0, 
-        interviewingCV: interviewingCV || 0 
+      setStats({
+        totalCV: totalCV || 0,
+        openJobs: openJobs || 0,
+        interviewingCV: interviewingCV || 0
       });
 
       // Gọi các hàm PostgreSQL đã tạo
       const { data: trend, error: trendError } = await supabase.rpc('get_monthly_cv_trend');
       if (trendError) console.error("Error fetching trend:", trendError);
       if (trend) setTrendData(trend as TrendData[]);
-      
+
       const { data: sources, error: sourcesError } = await supabase.rpc('get_candidate_sources');
       if (sourcesError) console.error("Error fetching sources:", sourcesError);
       if (sources && sources.length > 0) {
@@ -69,7 +69,7 @@ export function DashboardPage() {
         .select('title, cv_candidates(count)')
         .order('count', { foreignTable: 'cv_candidates', ascending: false })
         .limit(4);
-      
+
       if (jobsError) console.error("Error fetching top jobs:", jobsError);
       if (jobs) setTopJobs(jobs);
     } catch (error) {
@@ -107,13 +107,9 @@ export function DashboardPage() {
           <h1 className="text-2xl font-bold">Bảng điều khiển</h1>
           <p className="text-sm text-muted-foreground">Tổng quan hệ thống</p>
         </div>
-<<<<<<< HEAD
-        <Button variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-=======
+
         <Button variant="outline" onClick={fetchDashboardData} disabled={loading}>
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
->>>>>>> origin/Hậu2
           Làm mới
         </Button>
       </div>
