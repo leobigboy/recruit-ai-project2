@@ -9,18 +9,14 @@ import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
-<<<<<<< HEAD
 import CategorySettingsPage from "@/components/settings/CategorySettings"
-
-=======
->>>>>>> origin/Hậu2
 
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
   { id: "ai", label: "AI", icon: Bot },
   { id: "email", label: "Email", icon: Mail },
   { id: "notifications", label: "Thông báo", icon: Bell },
-  { id: "category", label: "Danh mục", icon: FolderTree }, // changed id to `category`
+  { id: "category", label: "Danh mục", icon: FolderTree },
   { id: "users", label: "Người dùng", icon: Users },
   { id: "permissions", label: "Phân quyền", icon: Shield },
 ]
