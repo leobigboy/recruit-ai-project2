@@ -17,6 +17,7 @@ import ForgotPasswordPage from "./pages/forgot-password";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { EmailManagementPage } from "./pages/EmailManagementPage"
 import { SettingsPage } from "./pages/SettingsPage";
+<<<<<<< HEAD
 
 // New pages
 import AIToolsPage from "./pages/AI/AIToolsPage";
@@ -34,6 +35,9 @@ const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
   return <>{children ?? <Outlet />}</>;
 };
 
+=======
+import { EmailPage } from "./pages/EmailPage"
+>>>>>>> origin/Hậu2
 const router = createBrowserRouter([
   // Root redirect -> login
   {
@@ -55,6 +59,7 @@ const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
+<<<<<<< HEAD
       { index: true, element: <DashboardPage /> }, // /app
       { path: "mo-ta-cong-viec", element: <JobsPage /> },
       { path: "ung-vien", element: <CandidatesPage /> },
@@ -67,6 +72,37 @@ const router = createBrowserRouter([
       // ✅ New pages
       { path: "ai", element: <AIToolsPage /> },       // /app/ai
       { path: "offers", element: <OffersPage /> },   // /app/offers
+=======
+      {
+        index: true,
+        element: <DashboardPage />,
+      },
+      {
+        path: "mo-ta-cong-viec",
+        element: <JobsPage />,
+      },
+      { 
+        path: "ung-vien", 
+        element: <CandidatesPage />
+      },
+      { 
+        path: "lich-phong-van", 
+        element: <InterviewsPage /> 
+      },
+      { 
+        path: "danh-gia",
+        element: <ReviewsPage />
+      },
+      {
+        path: "quan-ly-email",
+        element: <EmailPage />
+      },
+      {
+        path: "cai-dat",
+        element: <SettingsPage />
+      },
+      
+>>>>>>> origin/Hậu2
     ],
   },
 
