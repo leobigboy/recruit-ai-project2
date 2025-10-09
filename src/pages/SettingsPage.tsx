@@ -9,7 +9,8 @@ import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
-import { CategoryPage } from "@/components/settings/CategorySettings";
+import CategorySettingsPage from "@/components/settings/CategorySettings"
+
 
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
@@ -96,7 +97,7 @@ export function SettingsPage() {
           {activeTab === "ai" && <AiSettings />}
           {activeTab === "notifications" && <NotificationSettings />}
           {activeTab === "email" && <EmailSettings />}
-          {activeTab === "category" && <CategoryPage />} {/* render CategoryPage when tab is `category` */}
+          {activeTab === "category" && <CategorySettingsPage />}
 
         </div>
         

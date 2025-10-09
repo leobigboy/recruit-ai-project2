@@ -47,18 +47,12 @@ export function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Lấy dữ liệu cho các thẻ thống kê
+      // Đếm tổng CV
       const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
+      // Đếm vị trí đang đăng (status = 'Đã đăng')
       const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
-<<<<<<< HEAD
-      const { count: interviewingCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true }).eq('status', 'Phỏng vấn');
-      setStats({
-        totalCV: totalCV || 0,
-        openJobs: openJobs || 0,
-        interviewingCV: interviewingCV || 0
-=======
       
-      // Lấy thống kê lịch phỏng vấn
+      // Lấy thống kê lịch phỏng vấn (thông qua RPC nếu có)
       const { data: interviewStats, error: interviewError } = await supabase.rpc('get_interview_stats');
       if (interviewError) console.error("Error fetching interview stats:", interviewError);
       
@@ -74,10 +68,9 @@ export function DashboardPage() {
         openJobs: openJobs || 0, 
         interviewingCV: Number(interviewData.total_interviews) || 0,
         interviewingChange: Number(interviewData.percentage_change) || 0
->>>>>>> origin/Hậu2
       });
 
-      // Gọi các hàm PostgreSQL đã tạo
+      // Gọi các hàm PostgreSQL đã tạo cho xu hướng và nguồn
       const { data: trend, error: trendError } = await supabase.rpc('get_monthly_cv_trend');
       if (trendError) console.error("Error fetching trend:", trendError);
       if (trend) setTrendData(trend as TrendData[]);
@@ -95,11 +88,10 @@ export function DashboardPage() {
         ]);
       }
 
-      // Lấy top vị trí tuyển dụng
+      // Lấy top vị trí tuyển dụng (cố gắng lấy số lượng ứng viên cho mỗi job nếu view/relationship có sẵn)
       const { data: jobs, error: jobsError } = await supabase
         .from('cv_jobs')
         .select('title, cv_candidates(count)')
-        .order('count', { foreignTable: 'cv_candidates', ascending: false })
         .limit(4);
 
       if (jobsError) console.error("Error fetching top jobs:", jobsError);
@@ -151,88 +143,56 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-<<<<<<< HEAD
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Tổng số</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.totalCV}</div>
-                  <p className="text-xs text-blue-600 font-medium">+8%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100">
-                <User className="w-6 h-6 text-blue-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng CV</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCV}</div>
+            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Đang chờ</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.openJobs}</div>
-                  <p className="text-xs text-yellow-600 font-medium">+3%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.openJobs}</div>
+            <p className="text-xs text-muted-foreground">+0 so với tháng trước</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Hoàn thành</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.interviewingCV}</div>
-                  <p className="text-xs text-green-600 font-medium">+12%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-green-100">
-                <ClipboardList className="w-6 h-6 text-green-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.interviewingCV}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.interviewingChange > 0 ? (
+                <span className="text-green-600">+{stats.interviewingChange}%</span>
+              ) : stats.interviewingChange < 0 ? (
+                <span className="text-red-600">{stats.interviewingChange}%</span>
+              ) : (
+                <span>0%</span>
+              )} so với tháng trước
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Đã hủy</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">0</div>
-                  <p className="text-xs text-red-600 font-medium">-5%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-red-100">
-                <Briefcase className="w-6 h-6 text-red-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">N/A</div>
           </CardContent>
         </Card>
-=======
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng CV</CardTitle><User className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.totalCV}</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle><Briefcase className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.openJobs}</div><p className="text-xs text-muted-foreground">+0 so với tháng trước</p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle><ClipboardList className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.interviewingCV}</div><p className="text-xs text-muted-foreground">
-          {stats.interviewingChange > 0 ? (
-            <span className="text-green-600">+{stats.interviewingChange}%</span>
-          ) : stats.interviewingChange < 0 ? (
-            <span className="text-red-600">{stats.interviewingChange}%</span>
-          ) : (
-            <span>0%</span>
-          )} so với tháng trước
-        </p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle><Clock className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">N/A</div></CardContent></Card>
->>>>>>> origin/Hậu2
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -312,7 +272,7 @@ export function DashboardPage() {
           <CardContent>
             <ul className="space-y-4">
               {topJobs.length > 0 ? topJobs.map((job, index) => (
-                <li key={job.title} className="flex items-center justify-between gap-4">
+                <li key={job.title ?? index} className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-bold text-gray-600">
                       {index + 1}
@@ -320,7 +280,7 @@ export function DashboardPage() {
                     <div>
                       <p className="font-semibold">{job.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {job.cv_candidates[0]?.count || 0} ứng viên
+                        {Array.isArray(job.cv_candidates) ? (job.cv_candidates[0]?.count || 0) : 0} ứng viên
                       </p>
                     </div>
                   </div>
@@ -359,3 +319,5 @@ export function DashboardPage() {
     </div>
   );
 }
+
+export default DashboardPage;

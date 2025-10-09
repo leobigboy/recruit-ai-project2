@@ -1,451 +1,392 @@
-// src/pages/Category.tsx
-import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { Trash2, Edit2, Plus, Search, Filter, ChevronDown, X, Check } from 'lucide-react';
+"use client"
 
-interface CategoryItem {
-  category_id: string;
-  category_name: string;
-  category_type: string;
-  category_slug: string;
-  icon: string;
-  icon_color: string;
-  item_count: number;
-  sort_order: number;
-  items: any;
-  created_at?: string;
-  updated_at?: string;
+import { useEffect, useState } from "react"
+import {
+  TrendingUp,
+  Star,
+  Building,
+  Zap,
+  Mic,
+  Briefcase,
+  MapPin,
+  Target,
+  GraduationCap,
+  Users,
+  AlertTriangle,
+  Building2,
+  Plus,
+  Trash2,
+  Download,
+  Upload,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { supabase } from '@/lib/supabaseClient'
+
+// Icon mapping
+const iconMap: Record<string, any> = {
+  "trending-up": TrendingUp,
+  star: Star,
+  building: Building,
+  zap: Zap,
+  mic: Mic,
+  briefcase: Briefcase,
+  "map-pin": MapPin,
+  target: Target,
+  "graduation-cap": GraduationCap,
+  users: Users,
+  "alert-triangle": AlertTriangle,
+  "building-2": Building2,
 }
 
-interface CategoryWithItems {
-  category_id: string;
-  category_name: string;
-  category_type: string;
-  category_slug: string;
-  icon: string;
-  icon_color: string;
-  created_at?: string;
-  updated_at?: string;
+type Category = {
+  id: string
+  name: string
+  type?: string
+  slug?: string
+  icon?: string
+  icon_color?: string
+  sort_order?: number
 }
 
-export const CategoryPage: React.FC = () => {
-  const [categories, setCategories] = useState<CategoryItem[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<CategoryItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('vi-tri-cong-viec');
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isAddingItem, setIsAddingItem] = useState<string | false>(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  
-  // Form states
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newItemName, setNewItemName] = useState('');
-  const [editingItem, setEditingItem] = useState<{id: string, name: string, categoryId: string} | null>(null);
+type CategoryItem = {
+  id: string
+  category_id: string
+  items: string
+  created_at?: string
+  updated_at?: string
+}
 
-  // Predefined category types
-  const categoryTypes = [
-    { value: 'vi-tri-cong-viec', label: 'Vị trí công việc', icon: '💼' },
-    { value: 'cap-do-kinh-nghiem', label: 'Cấp độ kinh nghiệm', icon: '📊' },
-    { value: 'phong-ban', label: 'Phòng ban', icon: '🏢' },
-    { value: 'dia-diem-lam-viec', label: 'Địa điểm làm việc', icon: '📍' },
-    { value: 'loai-hinh-cong-viec', label: 'Loại hình công việc', icon: '📋' },
-    { value: 'ky-nang', label: 'Kỹ năng', icon: '🎯' },
-    { value: 'nguon-ung-vien', label: 'Nguồn ứng viên', icon: '👥' },
-    { value: 'loai-hinh-cong-ty', label: 'Loại hình công ty', icon: '🏢' },
-    { value: 'truong-dai-hoc', label: 'Trường đại học', icon: '🎓' },
-    { value: 'muc-do-uu-tien', label: 'Mức độ ưu tiên', icon: '⚡' }
-  ];
+export default function CategorySettingsPage() {
+  // state
+  const [categories, setCategories] = useState<Category[]>([])
+  const [itemsByCategory, setItemsByCategory] = useState<Record<string, CategoryItem[]>>({})
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [newItemName, setNewItemName] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // derived
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId) || null
+  const items = selectedCategory ? (itemsByCategory[selectedCategory.id] || []) : []
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    fetchAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  useEffect(() => {
-    filterCategories();
-  }, [selectedCategory, categories]);
-
-  const fetchCategories = async () => {
+  // fetch categories and their items from Supabase
+  const fetchAll = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      setLoading(true);
-      
-      // Fetch all categories with items
+      // fetch categories
       const { data: categoriesData, error: categoriesError } = await supabase
-        .from('cv_categories_with_items')
+        .from('cv_categories')
         .select('*')
-        .order('category_name');
+        .order('sort_order', { ascending: true })
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) throw categoriesError
+      let cats = (categoriesData || []) as Category[]
+      const validCats = cats.filter((c) => c && c.id)
+      setCategories(validCats)
 
-      // Group items by category
-      const groupedData: { [key: string]: CategoryItem } = {};
-      
-      categoriesData?.forEach((item: CategoryWithItems & { items: any }) => {
-        const categoryKey = item.category_id;
-        
-        if (!groupedData[categoryKey]) {
-          groupedData[categoryKey] = {
-            category_id: item.category_id,
-            category_name: item.category_name,
-            category_type: item.category_type,
-            category_slug: item.category_slug,
-            icon: item.icon || '📁',
-            icon_color: item.icon_color || '#6B7280',
-            item_count: 0,
-            sort_order: 0,
-            items: []
-          };
-        }
-        
-        if (item.items) {
-          groupedData[categoryKey].items.push(item.items);
-          groupedData[categoryKey].item_count++;
-        }
-      });
+      // fetch items only for valid ids
+      const categoryIds = validCats.map(c => c.id).filter(Boolean)
+      let itemsData: CategoryItem[] = []
+      if (categoryIds.length > 0) {
+        const { data: itemsRes, error: itemsError } = await supabase
+          .from('cv_categories_with_items')
+          .select('*')
+          .in('category_id', categoryIds)
 
-      const categoriesArray = Object.values(groupedData);
-      setCategories(categoriesArray);
-      
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+        if (itemsError) throw itemsError
+        itemsData = (itemsRes || []) as CategoryItem[]
+      }
+
+      // group items by category_id
+      const grouped: Record<string, CategoryItem[]> = {}
+      for (const it of itemsData) {
+        if (!it || !it.category_id) continue
+        if (!grouped[it.category_id]) grouped[it.category_id] = []
+        grouped[it.category_id].push(it)
+      }
+      setItemsByCategory(grouped)
+
+      // set default selected if none
+      if (!selectedCategoryId && validCats.length > 0) {
+        const defaultCat = validCats.find(c => c.name === "Vị trí công việc") || validCats[0]
+        setSelectedCategoryId(defaultCat.id)
+      }
+    } catch (err: any) {
+      console.error("Fetch categories/items error:", err)
+      setError(err?.message || "Lỗi khi tải dữ liệu")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  const filterCategories = () => {
-    let filtered = categories.filter(cat => cat.category_type === selectedCategory);
-    
-    if (searchTerm) {
-      filtered = filtered.filter(cat => 
-        cat.category_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cat.items?.some((item: any) => 
-          item.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }
-    
-    setFilteredCategories(filtered);
-  };
+  // change selection
+  const handleCategoryChange = (categoryId: string) => {
+    if (!categoryId) return
+    setSelectedCategoryId(categoryId)
+    setNewItemName("")
+  }
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    
+  // add an item (writes to supabase then updates local state)
+  const handleAddItem = async () => {
+    if (!selectedCategory) return
+    const name = newItemName.trim()
+    if (!name) return
+
+    setSaving(true)
+    setError(null)
     try {
-      const newCategory = {
-        category_name: newCategoryName,
-        category_type: selectedCategory,
-        category_slug: selectedCategory,
-        icon: categoryTypes.find(ct => ct.value === selectedCategory)?.icon || '📁',
-        icon_color: '#6B7280'
-      };
+      const payload = {
+        category_id: selectedCategory.id,
+        items: name,
+      }
 
-      const { error } = await supabase
-        .from('cv_categories')
-        .insert([newCategory]);
-
-      if (error) throw error;
-
-      setNewCategoryName('');
-      setIsAddingCategory(false);
-      fetchCategories();
-    } catch (error) {
-      console.error('Error adding category:', error);
-    }
-  };
-
-  const handleAddItem = async (categoryId: string) => {
-    if (!newItemName.trim()) return;
-    
-    try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('cv_categories_with_items')
-        .insert([{
-          category_id: categoryId,
-          items: newItemName
-        }]);
+        .insert([payload])
+        .select()
 
-      if (error) throw error;
+      if (error) throw error
+      const inserted = (data && data[0]) ? (data[0] as CategoryItem) : null
 
-      setNewItemName('');
-      setIsAddingItem(false);
-      fetchCategories();
-    } catch (error) {
-      console.error('Error adding item:', error);
+      setItemsByCategory(prev => {
+        const prevList = prev[selectedCategory.id] || []
+        return { ...prev, [selectedCategory.id]: inserted ? [...prevList, inserted] : prevList }
+      })
+      setNewItemName("")
+    } catch (err: any) {
+      console.error("Add item error:", err)
+      setError(err?.message || "Lỗi khi thêm mục")
+    } finally {
+      setSaving(false)
     }
-  };
+  }
 
-  const handleUpdateItem = async () => {
-    if (!editingItem || !editingItem.name.trim()) return;
-    
-    try {
-      const { error } = await supabase
-        .from('cv_categories_with_items')
-        .update({ items: editingItem.name })
-        .eq('category_id', editingItem.categoryId)
-        .eq('items', editingItem.id);
+  // delete item (confirmation + supabase + local update)
+  const handleDeleteItem = async (itemId: string) => {
+    if (!selectedCategory) return
+    if (!confirm("Bạn có chắc chắn muốn xóa mục này?")) return
 
-      if (error) throw error;
-
-      setEditingItem(null);
-      fetchCategories();
-    } catch (error) {
-      console.error('Error updating item:', error);
-    }
-  };
-
-  const handleDeleteItem = async (categoryId: string, itemName: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa "${itemName}"?`)) return;
-    
+    setSaving(true)
+    setError(null)
     try {
       const { error } = await supabase
         .from('cv_categories_with_items')
         .delete()
-        .eq('category_id', categoryId)
-        .eq('items', itemName);
+        .eq('id', itemId)
 
-      if (error) throw error;
+      if (error) throw error
 
-      fetchCategories();
-    } catch (error) {
-      console.error('Error deleting item:', error);
+      setItemsByCategory(prev => {
+        const prevList = prev[selectedCategory.id] || []
+        return { ...prev, [selectedCategory.id]: prevList.filter(i => i.id !== itemId) }
+      })
+    } catch (err: any) {
+      console.error("Delete item error:", err)
+      setError(err?.message || "Lỗi khi xóa mục")
+    } finally {
+      setSaving(false)
     }
-  };
+  }
 
-  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${categoryName}" và tất cả các mục con?`)) return;
-    
+  // export CSV
+  const handleExport = async () => {
     try {
-      // Delete all items first
-      const { error: itemsError } = await supabase
-        .from('cv_categories_with_items')
-        .delete()
-        .eq('category_id', categoryId);
-
-      if (itemsError) throw itemsError;
-
-      // Then delete the category
-      const { error: categoryError } = await supabase
-        .from('cv_categories')
-        .delete()
-        .eq('category_id', categoryId);
-
-      if (categoryError) throw categoryError;
-
-      fetchCategories();
-    } catch (error) {
-      console.error('Error deleting category:', error);
+      const rows: string[] = ["category_id,category_name,item_id,item_value"]
+      for (const cat of categories) {
+        const list = itemsByCategory[cat.id] || []
+        if (list.length === 0) {
+          rows.push(`${cat.id},"${cat.name}",,`)
+        } else {
+          for (const it of list) {
+            rows.push(`${cat.id},"${cat.name}",${it.id},"${(it.items || '').replace(/"/g, '""')}"`)
+          }
+        }
+      }
+      const csv = rows.join("\n")
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `categories_export_${new Date().toISOString().slice(0,10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Export error:", err)
+      alert("Không thể xuất dữ liệu.")
     }
-  };
+  }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Cài đặt hệ thống</h1>
-        <p className="text-gray-600">Quản lý cấu hình và tùy chỉnh hệ thống</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
-          <button className="border-b-2 border-blue-500 py-2 px-1 text-sm font-medium text-blue-600">
-            Danh mục
-          </button>
-        </nav>
-      </div>
-
-      {/* Category Selector */}
-      <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span className="text-2xl">📁</span>
-            Quản lý danh mục
-          </h2>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+    <div className="min-h-screen bg-gray-50">
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Category Management Section */}
+        <div className="bg-white rounded-lg border p-6 mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Building2 className="h-5 w-5 text-purple-600" />
             </div>
-            <button
-              onClick={() => setIsAddingCategory(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              Thêm
-            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Quản lý danh mục</h2>
+              <p className="text-sm text-gray-500">Quản lý dữ liệu master cho các dropdown trong hệ thống</p>
+            </div>
           </div>
-        </div>
 
-        <p className="text-gray-600 mb-4">
-          Quản lý dữ liệu master cho các dropdown trong hệ thống
-        </p>
+          {/* Error message */}
+          {error && (
+            <div className="mb-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
-        {/* Category Type Selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">Danh mục</label>
-          <div className="relative">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {categoryTypes.map(type => (
-                <option key={type.value} value={type.value}>
-                  {type.icon} {type.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
+          {/* Category Selector */}
+          <div className="mb-6">
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Danh mục</label>
+            <Select value={selectedCategoryId ?? ""} onValueChange={handleCategoryChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={loading ? "Đang tải..." : "Chọn danh mục"} />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => {
+                  const Icon = iconMap[category.icon || ""]
+                  return (
+                    <SelectItem key={category.id} value={category.id}>
+                      <div className="flex items-center gap-2">
+                        {Icon && <Icon className="h-4 w-4" />}
+                        <span>{category.name}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Danh sách các {categoryTypes.find(ct => ct.value === selectedCategory)?.label.toLowerCase()} trong công ty
-          </p>
-          <p className="text-sm text-gray-500">
-            {filteredCategories.reduce((sum, cat) => sum + cat.item_count, 0)} mục
-          </p>
-        </div>
-      </div>
 
-      {/* Add Category Form */}
-      {isAddingCategory && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Thêm danh mục mới..."
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-            <button
-              onClick={handleAddCategory}
-              className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
-            >
-              <Check className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => {
-                setIsAddingCategory(false);
-                setNewCategoryName('');
-              }}
-              className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Categories Grid */}
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCategories.map(category => (
-            <div key={category.category_id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{category.icon}</span>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{category.category_name}</h3>
-                    <p className="text-sm text-gray-500">{category.item_count} items</p>
-                  </div>
+          {/* Selected Category Display */}
+          {selectedCategory && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white rounded-lg">
+                  {(() => {
+                    const Icon = iconMap[selectedCategory.icon || ""]
+                    return Icon ? <Icon className="h-5 w-5" /> : null
+                  })()}
                 </div>
-                <button
-                  onClick={() => handleDeleteCategory(category.category_id, category.category_name)}
-                  className="p-1 text-red-600 hover:bg-red-100 rounded"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-2 mb-3">
-                {category.items?.slice(0, 5).map((item: string, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    {editingItem?.id === item && editingItem?.categoryId === category.category_id ? (
-                      <input
-                        type="text"
-                        value={editingItem.name}
-                        onChange={(e) => setEditingItem({...editingItem, name: e.target.value})}
-                        onBlur={handleUpdateItem}
-                        onKeyPress={(e) => e.key === 'Enter' && handleUpdateItem()}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded"
-                        autoFocus
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-700">{item}</span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setEditingItem({id: item, name: item, categoryId: category.category_id})}
-                        className="p-1 text-gray-600 hover:bg-gray-200 rounded"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(category.category_id, item)}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {category.item_count > 5 && (
-                  <p className="text-sm text-gray-500 text-center">
-                    +{category.item_count - 5} more items
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">{selectedCategory.name}</h3>
+                  <p className="text-sm text-gray-600">
+                    Danh sách {selectedCategory.name.toLowerCase()} trong công ty
                   </p>
-                )}
-              </div>
-
-              {isAddingItem === category.category_id ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Thêm mục mới..."
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleAddItem(category.category_id)}
-                    className="p-2 text-green-600 hover:bg-green-100 rounded-lg"
-                  >
-                    <Check className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsAddingItem(false);
-                      setNewItemName('');
-                    }}
-                    className="p-2 text-red-600 hover:bg-red-100 rounded-lg"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
+                <Badge variant="secondary" className="bg-blue-600 text-white">
+                  {items.length} mục
+                </Badge>
+              </div>
+            </div>
+          )}
+
+          {/* Add New Item */}
+          <div className="mb-6">
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Thêm mục mới</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder={selectedCategory ? `Thêm ${selectedCategory.name.toLowerCase()} mới...` : "Thêm mục mới..."}
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddItem()
+                }}
+                className="flex-1"
+                disabled={!selectedCategory || saving || loading}
+              />
+              <Button onClick={handleAddItem} className="bg-blue-600 hover:bg-blue-700" disabled={!selectedCategory || saving || loading}>
+                <Plus className="h-4 w-4 mr-2" />
+                Thêm
+              </Button>
+            </div>
+          </div>
+
+          {/* Items List */}
+          <div className="mb-6">
+            <div className="space-y-2">
+              {loading ? (
+                <div className="text-sm text-gray-500">Đang tải mục...</div>
+              ) : items.length === 0 ? (
+                <div className="text-sm text-gray-500">Chưa có mục nào.</div>
               ) : (
-                <button
-                  onClick={() => setIsAddingItem(category.category_id)}
-                  className="w-full py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center justify-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Thêm mục
-                </button>
+                items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 border-b border-gray-200"
+                  >
+                    <span className="text-sm text-gray-900">{item.items}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="text-red-600 hover:text-red-700"
+                      disabled={saving || loading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
               )}
             </div>
-          ))}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1 bg-transparent" onClick={handleExport} disabled={loading}>
+              <Download className="h-4 w-4 mr-2" />
+              Xuất dữ liệu
+            </Button>
+            <Button variant="outline" className="flex-1 bg-transparent" disabled={loading}>
+              <Upload className="h-4 w-4 mr-2" />
+              Nhập dữ liệu
+            </Button>
+          </div>
         </div>
-      )}
+
+        {/* Category Overview Section */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Tổng quan danh mục</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {categories.map((category) => {
+              const Icon = iconMap[category.icon || ""]
+              const count = (itemsByCategory[category.id] || []).length
+              return (
+                <Card
+                  key={category.id}
+                  className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => handleCategoryChange(category.id)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="p-2 rounded-lg" style={{ backgroundColor: `${category.icon_color ?? '#ddd'}20` }}>
+                      {Icon && <Icon className="h-5 w-5" style={{ color: category.icon_color ?? '#666' }} />}
+                    </div>
+                    <Badge variant="secondary" className="bg-blue-600 text-white">
+                      {count} mục
+                    </Badge>
+                  </div>
+                  <h3 className="font-medium text-gray-900 text-sm">{category.name}</h3>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </div>
     </div>
-  );
-};
+  )
+}
