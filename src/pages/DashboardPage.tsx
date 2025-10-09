@@ -26,7 +26,19 @@ export function DashboardPage() {
     count: number;
   }
 
-  const [stats, setStats] = useState({ totalCV: 0, openJobs: 0, interviewingCV: 0 });
+  interface StatsData {
+    totalCV: number;
+    openJobs: number;
+    interviewingCV: number;
+    interviewingChange: number;
+  }
+
+  const [stats, setStats] = useState<StatsData>({ 
+    totalCV: 0, 
+    openJobs: 0, 
+    interviewingCV: 0,
+    interviewingChange: 0 
+  });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [sourceData, setSourceData] = useState<SourceData[]>([]);
   const [topJobs, setTopJobs] = useState<any[]>([]);
@@ -38,11 +50,23 @@ export function DashboardPage() {
       // Lấy dữ liệu cho các thẻ thống kê
       const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
       const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
-      const { count: interviewingCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true }).eq('status', 'Phỏng vấn');
+      
+      // Lấy thống kê lịch phỏng vấn
+      const { data: interviewStats, error: interviewError } = await supabase.rpc('get_interview_stats');
+      if (interviewError) console.error("Error fetching interview stats:", interviewError);
+      
+      const interviewData = interviewStats?.[0] || { 
+        total_interviews: 0, 
+        this_month_count: 0, 
+        last_month_count: 0, 
+        percentage_change: 0 
+      };
+      
       setStats({ 
         totalCV: totalCV || 0, 
         openJobs: openJobs || 0, 
-        interviewingCV: interviewingCV || 0 
+        interviewingCV: Number(interviewData.total_interviews) || 0,
+        interviewingChange: Number(interviewData.percentage_change) || 0
       });
 
       // Gọi các hàm PostgreSQL đã tạo
@@ -120,7 +144,15 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng CV</CardTitle><User className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.totalCV}</div><p className="text-xs text-muted-foreground">+0% so với tháng trước</p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle><Briefcase className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.openJobs}</div><p className="text-xs text-muted-foreground">+0 so với tháng trước</p></CardContent></Card>
-        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle><ClipboardList className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.interviewingCV}</div><p className="text-xs text-muted-foreground">Tổng số từ trước đến nay</p></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle><ClipboardList className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{stats.interviewingCV}</div><p className="text-xs text-muted-foreground">
+          {stats.interviewingChange > 0 ? (
+            <span className="text-green-600">+{stats.interviewingChange}%</span>
+          ) : stats.interviewingChange < 0 ? (
+            <span className="text-red-600">{stats.interviewingChange}%</span>
+          ) : (
+            <span>0%</span>
+          )} so với tháng trước
+        </p></CardContent></Card>
         <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle><Clock className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">N/A</div></CardContent></Card>
       </div>
 
