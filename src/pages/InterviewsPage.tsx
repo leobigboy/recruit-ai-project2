@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Calendar, Clock, CheckCircle, XCircle, MoreHorizontal, Search, User, Briefcase, MapPin, Video, X } from 'lucide-react'
+import { Plus, Calendar, Clock, CheckCircle, XCircle, MoreHorizontal, Search, User, Briefcase, MapPin, Video, X, Star } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,10 +46,16 @@ export function InterviewsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [candidates, setCandidates] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewData, setReviewData] = useState({
+    rating: 0,
+    notes: '',
+    outcome: 'Vòng tiếp theo'
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -111,9 +117,9 @@ export function InterviewsPage() {
 
   // Tính toán thống kê
   const totalInterviews = interviews.length;
-  const pendingInterviews = interviews.filter(i => i.status === 'Đang chờ' || i.status === 'pending').length;
-  const completedInterviews = interviews.filter(i => i.status === 'Hoàn thành' || i.status === 'completed').length;
-  const cancelledInterviews = interviews.filter(i => i.status === 'Đã hủy' || i.status === 'cancelled').length;
+  const pendingInterviews = interviews.filter(i => i.status === 'Đang chờ').length;
+  const completedInterviews = interviews.filter(i => i.status === 'Hoàn thành').length;
+  const cancelledInterviews = interviews.filter(i => i.status === 'Đã hủy').length;
 
   // Lọc dữ liệu
   const filteredInterviews = interviews.filter(interview => {
@@ -129,15 +135,12 @@ export function InterviewsPage() {
 
   // Format trạng thái badge
   const getStatusBadgeClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'hoàn thành':
-      case 'completed':
+    switch (status) {
+      case 'Hoàn thành':
         return 'bg-green-100 text-green-700 hover:bg-green-100';
-      case 'đang chờ':
-      case 'pending':
+      case 'Đang chờ':
         return 'bg-orange-100 text-orange-700 hover:bg-orange-100';
-      case 'đã hủy':
-      case 'cancelled':
+      case 'Đã hủy':
         return 'bg-red-100 text-red-700 hover:bg-red-100';
       default:
         return 'bg-gray-100 text-gray-700 hover:bg-gray-100';
@@ -227,6 +230,13 @@ export function InterviewsPage() {
   const handleUpdateStatus = async (newStatus: string) => {
     if (!selectedInterview) return;
     
+    // Nếu chọn "Hoàn thành", mở dialog đánh giá
+    if (newStatus === 'Hoàn thành') {
+      setIsEditDialogOpen(false);
+      setIsReviewDialogOpen(true);
+      return;
+    }
+    
     setSubmitting(true);
     try {
       const { error } = await supabase
@@ -258,6 +268,65 @@ export function InterviewsPage() {
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Có lỗi xảy ra khi cập nhật trạng thái!');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Submit đánh giá
+  const handleSubmitReview = async () => {
+    if (!selectedInterview || reviewData.rating === 0) {
+      alert('Vui lòng chọn số sao đánh giá!');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      // 1. Cập nhật trạng thái interview thành "Hoàn thành"
+      const { error: updateError } = await supabase
+        .from('cv_interviews')
+        .update({ status: 'Hoàn thành' })
+        .eq('id', selectedInterview.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Tạo review mới
+      const { error: reviewError } = await supabase
+        .from('cv_interview_reviews')
+        .insert([{
+          interview_id: selectedInterview.id,
+          rating: reviewData.rating,
+          notes: reviewData.notes,
+          outcome: reviewData.outcome
+        }]);
+
+      if (reviewError) throw reviewError;
+
+      // 3. Refresh danh sách interviews
+      const { data: updatedInterviews } = await supabase
+        .from('cv_interviews')
+        .select(`
+          *,
+          cv_candidates!candidate_id (
+            full_name,
+            cv_jobs!job_id ( title )
+          )
+        `)
+        .order('interview_date', { ascending: false });
+
+      if (updatedInterviews) {
+        setInterviews(updatedInterviews as Interview[]);
+      }
+
+      // Reset và đóng dialog
+      setReviewData({ rating: 0, notes: '', outcome: 'Vòng tiếp theo' });
+      setIsReviewDialogOpen(false);
+      setSelectedInterview(null);
+      
+      alert('Đánh giá đã được lưu thành công!');
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      alert('Có lỗi xảy ra khi lưu đánh giá!');
     } finally {
       setSubmitting(false);
     }
@@ -407,14 +476,11 @@ export function InterviewsPage() {
           <SelectTrigger className="w-[180px] bg-white">
             <SelectValue placeholder="Tất cả trạng thái" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-white" style={{ zIndex: 50 }}>
             <SelectItem value="all">Tất cả trạng thái</SelectItem>
             <SelectItem value="Đang chờ">Đang chờ</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="Hoàn thành">Hoàn thành</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
             <SelectItem value="Đã hủy">Đã hủy</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
 
@@ -536,7 +602,7 @@ export function InterviewsPage() {
       {/* Dialog tạo lịch phỏng vấn */}
       {isDialogOpen && (
         <>
-          {/* Backdrop - che toàn bộ màn hình */}
+          {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/70 backdrop-blur-sm"
             style={{ zIndex: 999999 }}
@@ -883,7 +949,7 @@ export function InterviewsPage() {
                   <button
                     onClick={() => handleUpdateStatus('Đang chờ')}
                     disabled={submitting}
-                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-orange-50 transition-colors flex items-center justify-between"
+                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-orange-50 transition-colors flex items-center justify-between disabled:opacity-50"
                   >
                     <span>Đang chờ</span>
                     <Badge className="bg-orange-100 text-orange-700">Đang chờ</Badge>
@@ -892,7 +958,7 @@ export function InterviewsPage() {
                   <button
                     onClick={() => handleUpdateStatus('Hoàn thành')}
                     disabled={submitting}
-                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-green-50 transition-colors flex items-center justify-between"
+                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-green-50 transition-colors flex items-center justify-between disabled:opacity-50"
                   >
                     <span>Hoàn thành</span>
                     <Badge className="bg-green-100 text-green-700">Hoàn thành</Badge>
@@ -901,28 +967,10 @@ export function InterviewsPage() {
                   <button
                     onClick={() => handleUpdateStatus('Đã hủy')}
                     disabled={submitting}
-                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-red-50 transition-colors flex items-center justify-between"
+                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-red-50 transition-colors flex items-center justify-between disabled:opacity-50"
                   >
                     <span>Đã hủy</span>
                     <Badge className="bg-red-100 text-red-700">Đã hủy</Badge>
-                  </button>
-
-                  <button
-                    onClick={() => handleUpdateStatus('Đã lên lịch')}
-                    disabled={submitting}
-                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-blue-50 transition-colors flex items-center justify-between"
-                  >
-                    <span>Đã lên lịch</span>
-                    <Badge className="bg-blue-100 text-blue-700">Đã lên lịch</Badge>
-                  </button>
-
-                  <button
-                    onClick={() => handleUpdateStatus('Đã xong')}
-                    disabled={submitting}
-                    className="w-full px-4 py-3 text-left rounded-lg border hover:bg-gray-50 transition-colors flex items-center justify-between"
-                  >
-                    <span>Đã xong</span>
-                    <Badge className="bg-gray-100 text-gray-700">Đã xong</Badge>
                   </button>
                 </div>
               </div>
@@ -934,6 +982,130 @@ export function InterviewsPage() {
                   disabled={submitting}
                 >
                   Hủy
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Dialog Đánh giá sau khi Hoàn thành */}
+      {isReviewDialogOpen && selectedInterview && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            style={{ zIndex: 999999 }}
+            onClick={() => {
+              setIsReviewDialogOpen(false);
+              setReviewData({ rating: 0, notes: '', outcome: 'Vòng tiếp theo' });
+            }}
+          />
+          
+          <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1000000 }}>
+            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg m-4 pointer-events-auto">
+              <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Star className="w-5 h-5 text-yellow-500" />
+                  Đánh giá buổi phỏng vấn
+                </h2>
+                <button
+                  onClick={() => {
+                    setIsReviewDialogOpen(false);
+                    setReviewData({ rating: 0, notes: '', outcome: 'Vòng tiếp theo' });
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Thông tin ứng viên */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-sm text-gray-600">Ứng viên</p>
+                  <p className="font-semibold text-lg">{selectedInterview.cv_candidates?.full_name}</p>
+                  <p className="text-sm text-gray-600 mt-1">{selectedInterview.cv_candidates?.cv_jobs?.title}</p>
+                </div>
+
+                {/* Rating */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Đánh giá <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setReviewData({...reviewData, rating: star})}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star 
+                          className={`w-10 h-10 ${
+                            star <= reviewData.rating 
+                              ? 'fill-yellow-400 text-yellow-400' 
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                    <span className="ml-2 text-lg font-semibold text-gray-700">
+                      {reviewData.rating > 0 ? `${reviewData.rating}/5` : 'Chưa chọn'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Outcome */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Kết quả <span className="text-red-500">*</span>
+                  </label>
+                  <Select 
+                    value={reviewData.outcome}
+                    onValueChange={(value) => setReviewData({...reviewData, outcome: value})}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white" style={{ zIndex: 1000001 }}>
+                      <SelectItem value="Vòng tiếp theo">Vòng tiếp theo</SelectItem>
+                      <SelectItem value="Đạt">Đạt</SelectItem>
+                      <SelectItem value="Không đạt">Không đạt</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ghi chú đánh giá</label>
+                  <textarea
+                    value={reviewData.notes}
+                    onChange={(e) => setReviewData({...reviewData, notes: e.target.value})}
+                    placeholder="Nhập ghi chú về buổi phỏng vấn..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t px-6 py-4 flex justify-end gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setIsReviewDialogOpen(false);
+                    setReviewData({ rating: 0, notes: '', outcome: 'Vòng tiếp theo' });
+                  }}
+                  disabled={submitting}
+                >
+                  Hủy
+                </Button>
+                <Button 
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={handleSubmitReview}
+                  disabled={submitting || reviewData.rating === 0}
+                >
+                  <Star className="w-4 h-4 mr-2" />
+                  {submitting ? 'Đang lưu...' : 'Lưu đánh giá'}
                 </Button>
               </div>
             </div>
