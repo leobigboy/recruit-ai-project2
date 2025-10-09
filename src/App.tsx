@@ -21,7 +21,8 @@ import { SettingsPage } from "./pages/SettingsPage";
 // New pages
 import AIToolsPage from "./pages/AI/AIToolsPage";
 import OffersPage from "./pages/OffersPage";
-import { CategoryPage } from "./components/settings/CategorySettings";
+import CategorySettingsPage from "./components/settings/CategorySettings"
+
 
 // RequireAuth wrapper
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
@@ -64,7 +65,7 @@ const router = createBrowserRouter([
       { path: "danh-gia", element: <ReviewsPage /> },
       { path: "quan-ly-email", element: <EmailManagementPage /> },
       { path: "cai-dat", element: <SettingsPage /> },
-      { path: "cai-dat/danh-muc", element: <CategoryPage /> },  // Category route under settings
+      { path: "cai-dat/danh-muc", element: <CategorySettingsPage /> },
 
       // New pages
       { path: "ai", element: <AIToolsPage /> },       // /app/ai
