@@ -1,9 +1,15 @@
+// src/lib/utils.ts
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+/**
+ * Test Gemini AI connection
+ * FIX: Use gemini-pro model (stable, always available)
+ */
 export const testGeminiConnection = async (apiKey: string) => {
   try {
     // Gọi endpoint listModels - đơn giản và luôn hoạt động
@@ -13,7 +19,14 @@ export const testGeminiConnection = async (apiKey: string) => {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: 'Test connection'
+            }]
+          }]
+        })
       }
     );
 
