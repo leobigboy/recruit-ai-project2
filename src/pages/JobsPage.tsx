@@ -37,12 +37,13 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabaseClient"
+import { generateJobDescription } from "@/lib/aiService"
 
 const getStatusBadge = (status: string) => {
   switch (status) {
     case "Đã đăng":
       return <Badge className="bg-blue-600 text-white hover:bg-blue-700 border-0">{status}</Badge>
-    case "Bản nhập":
+    case "Bản nháp":
       return <Badge className="bg-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300">{status}</Badge>
     case "Đã đóng":
       return <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-200">{status}</Badge>
@@ -77,13 +78,15 @@ export function JobsPage() {
     work_location: '',
     level: 'Mid-level',
     job_type: 'Full-time',
-    status: 'Bản nhập',
+    status: 'Bản nháp',
     description: '',
     requirements: '',
     benefits: '',
     posted_date: new Date().toISOString().split('T')[0]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [aiLanguage, setAiLanguage] = useState('vietnamese');
 
   useEffect(() => {
     fetchJobs();
@@ -119,6 +122,46 @@ export function JobsPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAIGenerate = async () => {
+    // Validation
+    if (!formData.title || !formData.department) {
+      alert('Vui lòng điền đầy đủ: Tiêu đề vị trí và Phòng ban');
+      return;
+    }
+
+    setGeneratingAI(true);
+
+    try {
+      const generatedContent = await generateJobDescription({
+        title: formData.title,
+        level: formData.level,
+        department: formData.department,
+        work_location: formData.work_location || 'Remote',
+        job_type: formData.job_type || 'Full-time',
+        language: aiLanguage,
+        keywords: formData.requirements // Sử dụng field requirements làm keywords
+      });
+
+      // Cập nhật form data với nội dung được generate
+      setFormData(prev => ({
+        ...prev,
+        description: generatedContent.description,
+        requirements: generatedContent.requirements,
+        benefits: generatedContent.benefits
+      }));
+
+      // Chuyển sang tab Manual để user review
+      setActiveTab('manual');
+      
+      alert('✅ Đã tạo gợi ý JD với AI thành công! Vui lòng kiểm tra và chỉnh sửa nếu cần.');
+    } catch (error: any) {
+      console.error('AI Generation error:', error);
+      alert(`❌ Lỗi khi tạo JD với AI: ${error.message}`);
+    } finally {
+      setGeneratingAI(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -172,7 +215,7 @@ export function JobsPage() {
         work_location: '',
         level: 'Mid-level',
         job_type: 'Full-time',
-        status: 'Bản nhập',
+        status: 'Bản nháp',
         description: '',
         requirements: '',
         benefits: '',
@@ -192,7 +235,7 @@ export function JobsPage() {
       work_location: '',
       level: 'Mid-level',
       job_type: 'Full-time',
-      status: 'Bản nhập',
+      status: 'Bản nháp',
       description: '',
       requirements: '',
       benefits: '',
@@ -295,7 +338,7 @@ export function JobsPage() {
               <SelectContent className="min-w-[180px] bg-white z-50 shadow-lg border border-gray-200" align="start" sideOffset={4}>
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="Đã đăng">Đã xuất bản</SelectItem>
-                <SelectItem value="Bản nhập">Bản nhập</SelectItem>
+                <SelectItem value="Bản nháp">Bản nháp</SelectItem>
                 <SelectItem value="Đã đóng">Đã đóng</SelectItem>
               </SelectContent>
             </Select>
@@ -344,9 +387,6 @@ export function JobsPage() {
                         <div className="font-medium text-gray-900">{job.title}</div>
                         <div className="text-sm text-gray-500">{job.level} • {job.job_type || 'Full-time'}</div>
                       </TableCell>
-                      <TableCell className="text-gray-700">{job.department}</TableCell>
-                      <TableCell className="text-gray-700">{job.work_location || job.location || 'Remote'}</TableCell>
-                      <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell className="text-gray-700">{job.cv_candidates[0]?.count || 0}</TableCell>
                       <TableCell className="text-gray-700">0</TableCell>
                       <TableCell className="text-gray-700">
@@ -472,7 +512,9 @@ export function JobsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Phòng ban</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Phòng ban <span className="text-red-500">*</span>
+                    </label>
                     <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Chọn phòng ban" />
@@ -519,7 +561,7 @@ export function JobsPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngôn ngữ</label>
-                    <Select defaultValue="vietnamese">
+                    <Select value={aiLanguage} onValueChange={setAiLanguage}>
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Tiếng Việt" />
                       </SelectTrigger>
@@ -539,16 +581,28 @@ export function JobsPage() {
                     value={formData.requirements}
                     onChange={(e) => handleInputChange('requirements', e.target.value)}
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Nhập các kỹ năng cần thiết để AI tạo JD phù hợp hơn
+                  </p>
                 </div>
 
                 <div className="flex gap-3 mt-6 pt-4 border-t">
                   <Button
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    onClick={handleAIGenerate}
+                    disabled={generatingAI}
                   >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    {isSubmitting ? 'Đang tạo...' : 'Tạo gợi ý với AI'}
+                    {generatingAI ? (
+                      <>
+                        <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Đang tạo với AI...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Tạo gợi ý với AI
+                      </>
+                    )}
                   </Button>
                 </div>
               </>
@@ -641,10 +695,10 @@ export function JobsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Trạng thái</label>
                     <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Bản nhập" />
+                        <SelectValue placeholder="Bản nháp" />
                       </SelectTrigger>
                       <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
-                        <SelectItem value="Bản nhập">Bản nhập</SelectItem>
+                        <SelectItem value="Bản nháp">Bản nháp</SelectItem>
                         <SelectItem value="Đã đăng">Đã đăng</SelectItem>
                         <SelectItem value="Đã đóng">Đã đóng</SelectItem>
                       </SelectContent>
