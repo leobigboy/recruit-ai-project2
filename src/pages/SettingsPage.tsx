@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button"
 import { CompanySettings } from "@/components/settings/CompanySettings"
 import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
-import { NotificationSettings } from "@/components/settings/NotificationSettings";
-import { EmailSettings } from "@/components/settings/EmailSettings";
+import { NotificationSettings } from "@/components/settings/NotificationSettings"
+import { EmailSettings } from "@/components/settings/EmailSettings"
 import CategorySettingsPage from "@/components/settings/CategorySettings"
-// import UsersPage để hiển thị trong tab Người dùng
-import UsersPage from "@/pages/User";
+import UsersPage from "@/pages/User"
+import Authorization from "@/pages/Authorization" // <-- render phân quyền ở tab Permissions
+import { toast } from "sonner"
 
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
@@ -24,51 +25,61 @@ const tabs = [
 ]
 
 interface CompanyProfile {
-    id?: string;
-    company_name?: string;
-    website?: string;
-    company_description?: string;
-    company_address?: string;
-    contact_email?: string;
+  id?: string
+  company_name?: string
+  website?: string
+  company_description?: string
+  company_address?: string
+  contact_email?: string
 }
 
-export function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("company");
-  const [profile, setProfile] = useState<CompanyProfile>({});
-  const [loading, setLoading] = useState(true);
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState("company")
+  const [profile, setProfile] = useState<CompanyProfile>({})
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    async function getProfile() {
-      setLoading(true);
-      const { data, error } = await supabase.from('cv_company_profile').select('*').single();
-      if (data) setProfile(data);
-      if (error && error.code !== 'PGRST116') console.error("Error fetching profile:", error);
-      setLoading(false);
+    const fetchProfile = async () => {
+      try {
+        setLoading(true)
+        const { data, error } = await supabase.from("cv_company_profile").select("*").single()
+        if (error && error.code !== "PGRST116") throw error
+        if (data) setProfile(data)
+      } catch (err: any) {
+        console.error(err)
+        toast.error("Lỗi tải thông tin công ty: " + (err?.message ?? ""))
+      } finally {
+        setLoading(false)
+      }
     }
-    getProfile();
-  }, []);
+
+    fetchProfile()
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setProfile(prev => ({ ...prev, [id]: value }));
-  };
+    const { id, value } = e.target
+    setProfile((prev) => ({ ...prev, [id]: value }))
+  }
 
   const handleSave = async () => {
-    // Chỉ lưu cho tab Company, các tab khác có nút lưu riêng
-    if (activeTab !== "company") {
-      return;
-    }
+    if (activeTab !== "company") return
 
-    setLoading(true);
-    const { error } = await supabase.from('cv_company_profile').upsert({ ...profile, id: profile.id || undefined });
-    setLoading(false);
-    if (error) alert("Lỗi! Không thể lưu thay đổi.");
-    else alert("Đã lưu thay đổi thành công!");
-  };
-  
+    try {
+      setLoading(true)
+      const { error } = await supabase.from("cv_company_profile").upsert({ ...profile, id: profile.id || undefined })
+      if (error) throw error
+      toast.success("Đã lưu thay đổi thành công!")
+    } catch (err: any) {
+      console.error(err)
+      toast.error("Không thể lưu thay đổi: " + (err?.message ?? ""))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8">
-      <div className="mx-auto max-w-5xl space-y-8">
+      <div className="mx-auto max-w-6xl space-y-8">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Cài đặt hệ thống</h1>
           <p className="text-muted-foreground">Quản lý cấu hình và tùy chỉnh hệ thống</p>
@@ -83,9 +94,7 @@ export function SettingsPage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                  isActive ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -96,28 +105,38 @@ export function SettingsPage() {
         </div>
 
         <div>
-          {activeTab === "company" && <CompanySettings profile={profile} handleInputChange={handleInputChange} />}
+          {activeTab === "company" && (
+            <CompanySettings profile={profile} handleInputChange={handleInputChange} />
+          )}
+
           {activeTab === "ai" && <AiSettings />}
+
           {activeTab === "notifications" && <NotificationSettings />}
+
           {activeTab === "email" && <EmailSettings />}
+
           {activeTab === "category" && <CategorySettingsPage />}
 
-          {/* Khi chọn tab Người dùng, render UsersPage (bỏ mock và fetch từ Supabase) */}
+          {/* Người dùng */}
           {activeTab === "users" && (
-            // Nếu UsersPage là 1 trang đầy đủ có header, sẽ render trong vùng này.
             <div className="pt-6">
               <UsersPage />
             </div>
           )}
 
-          {/* Nếu sau này muốn tách route riêng, có thể chuyển tab này thành Link tới /app/nguoi-dung */}
+          {/* Phân quyền: render Authorization page UI */}
+          {activeTab === "permissions" && (
+            <div className="pt-6">
+              <Authorization />
+            </div>
+          )}
         </div>
-        
+
         {/* Chỉ hiển thị nút Save cho tab Company */}
         {activeTab === "company" && (
           <div className="flex justify-end pt-4">
             <Button size="lg" onClick={handleSave} disabled={loading}>
-              {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+              {loading ? "Đang lưu..." : "Lưu thay đổi"}
             </Button>
           </div>
         )}
@@ -125,5 +144,3 @@ export function SettingsPage() {
     </div>
   )
 }
-
-export default SettingsPage
