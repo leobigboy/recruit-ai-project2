@@ -29,7 +29,6 @@ body {
   color: hsl(var(--foreground));
 }
 
-<<<<<<< HEAD
 /* Style cho Switch */
 .switch[data-state="checked"] {
   background-color: #22c55e; /* Màu xanh lá (bg-green-500) */
@@ -63,5 +62,3 @@ body {
   border-radius: 50%;
   transition: transform 0.2s ease-in-out;
 }
-=======
->>>>>>> origin/Quang

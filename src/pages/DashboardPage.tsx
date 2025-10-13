@@ -1,5 +1,3 @@
-// src/pages/DashboardPage.tsx
-
 "use client"
 
 import { useState, useEffect } from 'react';
@@ -107,7 +105,12 @@ export function DashboardPage() {
       if (jobs) setTopJobs(jobs);
 
       // Lấy hoạt động gần đây
-      const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { limit_count: 6 });
+      // ======================= FIX HERE =======================
+      // Sửa tên tham số từ { limit_count: 6 } thành tên đúng trong hàm PostgreSQL của bạn.
+      // Dưới đây là một ví dụ phổ biến là `p_limit`.
+      const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { p_limit: 6 });
+      // ========================================================
+      
       if (activitiesError) console.error("Error fetching activities:", activitiesError);
       if (activities) setRecentActivities(activities as ActivityData[]);
     } catch (error) {
@@ -321,43 +324,43 @@ export function DashboardPage() {
         </Card>
         
         <Card className="bg-white shadow-sm">
-             <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
-             <CardContent>
-                {recentActivities.length > 0 ? (
-                  <ul className="space-y-4">
-                    {recentActivities.map((activity) => (
-                      <li key={activity.id} className="flex items-start gap-3">
-                        <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            {activity.user_name}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {activity.action}
-                            {activity.details && (
-                              <span className="text-gray-500"> • {activity.details}</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {new Date(activity.created_at).toLocaleString('vi-VN', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                    <Database className="w-12 h-12 mb-2" />
-                    <p className="text-sm">Chưa có hoạt động nào</p>
-                  </div>
-                )}
-             </CardContent>
+            <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
+            <CardContent>
+              {recentActivities.length > 0 ? (
+                <ul className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <li key={activity.id} className="flex items-start gap-3">
+                      <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.user_name}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {activity.action}
+                          {activity.details && (
+                            <span className="text-gray-500"> • {activity.details}</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(activity.created_at).toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <Database className="w-12 h-12 mb-2" />
+                  <p className="text-sm">Chưa có hoạt động nào</p>
+                </div>
+              )}
+            </CardContent>
         </Card>
       </div>
     </div>
