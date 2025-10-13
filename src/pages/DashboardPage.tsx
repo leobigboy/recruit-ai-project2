@@ -33,6 +33,14 @@ export function DashboardPage() {
     interviewingChange: number;
   }
 
+  interface ActivityData {
+    id: string;
+    user_name: string;
+    action: string;
+    details: string | null;
+    created_at: string;
+  }
+
   const [stats, setStats] = useState<StatsData>({ 
     totalCV: 0, 
     openJobs: 0, 
@@ -42,6 +50,7 @@ export function DashboardPage() {
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [sourceData, setSourceData] = useState<SourceData[]>([]);
   const [topJobs, setTopJobs] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityData[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
@@ -96,6 +105,11 @@ export function DashboardPage() {
 
       if (jobsError) console.error("Error fetching top jobs:", jobsError);
       if (jobs) setTopJobs(jobs);
+
+      // Lấy hoạt động gần đây
+      const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { limit_count: 6 });
+      if (activitiesError) console.error("Error fetching activities:", activitiesError);
+      if (activities) setRecentActivities(activities as ActivityData[]);
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
     } finally {
@@ -108,6 +122,17 @@ export function DashboardPage() {
   }, []);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+
+  // Hàm để lấy màu cho từng loại hoạt động
+  const getActivityColor = (action: string) => {
+    if (action.includes('Nộp CV') || action.includes('CV')) return 'bg-blue-500';
+    if (action.includes('Tạo') || action.includes('công việc')) return 'bg-green-500';
+    if (action.includes('Phỏng vấn') || action.includes('phỏng vấn')) return 'bg-purple-500';
+    if (action.includes('Đánh giá')) return 'bg-orange-500';
+    if (action.includes('Cập nhật')) return 'bg-yellow-500';
+    if (action.includes('Email') || action.includes('email')) return 'bg-pink-500';
+    return 'bg-gray-500';
+  };
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -212,7 +237,7 @@ export function DashboardPage() {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
                 <Database className="w-16 h-16 mb-2" />
                 <p>Chưa có dữ liệu</p>
               </div>
@@ -296,24 +321,43 @@ export function DashboardPage() {
         </Card>
         
         <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Hoạt động gần đây</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-5">
-              {recentActivitiesData.map((activity, index) => (
-                <li key={index} className="flex items-start gap-4">
-                  <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full ${activity.color}`}></span>
-                  <div>
-                    <p className="text-sm">{activity.text}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(activity.time).toLocaleString('vi-VN')}
-                    </p>
+             <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
+             <CardContent>
+                {recentActivities.length > 0 ? (
+                  <ul className="space-y-4">
+                    {recentActivities.map((activity) => (
+                      <li key={activity.id} className="flex items-start gap-3">
+                        <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">
+                            {activity.user_name}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {activity.action}
+                            {activity.details && (
+                              <span className="text-gray-500"> • {activity.details}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {new Date(activity.created_at).toLocaleString('vi-VN', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                    <Database className="w-12 h-12 mb-2" />
+                    <p className="text-sm">Chưa có hoạt động nào</p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
+                )}
+             </CardContent>
         </Card>
       </div>
     </div>
