@@ -92,6 +92,7 @@ Hãy tạo nội dung bằng ${params.language === 'vietnamese' ? 'Tiếng Việ
 
 /**
  * Generate Job Description với Gemini AI
+ * FIX: Sử dụng gemini-pro (stable model, always available)
  */
 async function generateWithGemini(
   params: JobGenerationParams,
@@ -111,9 +112,9 @@ Hãy tạo nội dung bằng ${params.language === 'vietnamese' ? 'Tiếng Việ
 
 Định dạng mỗi phần với các bullet points rõ ràng, cụ thể và hấp dẫn.`;
 
-  // Fix: Dùng API v1 thay vì v1beta và model mới nhất
+  // ✅ FIX: Sử dụng gemini-pro (stable, always available)
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: {
@@ -132,8 +133,6 @@ Hãy tạo nội dung bằng ${params.language === 'vietnamese' ? 'Tiếng Việ
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 2000,
-          topP: 0.8,
-          topK: 10
         }
       })
     }
