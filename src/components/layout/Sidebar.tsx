@@ -13,6 +13,7 @@ import {
   Bot,
   FileText,
 } from "lucide-react";
+import { UserMenu } from "./UserMenu";
 
 interface NavItemProps {
   to: string;
@@ -57,8 +58,12 @@ export function Sidebar() {
         <h1 className="text-xl font-bold text-blue-600">Recruit AI</h1>
         <p className="text-xs text-gray-500">Hệ thống quản lý tuyển dụng</p>
       </div>
+<<<<<<< HEAD
 
       <nav className="flex-1 space-y-2 overflow-auto pr-2">
+=======
+      <nav className="flex-1 space-y-2 overflow-y-auto">
+>>>>>>> cc65bbef6377f2932b01962793a24293bd727199
         {navItems.map((item) => (
           <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
         ))}
@@ -89,6 +94,7 @@ export function Sidebar() {
           <span className="truncate">Offer Management</span>
         </NavLink>
       </nav>
+<<<<<<< HEAD
 
       <div className="mt-auto px-4 py-3">
         <div className="flex items-center gap-3">
@@ -100,6 +106,11 @@ export function Sidebar() {
             <div className="text-xs text-gray-500">admin@company.com</div>
           </div>
         </div>
+=======
+      {/* User Profile Section */}
+      <div className="mt-auto pt-4 border-t border-gray-200">
+        <UserMenu />
+>>>>>>> cc65bbef6377f2932b01962793a24293bd727199
       </div>
     </aside>
   );
