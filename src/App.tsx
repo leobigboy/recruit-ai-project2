@@ -1,56 +1,80 @@
 // src/App.tsx
-import React from "react";
-import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
+import React, { useEffect, useState } from "react"
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+  Outlet,
+} from "react-router-dom"
+import { supabase } from "@/lib/supabaseClient"
 
 // Layouts / Pages
-import { MainLayout } from "./components/layout/MainLayout";
-import { DashboardPage } from "./pages/DashboardPage";
-import { JobsPage } from "./pages/JobsPage";
-import { CandidatesPage } from "./pages/CandidatesPage";
-import { InterviewsPage } from "./pages/InterviewsPage";
-import CVFilterPage from "./pages/CV-filter-page";
-import LoginPage from "./pages/login";
-import SignupPage from "./pages/signup";
-import ForgotPasswordPage from "./pages/forgot-password";
+import { MainLayout } from "./components/layout/MainLayout"
+import { DashboardPage } from "./pages/DashboardPage"
+import { JobsPage } from "./pages/JobsPage"
+import { CandidatesPage } from "./pages/CandidatesPage"
+import { InterviewsPage } from "./pages/InterviewsPage"
+import CVFilterPage from "./pages/CV-filter-page"
+import LoginPage from "./pages/login"
+import SignupPage from "./pages/signup"
+import ForgotPasswordPage from "./pages/forgot-password"
 
 // Additional pages
-import { ReviewsPage } from "./pages/ReviewsPage";
-import { EmailManagementPage } from "./pages/EmailManagementPage";
-import { SettingsPage } from "./pages/SettingsPage";
-
-// New pages
-import AIToolsPage from "./pages/AI/AIToolsPage";
-import OffersPage from "./pages/OffersPage";
+import { ReviewsPage } from "./pages/ReviewsPage"
+import { EmailManagementPage } from "./pages/EmailManagementPage"
+import SettingsPage from "./pages/SettingsPage" // ✅ sửa chỗ này
 import CategorySettingsPage from "./components/settings/CategorySettings"
+import UsersPage from "./pages/User"
+import AIToolsPage from "./pages/AI/AIToolsPage"
+import OffersPage from "./pages/OffersPage"
 
-// Users page import (file you asked to update)
-import UsersPage from "./pages/User"; // path: src/pages/user.tsx
+// ✅ Authorization component
+import Authorization from "./pages/Authorization"
 
-// RequireAuth wrapper
+// ----------------------------------------------------------------------
+
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const isAuthenticated =
-    typeof window !== "undefined" && localStorage.getItem("isAuthenticated") === "true";
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      setIsAuthenticated(!!data.session)
+    }
+    checkSession()
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session)
+    })
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
+  }, [])
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-500">
+        Đang kiểm tra đăng nhập...
+      </div>
+    )
   }
 
-  return <>{children ?? <Outlet />}</>;
-};
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children ?? <Outlet />}</>
+}
+
+// ----------------------------------------------------------------------
 
 const router = createBrowserRouter([
-  // Root redirect -> login
-  {
-    path: "/",
-    element: <Navigate to="/login" replace />,
-  },
-
-  // Auth pages
+  { path: "/", element: <Navigate to="/login" replace /> },
   { path: "/login", element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
 
-  // Protected app routes
   {
     path: "/app",
     element: (
@@ -59,7 +83,7 @@ const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      { index: true, element: <DashboardPage /> }, // /app
+      { index: true, element: <DashboardPage /> },
       { path: "mo-ta-cong-viec", element: <JobsPage /> },
       { path: "ung-vien", element: <CandidatesPage /> },
       { path: "lich-phong-van", element: <InterviewsPage /> },
@@ -68,20 +92,21 @@ const router = createBrowserRouter([
       { path: "quan-ly-email", element: <EmailManagementPage /> },
       { path: "cai-dat", element: <SettingsPage /> },
       { path: "cai-dat/danh-muc", element: <CategorySettingsPage /> },
-
-      // Users route (mới)
-      { path: "nguoi-dung", element: <UsersPage /> }, // -> /app/nguoi-dung
-
-      // New pages
-      { path: "ai", element: <AIToolsPage /> },       // /app/ai
-      { path: "offers", element: <OffersPage /> },   // /app/offers
+      { path: "nguoi-dung", element: <UsersPage /> },
+      { path: "ai", element: <AIToolsPage /> },
+      { path: "offers", element: <OffersPage /> },
     ],
   },
 
-  // Catch-all
   { path: "*", element: <Navigate to="/login" replace /> },
-]);
+])
+
+// ----------------------------------------------------------------------
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <Authorization>
+      <RouterProvider router={router} />
+    </Authorization>
+  )
 }
