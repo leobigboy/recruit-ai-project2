@@ -9,6 +9,7 @@ import {
   Mail,
   Settings,
 } from "lucide-react";
+import { UserMenu } from "./UserMenu";
 
 // Định nghĩa kiểu cho một mục menu
 interface NavItemProps {
@@ -50,7 +51,7 @@ export function Sidebar() {
         <h1 className="text-xl font-bold text-blue-600">Recruit AI</h1>
         <p className="text-xs text-gray-500">Hệ thống quản lý tuyển dụng</p>
       </div>
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-2 overflow-y-auto">
         {navItems.map((item) => (
           <NavItem
             key={item.to}
@@ -62,8 +63,8 @@ export function Sidebar() {
         ))}
       </nav>
       {/* User Profile Section */}
-      <div className="mt-auto">
-        {/* Sẽ thêm thông tin người dùng ở đây */}
+      <div className="mt-auto pt-4 border-t border-gray-200">
+        <UserMenu />
       </div>
     </aside>
   );
