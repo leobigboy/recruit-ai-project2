@@ -1,6 +1,5 @@
 // src/pages/CandidatesPage.tsx
 "use client"
-
 import { useState, useEffect } from "react"
 import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
