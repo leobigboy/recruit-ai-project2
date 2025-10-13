@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabaseClient"
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { EmailSettings } from "@/components/settings/EmailSettings";
 import CategorySettingsPage from "@/components/settings/CategorySettings"
+// import UsersPage để hiển thị trong tab Người dùng
+import UsersPage from "@/pages/User";
 
 const tabs = [
   { id: "company", label: "Công ty", icon: Building2 },
@@ -100,6 +102,15 @@ export function SettingsPage() {
           {activeTab === "email" && <EmailSettings />}
           {activeTab === "category" && <CategorySettingsPage />}
 
+          {/* Khi chọn tab Người dùng, render UsersPage (bỏ mock và fetch từ Supabase) */}
+          {activeTab === "users" && (
+            // Nếu UsersPage là 1 trang đầy đủ có header, sẽ render trong vùng này.
+            <div className="pt-6">
+              <UsersPage />
+            </div>
+          )}
+
+          {/* Nếu sau này muốn tách route riêng, có thể chuyển tab này thành Link tới /app/nguoi-dung */}
         </div>
         
         {/* Chỉ hiển thị nút Save cho tab Company */}
