@@ -33,7 +33,7 @@ export const LoginPage = () => {
         ? 'Email hoặc mật khẩu không chính xác' 
         : error.message);
     } else {
-      navigate('/');
+      navigate('/app');  // Fix: Redirect đến /app (dashboard) thay vì '/'
     }
   };
 
@@ -70,6 +70,7 @@ export const LoginPage = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   disabled={loading}
+                  autoComplete="email"  // Fix: Thêm để browser autofill và tắt cảnh báo
                 />
               </div>
             </div>
@@ -86,6 +87,7 @@ export const LoginPage = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   disabled={loading}
+                  autoComplete="current-password"  // Fix: Thêm để browser autofill mật khẩu và tắt cảnh báo
                 />
               </div>
             </div>

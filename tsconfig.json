@@ -9,7 +9,8 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ]
+      ],
+      "@/supabase": ["./src/lib/supabaseClient.ts"]
     },
 
     /* Bundler mode */
