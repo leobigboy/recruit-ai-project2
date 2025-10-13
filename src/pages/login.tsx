@@ -47,7 +47,7 @@ const AlertMessage = ({
     type = "error",
     onClose,
 }: {
-    message: string;
+    message?: string | null;
     type?: "error" | "success";
     onClose: () => void;
 }) => {

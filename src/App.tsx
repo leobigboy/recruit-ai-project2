@@ -23,6 +23,8 @@ import AIToolsPage from "./pages/AI/AIToolsPage";
 import OffersPage from "./pages/OffersPage";
 import CategorySettingsPage from "./components/settings/CategorySettings"
 
+// Users page import (file you asked to update)
+import UsersPage from "./pages/User"; // path: src/pages/user.tsx
 
 // RequireAuth wrapper
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
@@ -66,6 +68,9 @@ const router = createBrowserRouter([
       { path: "quan-ly-email", element: <EmailManagementPage /> },
       { path: "cai-dat", element: <SettingsPage /> },
       { path: "cai-dat/danh-muc", element: <CategorySettingsPage /> },
+
+      // Users route (mới)
+      { path: "nguoi-dung", element: <UsersPage /> }, // -> /app/nguoi-dung
 
       // New pages
       { path: "ai", element: <AIToolsPage /> },       // /app/ai
