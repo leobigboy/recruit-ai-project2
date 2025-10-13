@@ -1,4 +1,3 @@
-// src/components/layout/Sidebar.tsx
 import React from "react";
 import { NavLink } from "react-router-dom";
 import {
@@ -13,6 +12,7 @@ import {
   Bot,
   FileText,
 } from "lucide-react";
+import { UserMenu } from "./UserMenu";  // Đã import, giờ sẽ dùng
 
 interface NavItemProps {
   to: string;
@@ -57,7 +57,6 @@ export function Sidebar() {
         <h1 className="text-xl font-bold text-blue-600">Recruit AI</h1>
         <p className="text-xs text-gray-500">Hệ thống quản lý tuyển dụng</p>
       </div>
-
       <nav className="flex-1 space-y-2 overflow-auto pr-2">
         {navItems.map((item) => (
           <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
@@ -91,15 +90,8 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-            A
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">Admin</div>
-            <div className="text-xs text-gray-500">admin@company.com</div>
-          </div>
-        </div>
+        {/* Tích hợp UserMenu thay vì info tĩnh */}
+        <UserMenu />
       </div>
     </aside>
   );

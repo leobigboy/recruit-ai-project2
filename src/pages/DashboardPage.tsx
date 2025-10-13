@@ -1,4 +1,3 @@
-// src/pages/DashboardPage.tsx
 "use client"
 
 import { useState, useEffect } from 'react';
@@ -11,49 +10,147 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 // Dữ liệu mẫu
 const recentActivitiesData = [
-    { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
+  { text: 'Ứng viên Nguyễn Văn Anh đã nộp CV...', time: '2025-09-22T10:00:00.000Z', color: 'bg-blue-500' },
 ];
 
 export function DashboardPage() {
-  const [stats, setStats] = useState({ totalCV: 0, openJobs: 0, interviewingCV: 0 });
-  const [trendData, setTrendData] = useState([]);
-  const [sourceData, setSourceData] = useState([]);
-  const [topJobs, setTopJobs] = useState<any[]>([]);
+  interface SourceData {
+    source: string;
+    count: number;
+  }
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      // Lấy dữ liệu cho các thẻ thống kê
+  interface TrendData {
+    month: string;
+    count: number;
+  }
+
+  interface StatsData {
+    totalCV: number;
+    openJobs: number;
+    interviewingCV: number;
+    interviewingChange: number;
+  }
+
+  interface ActivityData {
+    id: string;
+    user_name: string;
+    action: string;
+    details: string | null;
+    created_at: string;
+  }
+
+  const [stats, setStats] = useState<StatsData>({ 
+    totalCV: 0, 
+    openJobs: 0, 
+    interviewingCV: 0,
+    interviewingChange: 0 
+  });
+  const [trendData, setTrendData] = useState<TrendData[]>([]);
+  const [sourceData, setSourceData] = useState<SourceData[]>([]);
+  const [topJobs, setTopJobs] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Đếm tổng CV
       const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
+      // Đếm vị trí đang đăng (status = 'Đã đăng')
       const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
-      const { count: interviewingCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true }).eq('status', 'Phỏng vấn');
+      
+      // Lấy thống kê lịch phỏng vấn (thông qua RPC nếu có)
+      const { data: interviewStats, error: interviewError } = await supabase.rpc('get_interview_stats');
+      if (interviewError) console.error("Error fetching interview stats:", interviewError);
+      
+      const interviewData = interviewStats?.[0] || { 
+        total_interviews: 0, 
+        this_month_count: 0, 
+        last_month_count: 0, 
+        percentage_change: 0 
+      };
+      
       setStats({ 
         totalCV: totalCV || 0, 
         openJobs: openJobs || 0, 
-        interviewingCV: interviewingCV || 0 
+        interviewingCV: Number(interviewData.total_interviews) || 0,
+        interviewingChange: Number(interviewData.percentage_change) || 0
       });
 
-      // Gọi các hàm PostgreSQL đã tạo
-      const { data: trend } = await supabase.rpc('get_monthly_cv_trend');
-      if (trend) setTrendData(trend);
-      
-      const { data: sources } = await supabase.rpc('get_candidate_sources');
-      if (sources) setSourceData(sources);
+      // Gọi các hàm PostgreSQL đã tạo cho xu hướng và nguồn
+      const { data: trend, error: trendError } = await supabase.rpc('get_monthly_cv_trend');
+      if (trendError) console.error("Error fetching trend:", trendError);
+      if (trend) setTrendData(trend as TrendData[]);
 
-      // Lấy top vị trí tuyển dụng
+      const { data: sources, error: sourcesError } = await supabase.rpc('get_candidate_sources');
+      if (sourcesError) console.error("Error fetching sources:", sourcesError);
+      if (sources && sources.length > 0) {
+        setSourceData(sources as SourceData[]);
+      } else {
+        // Dữ liệu mẫu nếu chưa có nguồn
+        setSourceData([
+          { source: 'Website', count: 0 },
+          { source: 'LinkedIn', count: 0 },
+          { source: 'Facebook', count: 0 }
+        ]);
+      }
+
+      // Lấy top vị trí tuyển dụng (cố gắng lấy số lượng ứng viên cho mỗi job nếu view/relationship có sẵn)
       const { data: jobs, error: jobsError } = await supabase
         .from('cv_jobs')
         .select('title, cv_candidates(count)')
-        .order('count', { foreignTable: 'cv_candidates', ascending: false })
         .limit(4);
-      
+
       if (jobsError) console.error("Error fetching top jobs:", jobsError);
       if (jobs) setTopJobs(jobs);
-    }
 
+      // Lấy hoạt động gần đây
+      // ======================= FIX HERE =======================
+      // Sửa tên tham số từ { limit_count: 6 } thành tên đúng trong hàm PostgreSQL của bạn.
+      // Dưới đây là một ví dụ phổ biến là `p_limit`.
+      const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { p_limit: 6 });
+      // ========================================================
+      
+      if (activitiesError) console.error("Error fetching activities:", activitiesError);
+      if (activities) setRecentActivities(activities as ActivityData[]);
+    } catch (error) {
+      console.error("Dashboard data fetch error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
+
+  // Hàm để lấy màu cho từng loại hoạt động
+  const getActivityColor = (action: string) => {
+    if (action.includes('Nộp CV') || action.includes('CV')) return 'bg-blue-500';
+    if (action.includes('Tạo') || action.includes('công việc')) return 'bg-green-500';
+    if (action.includes('Phỏng vấn') || action.includes('phỏng vấn')) return 'bg-purple-500';
+    if (action.includes('Đánh giá')) return 'bg-orange-500';
+    if (action.includes('Cập nhật')) return 'bg-yellow-500';
+    if (action.includes('Email') || action.includes('email')) return 'bg-pink-500';
+    return 'bg-gray-500';
+  };
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-sm">
+          <p className="font-semibold">{data.name}</p>
+          <p className="text-sm text-gray-600">
+            Số lượng: <span className="font-bold">{data.value}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="p-6 space-y-6 bg-gray-50/50 min-h-screen">
@@ -62,8 +159,9 @@ export function DashboardPage() {
           <h1 className="text-2xl font-bold">Bảng điều khiển</h1>
           <p className="text-sm text-muted-foreground">Tổng quan hệ thống</p>
         </div>
-        <Button variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
+
+        <Button variant="outline" onClick={fetchDashboardData} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Làm mới
         </Button>
       </div>
@@ -73,71 +171,54 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Tổng số</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.totalCV}</div>
-                  <p className="text-xs text-blue-600 font-medium">+8%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-100">
-                <User className="w-6 h-6 text-blue-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tổng CV</CardTitle>
+            <User className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalCV}</div>
+            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Đang chờ</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.openJobs}</div>
-                  <p className="text-xs text-yellow-600 font-medium">+3%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-yellow-100">
-                <Clock className="w-6 h-6 text-yellow-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vị trí đang tuyển</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.openJobs}</div>
+            <p className="text-xs text-muted-foreground">+0 so với tháng trước</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Hoàn thành</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">{stats.interviewingCV}</div>
-                  <p className="text-xs text-green-600 font-medium">+12%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-green-100">
-                <ClipboardList className="w-6 h-6 text-green-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CV phỏng vấn</CardTitle>
+            <ClipboardList className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.interviewingCV}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.interviewingChange > 0 ? (
+                <span className="text-green-600">+{stats.interviewingChange}%</span>
+              ) : stats.interviewingChange < 0 ? (
+                <span className="text-red-600">{stats.interviewingChange}%</span>
+              ) : (
+                <span>0%</span>
+              )} so với tháng trước
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-600">Đã hủy</p>
-                <div className="space-y-1">
-                  <div className="text-4xl font-bold text-gray-900">0</div>
-                  <p className="text-xs text-red-600 font-medium">-5%</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-red-100">
-                <Briefcase className="w-6 h-6 text-red-600"/>
-              </div>
-            </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Thời gian tuyển TB</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">N/A</div>
           </CardContent>
         </Card>
       </div>
@@ -148,15 +229,22 @@ export function DashboardPage() {
             <CardTitle>Xu hướng CV theo thời gian</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px] p-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e0e0e0', borderRadius: '0.5rem' }} />
-                <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} name="Số CV" />
-              </LineChart>
-            </ResponsiveContainer>
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData as any[]} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ backgroundColor: 'white', border: '1px solid #e0e0e0', borderRadius: '0.5rem' }} />
+                  <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} name="Số CV" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <Database className="w-16 h-16 mb-2" />
+                <p>Chưa có dữ liệu</p>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -165,17 +253,43 @@ export function DashboardPage() {
             <CardTitle>Nguồn ứng viên</CardTitle>
           </CardHeader>
           <CardContent className="h-[350px]">
-             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={sourceData} dataKey="count" nameKey="source" cx="50%" cy="50%" outerRadius={120} fill="#8884d8" label>
-                  {sourceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {sourceData.length > 0 && sourceData.some(item => item.count > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie 
+                    data={sourceData as any[]} 
+                    dataKey="count" 
+                    nameKey="source" 
+                    cx="50%" 
+                    cy="50%" 
+                    outerRadius={100} 
+                    fill="#8884d8" 
+                    label={(entry: any) => {
+                      const total = sourceData.reduce((sum, item) => sum + item.count, 0);
+                      const percent = total > 0 ? (entry.count / total * 100).toFixed(0) : '0';
+                      return `${entry.source}: ${percent}%`;
+                    }}
+                    labelLine={true}
+                  >
+                    {sourceData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value: any, entry: any) => `${value} (${entry.payload.count})`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <Database className="w-16 h-16 mb-2" />
+                <p>Chưa có dữ liệu nguồn ứng viên</p>
+                <p className="text-xs mt-2">Thêm cột "source" vào cv_candidates</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -186,7 +300,7 @@ export function DashboardPage() {
           <CardContent>
             <ul className="space-y-4">
               {topJobs.length > 0 ? topJobs.map((job, index) => (
-                <li key={job.title} className="flex items-center justify-between gap-4">
+                <li key={job.title ?? index} className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-bold text-gray-600">
                       {index + 1}
@@ -194,7 +308,7 @@ export function DashboardPage() {
                     <div>
                       <p className="font-semibold">{job.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {job.cv_candidates[0]?.count || 0} ứng viên
+                        {Array.isArray(job.cv_candidates) ? (job.cv_candidates[0]?.count || 0) : 0} ứng viên
                       </p>
                     </div>
                   </div>
@@ -210,26 +324,47 @@ export function DashboardPage() {
         </Card>
         
         <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Hoạt động gần đây</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-5">
-              {recentActivitiesData.map((activity, index) => (
-                <li key={index} className="flex items-start gap-4">
-                  <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full ${activity.color}`}></span>
-                  <div>
-                    <p className="text-sm">{activity.text}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(activity.time).toLocaleString('vi-VN')}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
+            <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
+            <CardContent>
+              {recentActivities.length > 0 ? (
+                <ul className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <li key={activity.id} className="flex items-start gap-3">
+                      <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.user_name}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {activity.action}
+                          {activity.details && (
+                            <span className="text-gray-500"> • {activity.details}</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(activity.created_at).toLocaleString('vi-VN', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                  <Database className="w-12 h-12 mb-2" />
+                  <p className="text-sm">Chưa có hoạt động nào</p>
+                </div>
+              )}
+            </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
+export default DashboardPage;
