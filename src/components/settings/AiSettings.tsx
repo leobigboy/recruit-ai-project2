@@ -132,25 +132,15 @@ const AiSettings = () => {
 
     setTestingGemini(true);
     try {
-      // Gọi API endpoint
-      const response = await fetch('/api/test-gemini', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey: config.gemini_api_key
-        })
-      });
-
-      const data = await response.json();
+      // Gọi trực tiếp (hoạt động cả local và production)
+      const result = await testGeminiConnection(config.gemini_api_key);
       
-      if (data.success) {
+      if (result.success) {
         setGeminiStatus('configured');
         alert('✅ Kết nối Gemini AI thành công!');
       } else {
         setGeminiStatus('error');
-        alert(`❌ Kết nối Gemini AI thất bại: ${data.error}`);
+        alert(`❌ Kết nối Gemini AI thất bại: ${result.error}`);
       }
     } catch (error: any) {
       setGeminiStatus('error');
