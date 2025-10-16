@@ -20,6 +20,7 @@ interface AIConfig {
 const AiSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingOpenAI, setTestingOpenAI] = useState(false);
   const [testingGemini, setTestingGemini] = useState(false);
   const [openAIStatus, setOpenAIStatus] = useState<'unconfigured' | 'configured' | 'error'>('unconfigured');
   const [geminiStatus, setGeminiStatus] = useState<'unconfigured' | 'configured' | 'error'>('unconfigured');
@@ -77,7 +78,7 @@ const AiSettings = () => {
       return;
     }
 
-    // Tạm thời không test OpenAI vì CORS, chỉ validate format
+    // Validate format
     if (!config.openai_api_key.startsWith('sk-')) {
       alert('❌ OpenAI API Key không hợp lệ. Key phải bắt đầu bằng "sk-"');
       setOpenAIStatus('error');
@@ -90,9 +91,37 @@ const AiSettings = () => {
       return;
     }
 
-    // Tự động đánh dấu đã cấu hình
-    setOpenAIStatus('configured');
-    alert('✅ OpenAI Key đã được lưu!\n\nLưu ý: Test kết nối sẽ được thực hiện khi deploy production với backend API.');
+    setTestingOpenAI(true);
+    
+    try {
+      // Gọi API endpoint
+      const response = await fetch('/api/test-openai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: config.openai_api_key,
+          endpoint: config.openai_endpoint
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOpenAIStatus('configured');
+        alert('✅ Kết nối OpenAI thành công!');
+      } else {
+        setOpenAIStatus('error');
+        alert(`❌ Kết nối OpenAI thất bại: ${data.error}`);
+      }
+    } catch (error: any) {
+      setOpenAIStatus('error');
+      alert('❌ Lỗi khi kết nối OpenAI: ' + (error.message || 'Unknown error'));
+      console.error('OpenAI test error:', error);
+    } finally {
+      setTestingOpenAI(false);
+    }
   };
 
   const testGemini = async () => {
@@ -103,6 +132,7 @@ const AiSettings = () => {
 
     setTestingGemini(true);
     try {
+      // Gọi trực tiếp (hoạt động cả local và production)
       const result = await testGeminiConnection(config.gemini_api_key);
       
       if (result.success) {
@@ -222,12 +252,6 @@ const AiSettings = () => {
                   OpenAI Platform
                 </a>
               </p>
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  <strong>Lưu ý:</strong> Test kết nối OpenAI sẽ được thực hiện khi deploy production.
-                </p>
-              </div>
             </div>
 
             <div className="space-y-2">
@@ -493,11 +517,20 @@ const AiSettings = () => {
             <Button 
               variant="outline" 
               className="justify-center"
-              disabled={!config.openai_api_key}
+              disabled={!config.openai_api_key || testingOpenAI}
               onClick={testOpenAI}
             >
-              <Sparkles className="h-4 w-4 mr-2 text-gray-400" />
-              Xác thực OpenAI Key
+              {testingOpenAI ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Đang test...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2 text-gray-400" />
+                  Test OpenAI
+                </>
+              )}
             </Button>
             <Button 
               variant="outline" 
@@ -518,9 +551,6 @@ const AiSettings = () => {
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            💡 Test OpenAI chỉ validate format key. Test kết nối thực tế sẽ được thực hiện khi deploy production.
-          </p>
         </div>
 
         {/* Configuration Details */}
