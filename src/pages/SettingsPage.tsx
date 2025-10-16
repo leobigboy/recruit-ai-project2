@@ -56,11 +56,45 @@ export function SettingsPage() {
       return;
     }
 
+    // Validation
+    if (!profile.company_name || profile.company_name.trim() === '') {
+      alert("⚠️ Vui lòng nhập tên công ty!");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.from('cv_company_profile').upsert({ ...profile, id: profile.id || undefined });
-    setLoading(false);
-    if (error) alert("Lỗi! Không thể lưu thay đổi.");
-    else alert("Đã lưu thay đổi thành công!");
+    
+    try {
+      const { error } = await supabase
+        .from('cv_company_profile')
+        .upsert({ 
+          ...profile, 
+          id: profile.id || undefined,
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) {
+        console.error("Save error:", error);
+        alert("❌ Lỗi! Không thể lưu thay đổi: " + error.message);
+      } else {
+        alert("✅ Đã lưu thay đổi thành công! Tên công ty sẽ được cập nhật trên sidebar.");
+        
+        // Reload lại profile để đảm bảo data mới nhất
+        const { data: updatedData } = await supabase
+          .from('cv_company_profile')
+          .select('*')
+          .single();
+        
+        if (updatedData) {
+          setProfile(updatedData);
+        }
+      }
+    } catch (error: any) {
+      console.error("Unexpected error:", error);
+      alert("❌ Có lỗi xảy ra: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
@@ -101,8 +135,19 @@ export function SettingsPage() {
         
         {/* Chỉ hiển thị nút Save cho tab Company */}
         {activeTab === "company" && (
-          <div className="flex justify-end pt-4">
-            <Button size="lg" onClick={handleSave} disabled={loading}>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button 
+              variant="outline"
+              onClick={() => window.location.reload()}
+              disabled={loading}
+            >
+              Hủy
+            </Button>
+            <Button 
+              size="lg" 
+              onClick={handleSave} 
+              disabled={loading || !profile.company_name}
+            >
               {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>

@@ -12,7 +12,7 @@ import { InterviewsPage } from "./pages/InterviewsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { EmailPage } from "./pages/EmailPage";
-
+import './i18n/config';
 const router = createBrowserRouter([
   // Public Routes (Authentication)
   {

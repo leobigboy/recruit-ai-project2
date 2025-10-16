@@ -1,0 +1,84 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "jobs": "Job Descriptions",
+    "candidates": "Candidates",
+    "interviews": "Interviews",
+    "reviews": "Interview Reviews",
+    "email": "Email Management",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Recruitment Management System",
+    "refresh": "Refresh",
+    "totalCV": "Total CVs",
+    "openJobs": "Open Positions",
+    "interviewingCV": "Interviewing CVs",
+    "avgTime": "Avg Hiring Time",
+    "comparedToLastMonth": "compared to last month",
+    "cvTrend": "CV Trend Over Time",
+    "candidateSources": "Candidate Sources",
+    "topJobs": "Top Hiring Positions",
+    "recentActivities": "Recent Activities",
+    "noData": "No data available",
+    "hot": "Hot",
+    "normal": "Normal",
+    "candidates": "candidates"
+  },
+  "settings": {
+    "title": "Settings",
+    "company": {
+      "title": "Company Information",
+      "description": "Update basic information about your company",
+      "name": "Company Name",
+      "website": "Website",
+      "address": "Office Address",
+      "email": "Contact Email",
+      "description_label": "Company Description",
+      "description_placeholder": "Enter company description, work culture, core values..."
+    },
+    "language": {
+      "title": "System Language",
+      "description": "Select display language for the entire system",
+      "vietnamese": "Vietnamese",
+      "english": "English"
+    },
+    "logo": {
+      "title": "Company Logo",
+      "description": "Upload logo to display on the system",
+      "change": "Change Logo",
+      "format": "File format: JPG, PNG, GIF, SVG. Max size: 2MB"
+    },
+    "colors": {
+      "title": "Interface Colors",
+      "description": "Colors will be applied to the entire interface",
+      "button": "Button Color",
+      "menu": "Menu Color",
+      "preview": "Color Preview",
+      "primaryButton": "Primary Button Color",
+      "menuBackground": "Menu Background Color"
+    },
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "saved": "Saved successfully!"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "profileSettings": "Profile Settings"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import"
+  }
+}

@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { User, Briefcase, ClipboardList, Clock, RefreshCw, Database } from 'lucide-react';
+import { User, Briefcase, ClipboardList, Clock, RefreshCw, Database, Flame } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
@@ -36,6 +36,13 @@ export function DashboardPage() {
     created_at: string;
   }
 
+  interface TopJobData {
+    id: string;
+    title: string;
+    candidate_count: number;
+    status: string;
+  }
+
   const [stats, setStats] = useState<StatsData>({ 
     totalCV: 0, 
     openJobs: 0, 
@@ -44,7 +51,7 @@ export function DashboardPage() {
   });
   const [trendData, setTrendData] = useState<TrendData[]>([]);
   const [sourceData, setSourceData] = useState<SourceData[]>([]);
-  const [topJobs, setTopJobs] = useState<any[]>([]);
+  const [topJobs, setTopJobs] = useState<TopJobData[]>([]);
   const [recentActivities, setRecentActivities] = useState<ActivityData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,15 +98,33 @@ export function DashboardPage() {
         ]);
       }
 
-      // Lấy top vị trí tuyển dụng
+      // Lấy top vị trí tuyển dụng theo số ứng viên
       const { data: jobs, error: jobsError } = await supabase
         .from('cv_jobs')
-        .select('title, cv_candidates(count)')
-        .order('count', { foreignTable: 'cv_candidates', ascending: false })
-        .limit(4);
+        .select(`
+          id,
+          title,
+          status,
+          cv_candidates(count)
+        `);
       
-      if (jobsError) console.error("Error fetching top jobs:", jobsError);
-      if (jobs) setTopJobs(jobs);
+      if (jobsError) {
+        console.error("Error fetching top jobs:", jobsError);
+      } else if (jobs) {
+        // Xử lý và sắp xếp dữ liệu
+        const jobsWithCount = jobs.map(job => ({
+          id: job.id,
+          title: job.title,
+          status: job.status,
+          candidate_count: job.cv_candidates?.[0]?.count || 0
+        }));
+
+        // Sắp xếp theo số lượng ứng viên từ cao xuống thấp
+        const sortedJobs = jobsWithCount.sort((a, b) => b.candidate_count - a.candidate_count);
+        
+        // Lấy top 6 vị trí
+        setTopJobs(sortedJobs.slice(0, 6));
+      }
 
       // Lấy hoạt động gần đây
       const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { limit_count: 6 });
@@ -243,63 +268,102 @@ export function DashboardPage() {
         </Card>
 
         <Card className="bg-white shadow-sm">
-            <CardHeader><CardTitle>Top vị trí tuyển dụng</CardTitle></CardHeader>
-            <CardContent>
-                <ul className="space-y-4">
-                    {topJobs.length > 0 ? topJobs.map((job, index) => (
-                        <li key={job.title} className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-bold text-gray-600">{index + 1}</span>
-                                <div>
-                                    <p className="font-semibold">{job.title}</p>
-                                    <p className="text-sm text-muted-foreground">{job.cv_candidates[0]?.count || 0} ứng viên</p>
-                                </div>
-                            </div>
-                            <Badge variant={index === 0 ? "destructive" : "secondary"}>{index === 0 ? "Hot" : "Bình thường"}</Badge>
-                        </li>
-                    )) : <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>}
-                </ul>
-            </CardContent>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              Top vị trí tuyển dụng
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {topJobs.length > 0 ? (
+              <ul className="space-y-3">
+                {topJobs.map((job, index) => (
+                  <li 
+                    key={job.id} 
+                    className="flex items-center justify-between gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span 
+                        className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 ${
+                          index < 3 
+                            ? 'bg-gradient-to-br from-orange-400 to-red-500 text-white shadow-md' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {index + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" title={job.title}>
+                          {job.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {job.candidate_count} ứng viên
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={index < 3 ? "destructive" : "secondary"}
+                      className={index < 3 ? "bg-gradient-to-r from-orange-500 to-red-500 text-white border-0" : ""}
+                    >
+                      {index < 3 ? (
+                        <span className="flex items-center gap-1">
+                          <Flame className="w-3 h-3" />
+                          Hot
+                        </span>
+                      ) : (
+                        "Bình thường"
+                      )}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <Database className="w-12 h-12 mb-2" />
+                <p className="text-sm">Chưa có dữ liệu vị trí tuyển dụng</p>
+              </div>
+            )}
+          </CardContent>
         </Card>
         
         <Card className="bg-white shadow-sm">
-             <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
-             <CardContent>
-                {recentActivities.length > 0 ? (
-                  <ul className="space-y-4">
-                    {recentActivities.map((activity) => (
-                      <li key={activity.id} className="flex items-start gap-3">
-                        <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            {activity.user_name}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {activity.action}
-                            {activity.details && (
-                              <span className="text-gray-500"> • {activity.details}</span>
-                            )}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {new Date(activity.created_at).toLocaleString('vi-VN', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                    <Database className="w-12 h-12 mb-2" />
-                    <p className="text-sm">Chưa có hoạt động nào</p>
-                  </div>
-                )}
-             </CardContent>
+          <CardHeader><CardTitle>Hoạt động gần đây</CardTitle></CardHeader>
+          <CardContent>
+            {recentActivities.length > 0 ? (
+              <ul className="space-y-4">
+                {recentActivities.map((activity) => (
+                  <li key={activity.id} className="flex items-start gap-3">
+                    <span className={`block w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${getActivityColor(activity.action)}`}></span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {activity.user_name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {activity.action}
+                        {activity.details && (
+                          <span className="text-gray-500"> • {activity.details}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {new Date(activity.created_at).toLocaleString('vi-VN', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                <Database className="w-12 h-12 mb-2" />
+                <p className="text-sm">Chưa có hoạt động nào</p>
+              </div>
+            )}
+          </CardContent>
         </Card>
       </div>
     </div>

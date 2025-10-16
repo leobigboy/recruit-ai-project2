@@ -1,0 +1,84 @@
+{
+  "nav": {
+    "dashboard": "Bảng điều khiển",
+    "jobs": "Mô tả công việc",
+    "candidates": "Ứng viên",
+    "interviews": "Lịch phỏng vấn",
+    "reviews": "Đánh giá phỏng vấn",
+    "email": "Quản lý email",
+    "settings": "Cài đặt"
+  },
+  "dashboard": {
+    "title": "Bảng điều khiển",
+    "subtitle": "Hệ thống quản lý tuyển dụng",
+    "refresh": "Làm mới",
+    "totalCV": "Tổng CV",
+    "openJobs": "Vị trí đang tuyển",
+    "interviewingCV": "CV phỏng vấn",
+    "avgTime": "Thời gian tuyển TB",
+    "comparedToLastMonth": "so với tháng trước",
+    "cvTrend": "Xu hướng CV theo thời gian",
+    "candidateSources": "Nguồn ứng viên",
+    "topJobs": "Top vị trí tuyển dụng",
+    "recentActivities": "Hoạt động gần đây",
+    "noData": "Chưa có dữ liệu",
+    "hot": "Hot",
+    "normal": "Bình thường",
+    "candidates": "ứng viên"
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "company": {
+      "title": "Thông tin công ty",
+      "description": "Cập nhật thông tin cơ bản về công ty của bạn",
+      "name": "Tên công ty",
+      "website": "Website",
+      "address": "Địa chỉ văn phòng",
+      "email": "Email liên hệ",
+      "description_label": "Mô tả công ty",
+      "description_placeholder": "Nhập mô tả về công ty, văn hóa làm việc, giá trị cốt lõi..."
+    },
+    "language": {
+      "title": "Ngôn ngữ hệ thống",
+      "description": "Chọn ngôn ngữ hiển thị cho toàn bộ hệ thống",
+      "vietnamese": "Tiếng Việt",
+      "english": "English"
+    },
+    "logo": {
+      "title": "Logo công ty",
+      "description": "Tải lên logo để hiển thị trên hệ thống",
+      "change": "Thay đổi logo",
+      "format": "Định dạng file: JPG, PNG, GIF, SVG. Kích thước tối đa: 2MB"
+    },
+    "colors": {
+      "title": "Màu sắc giao diện",
+      "description": "Màu sắc sẽ được áp dụng cho toàn bộ giao diện",
+      "button": "Màu button",
+      "menu": "Màu menu",
+      "preview": "Xem trước màu sắc",
+      "primaryButton": "Màu button chính",
+      "menuBackground": "Màu nền menu"
+    },
+    "save": "Lưu thay đổi",
+    "saving": "Đang lưu...",
+    "saved": "Đã lưu thành công!"
+  },
+  "auth": {
+    "login": "Đăng nhập",
+    "logout": "Đăng xuất",
+    "register": "Đăng ký",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "profileSettings": "Cài đặt tài khoản"
+  },
+  "common": {
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "search": "Tìm kiếm",
+    "filter": "Lọc",
+    "export": "Xuất",
+    "import": "Nhập"
+  }
+}
