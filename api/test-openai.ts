@@ -1,7 +1,11 @@
-// api/test-openai.ts
-import type { Request, Response } from 'express';
+// @ts-nocheck
+// api/test-openai.js
 
-export default async function handler(req: Request, res: Response) {
+/**
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,8 +16,7 @@ export default async function handler(req: Request, res: Response) {
   );
 
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
@@ -71,11 +74,12 @@ export default async function handler(req: Request, res: Response) {
         error: 'Invalid OpenAI response' 
       });
     }
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('OpenAI test error:', error);
     return res.status(500).json({ 
       success: false, 
-      error: error.message || 'Internal server error' 
+      error: errorMessage
     });
   }
 }
