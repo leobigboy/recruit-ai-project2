@@ -1,4 +1,3 @@
-// src/pages/JobsPage.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -87,6 +86,9 @@ export function JobsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiLanguage, setAiLanguage] = useState('vietnamese');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
 
   useEffect(() => {
     fetchJobs();
@@ -243,6 +245,22 @@ export function JobsPage() {
     });
   };
 
+  const filteredJobs = jobs.filter((job) => {
+    const lowerQuery = searchQuery.toLowerCase();
+    const matchesSearch =
+      job.title.toLowerCase().includes(lowerQuery) ||
+      job.department.toLowerCase().includes(lowerQuery) ||
+      (job.level || '').toLowerCase().includes(lowerQuery) ||
+      (job.job_type || '').toLowerCase().includes(lowerQuery) ||
+      (job.work_location || '').toLowerCase().includes(lowerQuery) ||
+      (job.location || '').toLowerCase().includes(lowerQuery);
+
+    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+    const matchesDepartment = departmentFilter === 'all' || job.department === departmentFilter;
+
+    return matchesSearch && matchesStatus && matchesDepartment;
+  });
+
   const totalJobs = jobs.length;
   const openJobs = jobs.filter(job => job.status === 'Đã đăng').length;
 
@@ -320,7 +338,7 @@ export function JobsPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-gray-900">Danh sách JD ({jobs.length})</CardTitle>
+          <CardTitle className="text-gray-900">Danh sách JD ({filteredJobs.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 mb-4">
@@ -328,10 +346,12 @@ export function JobsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input 
                 placeholder="Tìm kiếm theo tiêu đề, phòng ban, vị trí..." 
-                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500" 
+                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px] border-gray-300">
                 <SelectValue placeholder="Tất cả trạng thái" />
               </SelectTrigger>
@@ -342,14 +362,17 @@ export function JobsPage() {
                 <SelectItem value="Đã đóng">Đã đóng</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px] border-gray-300">
                 <SelectValue placeholder="Tất cả phòng ban" />
               </SelectTrigger>
               <SelectContent className="min-w-[180px] bg-white z-50 shadow-lg border border-gray-200" align="start" sideOffset={4}>
                 <SelectItem value="all">Tất cả phòng ban</SelectItem>
-                <SelectItem value="engineering">Engineering</SelectItem>
-                <SelectItem value="design">Design</SelectItem>
+                <SelectItem value="Engineering">Engineering</SelectItem>
+                <SelectItem value="Design">Design</SelectItem>
+                <SelectItem value="Product">Product</SelectItem>
+                <SelectItem value="Marketing">Marketing</SelectItem>
+                <SelectItem value="Sales">Sales</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -374,19 +397,22 @@ export function JobsPage() {
                       Đang tải dữ liệu...
                     </TableCell>
                   </TableRow>
-                ) : jobs.length === 0 ? (
+                ) : filteredJobs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center h-24 text-gray-500">
                       Chưa có JD nào. Hãy tạo JD đầu tiên!
                     </TableCell>
                   </TableRow>
                 ) : (
-                  jobs.map((job) => (
+                  filteredJobs.map((job) => (
                     <TableRow key={job.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="font-medium text-gray-900">{job.title}</div>
                         <div className="text-sm text-gray-500">{job.level} • {job.job_type || 'Full-time'}</div>
                       </TableCell>
+                      <TableCell className="text-gray-700">{job.department}</TableCell>
+                      <TableCell className="text-gray-700">{job.work_location || job.location || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell className="text-gray-700">{job.cv_candidates[0]?.count || 0}</TableCell>
                       <TableCell className="text-gray-700">0</TableCell>
                       <TableCell className="text-gray-700">
