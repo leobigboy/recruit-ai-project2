@@ -31,19 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { supabase } from "@/lib/supabaseClient"
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "Đã đăng":
-      return <Badge className="bg-blue-100 text-blue-800 border-blue-200">{status}</Badge>
-    case "Nháp":
-      return <Badge className="bg-gray-100 text-gray-800 border-gray-200">{status}</Badge>
-    case "Đã đóng":
-      return <Badge className="bg-red-100 text-red-800 border-red-200">{status}</Badge>
-    default:
-      return <Badge variant="secondary">{status}</Badge>
-  }
-}
+import { useTranslation } from 'react-i18next'
 
 interface Job {
   id: string;
@@ -58,9 +46,42 @@ interface Job {
 }
 
 export function JobsPage() {
+  const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [totalCandidatesCount, setTotalCandidatesCount] = useState(0); // <-- State mới để lưu tổng ứng viên
+  const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Hàm để lấy status badge với đa ngôn ngữ
+  const getStatusBadge = (status: string) => {
+    let translatedStatus = status;
+    let badgeClass = "bg-gray-100 text-gray-800 border-gray-200";
+
+    if (status === "Đã đăng" || status === "Published") {
+      translatedStatus = t('jobs.status.published');
+      badgeClass = "bg-blue-100 text-blue-800 border-blue-200";
+    } else if (status === "Nháp" || status === "Draft") {
+      translatedStatus = t('jobs.status.draft');
+      badgeClass = "bg-gray-100 text-gray-800 border-gray-200";
+    } else if (status === "Đã đóng" || status === "Closed") {
+      translatedStatus = t('jobs.status.closed');
+      badgeClass = "bg-red-100 text-red-800 border-red-200";
+    }
+
+    return <Badge className={badgeClass}>{translatedStatus}</Badge>;
+  };
+
+  // Hàm để dịch job type
+  const translateJobType = (jobType?: string) => {
+    if (!jobType) return t('jobs.jobTypes.fulltime');
+    
+    const lowerType = jobType.toLowerCase();
+    if (lowerType.includes('full')) return t('jobs.jobTypes.fulltime');
+    if (lowerType.includes('part')) return t('jobs.jobTypes.parttime');
+    if (lowerType.includes('contract') || lowerType.includes('hợp đồng')) return t('jobs.jobTypes.contract');
+    if (lowerType.includes('remote')) return t('jobs.jobTypes.remote');
+    
+    return jobType;
+  };
 
   useEffect(() => {
     async function getJobsData() {
@@ -88,7 +109,7 @@ export function JobsPage() {
         setTotalCandidatesCount(count);
       }
       if (countError) {
-          console.error('Error fetching total candidates count:', countError);
+        console.error('Error fetching total candidates count:', countError);
       }
 
       setLoading(false);
@@ -97,84 +118,173 @@ export function JobsPage() {
   }, []);
 
   const totalJobs = jobs.length;
-  const openJobs = jobs.filter(job => job.status === 'Đã đăng').length;
+  const openJobs = jobs.filter(job => job.status === 'Đã đăng' || job.status === 'Published').length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Mô tả công việc</h1>
-          <p className="text-sm text-muted-foreground">Quản lý và tạo mô tả công việc</p>
+          <h1 className="text-2xl font-bold">{t('jobs.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('jobs.subtitle')}</p>
         </div>
         <Button>
           <Plus className="w-4 h-4 mr-2" />
-          Tạo JD mới
+          {t('jobs.createNew')}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng JDs</CardTitle><FileText className="h-5 w-5 text-blue-500"/></CardHeader><CardContent><div className="text-2xl font-bold">{totalJobs}</div><p className="text-xs text-muted-foreground">+0 so với tháng trước</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">JDs đang mở</CardTitle><CheckCircle className="h-5 w-5 text-green-500"/></CardHeader><CardContent><div className="text-2xl font-bold">{openJobs}</div><p className="text-xs text-muted-foreground">+0%</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Tổng ứng viên</CardTitle><Users className="h-5 w-5 text-purple-500"/></CardHeader><CardContent><div className="text-2xl font-bold">{totalCandidatesCount}</div><p className="text-xs text-muted-foreground">Sẽ cập nhật sau</p></CardContent></Card>
-          <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Lượt xem</CardTitle><Eye className="h-5 w-5 text-orange-500"/></CardHeader><CardContent><div className="text-2xl font-bold">0</div><p className="text-xs text-muted-foreground">Sẽ cập nhật sau</p></CardContent></Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t('jobs.stats.totalJDs')}</CardTitle>
+            <FileText className="h-5 w-5 text-blue-500"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalJobs}</div>
+            <p className="text-xs text-muted-foreground">+0 {t('jobs.stats.comparedToLastMonth')}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t('jobs.stats.openJDs')}</CardTitle>
+            <CheckCircle className="h-5 w-5 text-green-500"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{openJobs}</div>
+            <p className="text-xs text-muted-foreground">+0%</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t('jobs.stats.totalCandidates')}</CardTitle>
+            <Users className="h-5 w-5 text-purple-500"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalCandidatesCount}</div>
+            <p className="text-xs text-muted-foreground">{t('jobs.stats.willUpdateLater')}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t('jobs.stats.views')}</CardTitle>
+            <Eye className="h-5 w-5 text-orange-500"/>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">{t('jobs.stats.willUpdateLater')}</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách JD ({jobs.length})</CardTitle>
+          <CardTitle>{t('jobs.list.title')} ({jobs.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input placeholder="Tìm kiếm theo tiêu đề, phòng ban, vị trí..." className="pl-10" />
+              <Input placeholder={t('jobs.list.searchPlaceholder')} className="pl-10" />
             </div>
-            <Select><SelectTrigger className="w-[180px]"><SelectValue placeholder="Tất cả trạng thái" /></SelectTrigger><SelectContent><SelectItem value="all">Tất cả trạng thái</SelectItem></SelectContent></Select>
-            <Select><SelectTrigger className="w-[180px]"><SelectValue placeholder="Tất cả phòng ban" /></SelectTrigger><SelectContent><SelectItem value="all">Tất cả phòng ban</SelectItem></SelectContent></Select>
+            <Select>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={t('jobs.list.allStatus')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('jobs.list.allStatus')}</SelectItem>
+                <SelectItem value="published">{t('jobs.status.published')}</SelectItem>
+                <SelectItem value="draft">{t('jobs.status.draft')}</SelectItem>
+                <SelectItem value="closed">{t('jobs.status.closed')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder={t('jobs.list.allDepartments')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('jobs.list.allDepartments')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="border rounded-lg">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Vị trí</TableHead>
-                  <TableHead>Phòng ban</TableHead>
-                  <TableHead>Địa điểm</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Ứng viên</TableHead>
-                  <TableHead>Lượt xem</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
-                  <TableHead className="text-right">Hành động</TableHead>
+                  <TableHead>{t('jobs.table.position')}</TableHead>
+                  <TableHead>{t('jobs.table.department')}</TableHead>
+                  <TableHead>{t('jobs.table.location')}</TableHead>
+                  <TableHead>{t('jobs.table.status')}</TableHead>
+                  <TableHead>{t('jobs.table.candidates')}</TableHead>
+                  <TableHead>{t('jobs.table.views')}</TableHead>
+                  <TableHead>{t('jobs.table.createdDate')}</TableHead>
+                  <TableHead className="text-right">{t('jobs.table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center h-24">Đang tải dữ liệu...</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center h-24">
+                      {t('jobs.list.loading')}
+                    </TableCell>
+                  </TableRow>
+                ) : jobs.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center h-24 text-muted-foreground">
+                      {t('dashboard.noData')}
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   jobs.map((job) => (
                     <TableRow key={job.id}>
                       <TableCell>
                         <div className="font-medium">{job.title}</div>
-                        <div className="text-sm text-muted-foreground">{job.level} • {job.job_type || 'Full-time'}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {job.level} • {translateJobType(job.job_type)}
+                        </div>
                       </TableCell>
                       <TableCell>{job.department}</TableCell>
-                      <TableCell>{job.location || 'Remote'}</TableCell>
+                      <TableCell>{job.location || t('jobs.jobTypes.remote')}</TableCell>
                       <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell>{job.cv_candidates[0]?.count || 0}</TableCell>
                       <TableCell>0</TableCell>
-                      <TableCell>{new Date(job.created_at).toLocaleDateString('vi-VN')}</TableCell>
+                      <TableCell>
+                        {new Date(job.created_at).toLocaleDateString(
+                          i18n.language === 'vi' ? 'vi-VN' : 'en-US'
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Hành động</DropdownMenuLabel>
-                            <DropdownMenuItem><Eye className="mr-2 h-4 w-4" /><span>Xem chi tiết</span></DropdownMenuItem>
-                            <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /><span>Chỉnh sửa</span></DropdownMenuItem>
-                            <DropdownMenuItem><Copy className="mr-2 h-4 w-4" /><span>Sao chép</span></DropdownMenuItem>
-                            <DropdownMenuItem><Share2 className="mr-2 h-4 w-4" /><span>Chia sẻ</span></DropdownMenuItem>
+                            <DropdownMenuLabel>{t('jobs.actions.title')}</DropdownMenuLabel>
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              <span>{t('jobs.actions.viewDetails')}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>{t('jobs.actions.edit')}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="mr-2 h-4 w-4" />
+                              <span>{t('jobs.actions.copy')}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Share2 className="mr-2 h-4 w-4" />
+                              <span>{t('jobs.actions.share')}</span>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50"><Trash2 className="mr-2 h-4 w-4" /><span>Xóa</span></DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>{t('jobs.actions.delete')}</span>
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

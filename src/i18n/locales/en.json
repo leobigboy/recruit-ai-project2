@@ -11,20 +11,34 @@
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "Recruitment Management System",
+    "systemOverview": "System Overview",
     "refresh": "Refresh",
-    "totalCV": "Total CVs",
-    "openJobs": "Open Positions",
-    "interviewingCV": "Interviewing CVs",
-    "avgTime": "Avg Hiring Time",
-    "comparedToLastMonth": "compared to last month",
-    "cvTrend": "CV Trend Over Time",
-    "candidateSources": "Candidate Sources",
-    "topJobs": "Top Hiring Positions",
-    "recentActivities": "Recent Activities",
+    "realTimeData": "Dashboard is displaying real-time data from your system.",
+    "stats": {
+      "totalCV": "Total CVs",
+      "openJobs": "Open Positions",
+      "interviewingCV": "Interviewing CVs",
+      "avgTime": "Avg Hiring Time",
+      "comparedToLastMonth": "compared to last month"
+    },
+    "charts": {
+      "cvTrend": "CV Trend Over Time",
+      "candidateSources": "Candidate Sources",
+      "topJobs": "Top Hiring Positions",
+      "recentActivities": "Recent Activities",
+      "cvCount": "CV Count"
+    },
+    "topJobs": {
+      "hot": "Hot",
+      "normal": "Normal",
+      "candidates": "candidates"
+    },
     "noData": "No data available",
-    "hot": "Hot",
-    "normal": "Normal",
-    "candidates": "candidates"
+    "noDataSources": "No candidate source data",
+    "addSourceColumn": "Add \"source\" column to cv_candidates",
+    "noJobsData": "No job positions data",
+    "noActivities": "No activities yet",
+    "loading": "Loading..."
   },
   "settings": {
     "title": "Settings",
@@ -79,6 +93,248 @@
     "search": "Search",
     "filter": "Filter",
     "export": "Export",
-    "import": "Import"
+    "import": "Import",
+    "quantity": "Quantity"
+  },
+  "jobs": {
+    "title": "Job Descriptions",
+    "subtitle": "Manage and create job descriptions",
+    "createNew": "Create New JD",
+    "stats": {
+      "totalJDs": "Total JDs",
+      "openJDs": "Open JDs",
+      "totalCandidates": "Total Candidates",
+      "views": "Views",
+      "comparedToLastMonth": "compared to last month",
+      "willUpdateLater": "Will update later"
+    },
+    "list": {
+      "title": "JD List",
+      "searchPlaceholder": "Search by title, department, position...",
+      "allStatus": "All Status",
+      "allDepartments": "All Departments",
+      "loading": "Loading data..."
+    },
+    "table": {
+      "position": "Position",
+      "department": "Department",
+      "location": "Location",
+      "status": "Status",
+      "candidates": "Candidates",
+      "views": "Views",
+      "createdDate": "Created Date",
+      "actions": "Actions"
+    },
+    "status": {
+      "published": "Published",
+      "draft": "Draft",
+      "closed": "Closed"
+    },
+    "actions": {
+      "title": "Actions",
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "copy": "Copy",
+      "share": "Share",
+      "delete": "Delete"
+    },
+    "jobTypes": {
+      "fulltime": "Full-time",
+      "parttime": "Part-time",
+      "contract": "Contract",
+      "remote": "Remote"
+    }
+  },
+  "candidates": {
+    "title": "Candidate Management",
+    "subtitle": "Manage and track all candidates",
+    "refresh": "Refresh",
+    "addCandidate": "Add Candidate",
+    "stats": {
+      "totalCandidates": "Total Candidates",
+      "interviewing": "Interviewing",
+      "screened": "Screened",
+      "successRate": "Success Rate",
+      "comparedToLastMonth": "compared to last month"
+    },
+    "info": {
+      "showing": "Showing",
+      "of": "/",
+      "candidates": "candidates",
+      "lastUpdate": "Last update:",
+      "synced": "Synced"
+    },
+    "search": {
+      "placeholder": "Search by name, email or position...",
+      "allStatus": "All Status",
+      "allPositions": "All Positions",
+      "allLevels": "All Levels"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "position": "Position",
+      "status": "Status",
+      "level": "Level",
+      "appliedDate": "Applied Date",
+      "actions": "Actions",
+      "loading": "Loading data...",
+      "noData": "No candidates yet",
+      "noDataDesc": "Get started by adding your first candidate!",
+      "noExperience": "No experience",
+      "source": "Source:"
+    },
+    "status": {
+      "new": "New",
+      "screening": "Screening",
+      "interviewing": "Interviewing",
+      "offered": "Offered",
+      "hired": "Hired",
+      "rejected": "Rejected"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "aiAnalysis": "AI Analysis",
+      "aiAnalysisDesc": "Analyze all CVs",
+      "export": "Export Data",
+      "exportDesc": "Download Excel",
+      "bulkActions": "Bulk Actions",
+      "bulkActionsDesc": "Update multiple candidates",
+      "reports": "Reports",
+      "reportsDesc": "Detailed statistics"
+    }
+  },
+  "interviews": {
+    "title": "Interview Schedule",
+    "subtitle": "Manage and track interview schedules",
+    "createInterview": "Create Interview",
+    "stats": {
+      "totalThisMonth": "Total (This Month)",
+      "pending": "Pending",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "comparedToLastMonth": "compared to last month"
+    },
+    "list": {
+      "title": "Interview Schedule List",
+      "loading": "Loading data...",
+      "noData": "No interviews scheduled yet"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "position": "Applied Position",
+      "round": "Interview Round",
+      "dateTime": "Date & Time",
+      "interviewer": "Interviewer",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "pending": "Pending",
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "rescheduled": "Rescheduled"
+    },
+    "rounds": {
+      "round1": "Round 1",
+      "round2": "Round 2",
+      "round3": "Round 3",
+      "final": "Final Round"
+    },
+    "actions": {
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "reschedule": "Reschedule"
+    }
+  },
+  "reviews": {
+    "title": "Interview Reviews",
+    "subtitle": "Manage and track interview reviews",
+    "refresh": "Refresh",
+    "stats": {
+      "totalReviews": "Total Reviews",
+      "averageRating": "Average Rating",
+      "recommendationRate": "Recommendation Rate"
+    },
+    "list": {
+      "title": "Review List",
+      "loading": "Loading data...",
+      "noData": "No reviews yet"
+    },
+    "table": {
+      "candidate": "Candidate",
+      "position": "Position",
+      "round": "Round",
+      "interviewer": "Interviewer",
+      "interviewDate": "Interview Date",
+      "rating": "Rating",
+      "actions": "Actions"
+    },
+    "actions": {
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "outcome": {
+      "nextRound": "Next Round",
+      "hired": "Hired",
+      "rejected": "Rejected"
+    }
+  },
+  "settings": {
+    "title": "System Settings",
+    "subtitle": "Manage configuration and customize system",
+    "tabs": {
+      "company": "Company",
+      "ai": "AI",
+      "email": "Email",
+      "notifications": "Notifications",
+      "categories": "Categories",
+      "users": "Users",
+      "permissions": "Permissions"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "save": "Save Changes",
+      "saving": "Saving..."
+    },
+    "messages": {
+      "nameRequired": "⚠️ Please enter company name!",
+      "saveError": "❌ Error! Cannot save changes:",
+      "saveSuccess": "✅ Changes saved successfully! Company name will be updated on sidebar.",
+      "unexpectedError": "❌ An error occurred:"
+    },
+    "company": {
+      "title": "Company Information",
+      "description": "Update basic information about your company",
+      "name": "Company Name",
+      "website": "Website",
+      "address": "Office Address",
+      "email": "Contact Email",
+      "description_label": "Company Description",
+      "description_placeholder": "Enter company description, work culture, core values..."
+    },
+    "language": {
+      "title": "System Language",
+      "description": "Select display language for the entire system",
+      "vietnamese": "Vietnamese",
+      "english": "English"
+    },
+    "logo": {
+      "title": "Company Logo",
+      "description": "Upload logo to display on the system",
+      "change": "Change Logo",
+      "format": "File format: JPG, PNG, GIF, SVG. Max size: 2MB"
+    },
+    "colors": {
+      "title": "Interface Colors",
+      "description": "Colors will be applied to the entire interface",
+      "button": "Button Color",
+      "menu": "Menu Color",
+      "preview": "Color Preview",
+      "primaryButton": "Primary Button Color",
+      "menuBackground": "Menu Background Color"
+    }
   }
 }

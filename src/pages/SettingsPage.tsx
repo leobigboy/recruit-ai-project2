@@ -7,32 +7,35 @@ import { Button } from "@/components/ui/button"
 import { CompanySettings } from "@/components/settings/CompanySettings"
 import AiSettings from "@/components/settings/AiSettings"
 import { supabase } from "@/lib/supabaseClient"
-import { NotificationSettings } from "@/components/settings/NotificationSettings";
-import { EmailSettings } from "@/components/settings/EmailSettings";
-
-const tabs = [
-  { id: "company", label: "Công ty", icon: Building2 },
-  { id: "ai", label: "AI", icon: Bot },
-  { id: "email", label: "Email", icon: Mail },
-  { id: "notifications", label: "Thông báo", icon: Bell },
-  { id: "categories", label: "Danh mục", icon: FolderTree },
-  { id: "users", label: "Người dùng", icon: Users },
-  { id: "permissions", label: "Phân quyền", icon: Shield },
-]
+import { NotificationSettings } from "@/components/settings/NotificationSettings"
+import { EmailSettings } from "@/components/settings/EmailSettings"
+import { useTranslation } from 'react-i18next'
 
 interface CompanyProfile {
-    id?: string;
-    company_name?: string;
-    website?: string;
-    company_description?: string;
-    company_address?: string;
-    contact_email?: string;
+  id?: string;
+  company_name?: string;
+  website?: string;
+  company_description?: string;
+  company_address?: string;
+  contact_email?: string;
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("company");
   const [profile, setProfile] = useState<CompanyProfile>({});
   const [loading, setLoading] = useState(true);
+
+  // Định nghĩa tabs với translation
+  const tabs = [
+    { id: "company", label: t('settings.tabs.company'), icon: Building2 },
+    { id: "ai", label: t('settings.tabs.ai'), icon: Bot },
+    { id: "email", label: t('settings.tabs.email'), icon: Mail },
+    { id: "notifications", label: t('settings.tabs.notifications'), icon: Bell },
+    { id: "categories", label: t('settings.tabs.categories'), icon: FolderTree },
+    { id: "users", label: t('settings.tabs.users'), icon: Users },
+    { id: "permissions", label: t('settings.tabs.permissions'), icon: Shield },
+  ];
 
   useEffect(() => {
     async function getProfile() {
@@ -58,7 +61,7 @@ export function SettingsPage() {
 
     // Validation
     if (!profile.company_name || profile.company_name.trim() === '') {
-      alert("⚠️ Vui lòng nhập tên công ty!");
+      alert(t('settings.messages.nameRequired'));
       return;
     }
 
@@ -75,9 +78,9 @@ export function SettingsPage() {
       
       if (error) {
         console.error("Save error:", error);
-        alert("❌ Lỗi! Không thể lưu thay đổi: " + error.message);
+        alert(t('settings.messages.saveError') + ' ' + error.message);
       } else {
-        alert("✅ Đã lưu thay đổi thành công! Tên công ty sẽ được cập nhật trên sidebar.");
+        alert(t('settings.messages.saveSuccess'));
         
         // Reload lại profile để đảm bảo data mới nhất
         const { data: updatedData } = await supabase
@@ -91,7 +94,7 @@ export function SettingsPage() {
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);
-      alert("❌ Có lỗi xảy ra: " + error.message);
+      alert(t('settings.messages.unexpectedError') + ' ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -101,8 +104,8 @@ export function SettingsPage() {
     <div className="min-h-screen bg-gray-50/50 p-6 md:p-8">
       <div className="mx-auto max-w-5xl space-y-8">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Cài đặt hệ thống</h1>
-          <p className="text-muted-foreground">Quản lý cấu hình và tùy chỉnh hệ thống</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('settings.title')}</h1>
+          <p className="text-muted-foreground">{t('settings.subtitle')}</p>
         </div>
 
         <div className="flex gap-1 sm:gap-2 overflow-x-auto border-b">
@@ -141,14 +144,14 @@ export function SettingsPage() {
               onClick={() => window.location.reload()}
               disabled={loading}
             >
-              Hủy
+              {t('settings.buttons.cancel')}
             </Button>
             <Button 
               size="lg" 
               onClick={handleSave} 
               disabled={loading || !profile.company_name}
             >
-              {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
+              {loading ? t('settings.buttons.saving') : t('settings.buttons.save')}
             </Button>
           </div>
         )}

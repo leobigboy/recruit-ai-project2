@@ -2,8 +2,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-
-// Import translation files
 import vi from './locales/vi.json';
 import en from './locales/en.json';
 
