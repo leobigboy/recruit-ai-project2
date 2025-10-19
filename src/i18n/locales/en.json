@@ -336,5 +336,91 @@
       "primaryButton": "Primary Button Color",
       "menuBackground": "Menu Background Color"
     }
+  },
+  "ai": {
+    "title": "AI Settings",
+    "loading": "Loading configuration...",
+    "openai": {
+      "title": "AI Settings",
+      "description": "Configure OpenAI to use AI features in the system",
+      "apiKey": "OpenAI API Key",
+      "apiKeyPlaceholder": "sk-...",
+      "endpoint": "OpenAI Endpoint",
+      "endpointPlaceholder": "https://api.openai.com/v1",
+      "endpointDescription": "Default OpenAI API endpoint",
+      "getKeyFrom": "Get API key from",
+      "configured": "Configuration saved",
+      "invalid": "Invalid key",
+      "enable": "Enable OpenAI",
+      "enableDescription": "Enable/disable OpenAI features in the system"
+    },
+    "gemini": {
+      "title": "Google Gemini AI",
+      "description": "Configure Google Gemini AI for AI Job Matching and CV analysis",
+      "apiKey": "Gemini API Key",
+      "apiKeyPlaceholder": "AIza...",
+      "getKeyFrom": "Get API key from",
+      "configured": "Configured and connected successfully",
+      "connectionFailed": "Connection failed",
+      "quickSetup": "Quick Setup",
+      "quickSetupDescription": "Use default API key for testing",
+      "useDefaultKey": "Use default key",
+      "enable": "Enable Gemini AI",
+      "enableDescription": "Enable/disable AI Job Matching with Gemini"
+    },
+    "buttons": {
+      "save": "Save AI Settings",
+      "saving": "Saving...",
+      "testOpenAI": "Test OpenAI",
+      "testGemini": "Test Gemini AI",
+      "testing": "Testing..."
+    },
+    "status": {
+      "title": "AI Services Status",
+      "description": "Overview of AI services configuration status",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "error": "Error",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "services": {
+      "openai": {
+        "name": "OpenAI",
+        "description": "AI Evaluation, CV Analysis, Interview Questions"
+      },
+      "gemini": {
+        "name": "Gemini AI",
+        "description": "AI Job Matching, CV-JD Compatibility Analysis"
+      }
+    },
+    "testFeatures": {
+      "title": "Test Features"
+    },
+    "configDetails": {
+      "title": "Configuration Details",
+      "openaiKey": "OpenAI API Key:",
+      "geminiKey": "Gemini API Key:"
+    },
+    "availableFeatures": {
+      "title": "Available AI Features",
+      "aiEvaluation": "AI Candidate Evaluation",
+      "cvAnalysis": "Automatic CV Analysis",
+      "smartJD": "Smart JD Suggestions"
+    },
+    "messages": {
+      "enterOpenAIKey": "Please enter OpenAI API Key and Endpoint",
+      "invalidOpenAIKey": "❌ Invalid OpenAI API Key. Key must start with \"sk-\"",
+      "invalidEndpoint": "❌ Invalid OpenAI Endpoint. Endpoint must start with \"https://\"",
+      "openAISuccess": "✅ OpenAI connection successful!",
+      "openAIFailed": "❌ OpenAI connection failed:",
+      "openAIError": "❌ Error connecting to OpenAI:",
+      "enterGeminiKey": "Please enter Gemini API Key",
+      "geminiSuccess": "✅ Gemini AI connection successful!",
+      "geminiFailed": "❌ Gemini AI connection failed:",
+      "geminiError": "❌ Error connecting to Gemini AI:",
+      "saveError": "❌ Error! Cannot save AI settings.",
+      "saveSuccess": "✅ AI settings saved successfully!"
+    }
   }
 }

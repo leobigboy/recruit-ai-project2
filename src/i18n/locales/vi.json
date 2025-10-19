@@ -336,5 +336,91 @@
       "primaryButton": "Màu button chính",
       "menuBackground": "Màu nền menu"
     }
+  },
+  "ai": {
+    "title": "Cài đặt AI",
+    "loading": "Đang tải cấu hình...",
+    "openai": {
+      "title": "Cài đặt AI",
+      "description": "Cấu hình OpenAI để sử dụng các tính năng AI trong hệ thống",
+      "apiKey": "OpenAI API Key",
+      "apiKeyPlaceholder": "sk-...",
+      "endpoint": "OpenAI Endpoint",
+      "endpointPlaceholder": "https://api.openai.com/v1",
+      "endpointDescription": "Endpoint mặc định của OpenAI API",
+      "getKeyFrom": "Lấy API key từ",
+      "configured": "Đã lưu cấu hình",
+      "invalid": "Key không hợp lệ",
+      "enable": "Kích hoạt OpenAI",
+      "enableDescription": "Bật/tắt các tính năng OpenAI trong hệ thống"
+    },
+    "gemini": {
+      "title": "Google Gemini AI",
+      "description": "Cấu hình Google Gemini AI cho tính năng AI Job Matching và phân tích CV",
+      "apiKey": "Gemini API Key",
+      "apiKeyPlaceholder": "AIza...",
+      "getKeyFrom": "Lấy API key từ",
+      "configured": "Đã cấu hình và kết nối thành công",
+      "connectionFailed": "Kết nối thất bại",
+      "quickSetup": "Cài đặt nhanh",
+      "quickSetupDescription": "Sử dụng API key mặc định để test tính năng",
+      "useDefaultKey": "Dùng key mặc định",
+      "enable": "Kích hoạt Gemini AI",
+      "enableDescription": "Bật/tắt tính năng AI Job Matching với Gemini"
+    },
+    "buttons": {
+      "save": "Lưu cài đặt AI",
+      "saving": "Đang lưu...",
+      "testOpenAI": "Test OpenAI",
+      "testGemini": "Test Gemini AI",
+      "testing": "Đang test..."
+    },
+    "status": {
+      "title": "Trạng thái AI Services",
+      "description": "Tổng quan tình trạng cấu hình các dịch vụ AI",
+      "configured": "Đã cấu hình",
+      "notConfigured": "Chưa cấu hình",
+      "error": "Lỗi",
+      "enabled": "Đã kích hoạt",
+      "disabled": "Chưa kích hoạt"
+    },
+    "services": {
+      "openai": {
+        "name": "OpenAI",
+        "description": "AI Evaluation, Phân tích CV, Tạo câu hỏi phỏng vấn"
+      },
+      "gemini": {
+        "name": "Gemini AI",
+        "description": "AI Job Matching, Phân tích độ phù hợp CV-JD"
+      }
+    },
+    "testFeatures": {
+      "title": "Test tính năng"
+    },
+    "configDetails": {
+      "title": "Chi tiết cấu hình",
+      "openaiKey": "OpenAI API Key:",
+      "geminiKey": "Gemini API Key:"
+    },
+    "availableFeatures": {
+      "title": "Tính năng AI có sẵn",
+      "aiEvaluation": "Đánh giá ứng viên với AI",
+      "cvAnalysis": "Phân tích CV tự động",
+      "smartJD": "Gợi ý JD thông minh"
+    },
+    "messages": {
+      "enterOpenAIKey": "Vui lòng nhập OpenAI API Key và Endpoint",
+      "invalidOpenAIKey": "❌ OpenAI API Key không hợp lệ. Key phải bắt đầu bằng \"sk-\"",
+      "invalidEndpoint": "❌ OpenAI Endpoint không hợp lệ. Endpoint phải bắt đầu bằng \"https://\"",
+      "openAISuccess": "✅ Kết nối OpenAI thành công!",
+      "openAIFailed": "❌ Kết nối OpenAI thất bại:",
+      "openAIError": "❌ Lỗi khi kết nối OpenAI:",
+      "enterGeminiKey": "Vui lòng nhập Gemini API Key",
+      "geminiSuccess": "✅ Kết nối Gemini AI thành công!",
+      "geminiFailed": "❌ Kết nối Gemini AI thất bại:",
+      "geminiError": "❌ Lỗi khi kết nối Gemini AI:",
+      "saveError": "❌ Lỗi! Không thể lưu cài đặt AI.",
+      "saveSuccess": "✅ Đã lưu cài đặt AI thành công!"
+    }
   }
 }
