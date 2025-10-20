@@ -1,4 +1,4 @@
-// src/pages/User.tsx
+// src/pages/User.tsx - FIXED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
@@ -285,6 +285,25 @@ export default function UsersPage() {
         return
       }
 
+      // Kiểm tra email trùng lặp trước khi gọi RPC
+      console.log('🔍 Checking if email already exists...')
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('cv_profiles')
+        .select('email')
+        .ilike('email', formData.email.trim())
+        .limit(1)
+
+      if (checkError) {
+        console.error('❌ Error checking email:', checkError)
+        // Không throw, vẫn tiếp tục tạo user
+      }
+
+      if (existingUsers && existingUsers.length > 0) {
+        setError("Email này đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.")
+        setCreating(false)
+        return
+      }
+
       console.log('🚀 Calling RPC function "create_cv_user"...', {
         p_email: formData.email.trim(),
         p_full_name: formData.name.trim(),
@@ -302,19 +321,30 @@ export default function UsersPage() {
 
       if (rpcError) {
         console.error('❌ RPC error:', rpcError)
+        console.error('Full error object:', JSON.stringify(rpcError, null, 2))
         
         // Xử lý các loại lỗi cụ thể
-        if (rpcError.message.includes('Email đã tồn tại')) {
+        const errorMessage = rpcError.message || ''
+        
+        if (errorMessage.includes('Email đã tồn tại')) {
           setError("Email này đã tồn tại trong hệ thống.")
-        } else if (rpcError.message.includes('gen_salt')) {
-          setError("Lỗi mã hóa mật khẩu. Vui lòng kiểm tra extension pgcrypto trong Supabase.")
+        } else if (errorMessage.includes('gen_salt') || errorMessage.includes('pgcrypto')) {
+          setError("Lỗi mã hóa mật khẩu. Vui lòng chạy: CREATE EXTENSION IF NOT EXISTS pgcrypto; trong Supabase SQL Editor.")
+        } else if (errorMessage.includes('undefined_function') || rpcError.code === '42883') {
+          setError("Function create_cv_user không tồn tại. Vui lòng tạo function trong Supabase SQL Editor (xem artifact SQL).")
         } else if (rpcError.code === '23502') {
           setError("Lỗi dữ liệu không được để trống. Vui lòng kiểm tra form.")
-        } else if (rpcError.code === '42883') {
-          setError("Lỗi function không tồn tại. Vui lòng kiểm tra SQL function trong Supabase.")
+        } else if (errorMessage.includes('permission denied') || errorMessage.includes('policy')) {
+          setError("Không có quyền thực hiện thao tác này. Vui lòng kiểm tra RLS policies trong Supabase.")
         } else {
-          setError(`Lỗi tạo người dùng: ${rpcError.message}`)
+          setError(`Lỗi tạo người dùng: ${errorMessage || 'Không xác định'}`)
         }
+        setCreating(false)
+        return
+      }
+
+      if (!data) {
+        setError("Không nhận được ID người dùng từ server. Vui lòng kiểm tra lại.")
         setCreating(false)
         return
       }

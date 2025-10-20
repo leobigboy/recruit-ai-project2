@@ -321,9 +321,9 @@ export default function Authorization({ children }: AuthorizationProps) {
   const definedRoles = roles.length
 
   return (
-    <div className="w-full bg-gray-50 p-8">
+    <div className="w-full min-h-screen bg-white">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between px-8 pt-6 pb-4 bg-white border-b border-gray-200">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <Shield className="w-8 h-8 text-purple-600" />
@@ -337,16 +337,16 @@ export default function Authorization({ children }: AuthorizationProps) {
       </div>
 
       {error && (
-        <Card className="p-4 mb-4 border border-red-200 bg-red-50">
+        <div className="mx-8 mt-4 p-4 border border-red-200 bg-red-50 rounded-lg">
           <p className="text-sm text-red-700">Lỗi: {error}</p>
-        </Card>
+        </div>
       )}
 
       {/* Tabs */}
-      <div className="flex gap-4 mb-6 border-b border-gray-200">
+      <div className="flex gap-4 px-8 border-b border-gray-200 bg-white">
         <button
           onClick={() => setActiveTab("overview")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === "overview" 
               ? "border-blue-600 text-blue-600" 
               : "border-transparent text-gray-600 hover:text-gray-900"
@@ -356,7 +356,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         </button>
         <button
           onClick={() => setActiveTab("roles")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === "roles" 
               ? "border-blue-600 text-blue-600" 
               : "border-transparent text-gray-600 hover:text-gray-900"
@@ -366,7 +366,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         </button>
         <button
           onClick={() => setActiveTab("matrix")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === "matrix" 
               ? "border-blue-600 text-blue-600" 
               : "border-transparent text-gray-600 hover:text-gray-900"
@@ -378,7 +378,7 @@ export default function Authorization({ children }: AuthorizationProps) {
 
       {/* Overview Tab */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
+        <div className="px-8 py-6 space-y-6 bg-gray-50">
           <Card className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Cài đặt hệ thống</h2>
@@ -458,77 +458,79 @@ export default function Authorization({ children }: AuthorizationProps) {
 
       {/* Roles Tab */}
       {activeTab === "roles" && (
-        <div className="space-y-4">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Quản lý vai trò</h2>
-            <div className="space-y-4">
-              {roles.map((role) => {
-                const Icon = mapIcon(role.icon)
-                const enabledModules = Object.entries(role.permissions || {}).filter(
-                  ([_, perms]) => Object.values(perms).some((v) => v)
-                )
+        <div className="px-8 py-6 bg-gray-50">
+          <div className="bg-white rounded-lg border border-gray-200">
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quản lý vai trò</h2>
+              <div className="space-y-4">
+                {roles.map((role) => {
+                  const Icon = mapIcon(role.icon)
+                  const enabledModules = Object.entries(role.permissions || {}).filter(
+                    ([_, perms]) => Object.values(perms).some((v) => v)
+                  )
 
-                return (
-                  <div key={role.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
-                        <div 
-                          className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" 
-                          style={{ backgroundColor: `${role.color}20` }}
-                        >
-                          <Icon className="w-6 h-6" style={{ color: role.color }} />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 mb-1">{role.name}</h3>
-                          <p className="text-sm text-gray-600 mb-3">{role.description}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {enabledModules.slice(0, 4).map(([moduleId]) => {
-                              const module = modules.find((m) => m.id === moduleId)
-                              return (
-                                <Badge key={moduleId} className="bg-blue-600 text-white hover:bg-blue-700">
-                                  {module?.name ?? moduleId}: Có
-                                </Badge>
-                              )
-                            })}
-                            {enabledModules.length > 4 && (
-                              <Badge variant="secondary">+{enabledModules.length - 4} modules khác</Badge>
-                            )}
+                  return (
+                    <div key={role.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div 
+                            className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" 
+                            style={{ backgroundColor: `${role.color}20` }}
+                          >
+                            <Icon className="w-6 h-6" style={{ color: role.color }} />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 mb-1">{role.name}</h3>
+                            <p className="text-sm text-gray-600 mb-3">{role.description}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {enabledModules.slice(0, 4).map(([moduleId]) => {
+                                const module = modules.find((m) => m.id === moduleId)
+                                return (
+                                  <Badge key={moduleId} className="bg-blue-600 text-white hover:bg-blue-700">
+                                    {module?.name ?? moduleId}: Có
+                                  </Badge>
+                                )
+                              })}
+                              {enabledModules.length > 4 && (
+                                <Badge variant="secondary">+{enabledModules.length - 4} modules khác</Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm font-medium text-gray-900">{role.userCount} người dùng</p>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-gray-900">{role.userCount} người dùng</p>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleEditRole(role)} 
+                            className="flex items-center gap-2"
+                          >
+                            <Edit className="w-4 h-4" />
+                            <span>Chỉnh sửa</span>
+                          </Button>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleEditRole(role)} 
-                          className="flex items-center gap-2"
-                        >
-                          <Edit className="w-4 h-4" />
-                          <span>Chỉnh sửa</span>
-                        </Button>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
       {/* Matrix Tab */}
       {activeTab === "matrix" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between mb-4">
+        <div className="px-8 py-6 bg-gray-50 h-[calc(100vh-180px)]">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Ma trận phân quyền</h2>
               <p className="text-sm text-gray-600">Quản lý quyền truy cập chi tiết cho từng vai trò và module</p>
             </div>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700" 
+              className="bg-blue-600 hover:bg-blue-700 text-white" 
               onClick={async () => {
                 try {
                   setLoading(true)
@@ -586,26 +588,26 @@ export default function Authorization({ children }: AuthorizationProps) {
             </Button>
           </div>
 
-          <Card className="overflow-hidden border-2 border-gray-300">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-white">
-                    <th className="text-left p-4 font-semibold text-gray-900 min-w-[200px]">
+          <div className="overflow-hidden bg-white rounded-lg border border-gray-200 h-[calc(100%-80px)]">
+            <div className="h-full overflow-y-auto">
+              <table className="w-full table-fixed">
+                <thead className="sticky top-0 bg-gray-50 z-10">
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left p-3 font-semibold text-gray-900 w-[180px]">
                       Module / Vai trò
                     </th>
                     {roles.map((role) => {
                       const Icon = mapIcon(role.icon)
                       return (
-                        <th key={role.id} className="text-center p-4 min-w-[220px]">
-                          <div className="flex flex-col items-center gap-2">
+                        <th key={role.id} className="text-center p-3">
+                          <div className="flex flex-col items-center gap-1.5">
                             <div 
-                              className="w-12 h-12 rounded-full flex items-center justify-center" 
+                              className="w-10 h-10 rounded-full flex items-center justify-center" 
                               style={{ backgroundColor: `${role.color}20` }}
                             >
-                              <Icon className="w-6 h-6" style={{ color: role.color }} />
+                              <Icon className="w-5 h-5" style={{ color: role.color }} />
                             </div>
-                            <span className="font-semibold text-gray-900">{role.name}</span>
+                            <span className="font-semibold text-gray-900 text-sm">{role.name}</span>
                           </div>
                         </th>
                       )
@@ -617,32 +619,32 @@ export default function Authorization({ children }: AuthorizationProps) {
                     const ModuleIcon = mapIcon(module.icon)
                     return (
                       <tr key={module.id} className="border-b border-gray-200 hover:bg-gray-50">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <ModuleIcon className="w-5 h-5 text-gray-600" />
-                            <span className="font-medium text-gray-900">{module.name}</span>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <ModuleIcon className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                            <span className="font-medium text-gray-900 text-sm">{module.name}</span>
                           </div>
                         </td>
                         {roles.map((role) => (
-                          <td key={role.id} className="p-4">
-                            <div className="flex items-center justify-center gap-3">
+                          <td key={role.id} className="p-3">
+                            <div className="flex items-center justify-center gap-2">
                               {(["view", "create", "edit", "delete"] as Permission[]).map((permission) => {
                                 const isChecked = !!role.permissions?.[module.id]?.[permission]
                                 return (
-                                  <div key={permission} className="flex flex-col items-center gap-2">
+                                  <div key={permission} className="flex flex-col items-center gap-1">
                                     <button
                                       onClick={() => handlePermissionToggle(role.id, module.id, permission)}
-                                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                      className={`relative w-9 h-5 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
                                         isChecked ? 'bg-blue-600' : 'bg-gray-300'
                                       }`}
                                     >
                                       <span
-                                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-200 ease-in-out ${
-                                          isChecked ? 'translate-x-5' : 'translate-x-0'
+                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out ${
+                                          isChecked ? 'translate-x-4' : 'translate-x-0'
                                         }`}
                                       />
                                     </button>
-                                    <span className="text-[10px] text-gray-600 font-medium">
+                                    <span className="text-[9px] text-gray-600 font-medium">
                                       {permission === "view" 
                                         ? "Xem" 
                                         : permission === "create" 
@@ -663,7 +665,7 @@ export default function Authorization({ children }: AuthorizationProps) {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         </div>
       )}
 
