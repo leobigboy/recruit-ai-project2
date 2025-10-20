@@ -11,6 +11,14 @@ env/
 ENV/
 .venv
 
+# Environment Variables
+.env
+.env.local
+.env.*.local
+backend/.env
+src/.env
+**/.env
+
 # Logs
 logs
 *.log
