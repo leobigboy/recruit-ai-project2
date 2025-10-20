@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   initLayoutLMModel, 
-  extractCVInformation, 
-  ProcessedDocument,
+  extractCVInformation,
   validateExtractedData 
 } from '../utils/layoutLMHelper';
+import type { ProcessedDocument } from '../utils/layoutLMHelper';
 
 interface UseLayoutLMResult {
   isModelLoaded: boolean;
