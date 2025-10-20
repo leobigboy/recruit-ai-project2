@@ -5,26 +5,32 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import logging
 import json
+import PyPDF2
+import io
 
 # =========================================
 # Load environment
 # =========================================
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-if not OPENAI_API_KEY:
-    raise ValueError("❌ Thiếu OpenAI API key trong file .env")
+if not OPENROUTER_API_KEY:
+    raise ValueError("❌ Thiếu OpenRouter API key trong file .env")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost:5173",
+        "X-Title": "Recruit AI CV Parser"
+    }
+)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# =========================================
-# App khởi tạo
-# =========================================
 app = FastAPI(title="CV Parser API")
 
-# Cho phép frontend truy cập
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,6 +38,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# =========================================
+# Helper: Đọc PDF
+# =========================================
+def extract_text_from_pdf(content: bytes) -> str:
+    """Trích xuất text từ PDF bytes"""
+    try:
+        # Thử dùng PyPDF2
+        pdf_file = io.BytesIO(content)
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        
+        if text.strip():
+            return text
+        
+        # Nếu PyPDF2 thất bại, thử decode UTF-8
+        return content.decode("utf-8", errors="ignore")
+    except Exception as e:
+        logger.warning(f"Lỗi đọc PDF: {e}, fallback sang UTF-8")
+        return content.decode("utf-8", errors="ignore")
 
 # =========================================
 # Route kiểm tra server
@@ -49,54 +77,75 @@ async def parse_cv(file: UploadFile = File(...)):
     try:
         # Đọc nội dung file
         content = await file.read()
-        text = content.decode("utf-8", errors="ignore")
+        
+        # ✅ Xử lý PDF đúng cách
+        if file.filename.lower().endswith('.pdf'):
+            text = extract_text_from_pdf(content)
+        else:
+            text = content.decode("utf-8", errors="ignore")
+
+        logger.info(f"📄 Đọc được {len(text)} ký tự từ {file.filename}")
+        logger.info(f"📝 Preview: {text[:500]}...")  # Log 500 ký tự đầu
 
         if not text or len(text.strip()) < 50:
             raise HTTPException(status_code=400, detail="File trống hoặc không đọc được nội dung")
 
-        # Gửi text CV đến model OpenAI để trích xuất
+        # Prompt cải tiến
         prompt = f"""
-Bạn là một chuyên gia phân tích CV. Hãy phân tích CV sau và trả về JSON với các trường:
-- name: tên ứng viên
-- email: email
-- phone: số điện thoại
-- address: địa chỉ
-- skills: danh sách kỹ năng (array)
-- experience: kinh nghiệm làm việc (string)
-- education: học vấn (string)
-- university: tên trường đại học
+Bạn là chuyên gia phân tích CV. Hãy đọc kỹ CV sau và trích xuất thông tin CHÍNH XÁC.
 
-Chỉ trả về JSON thuần, không thêm markdown hay text khác.
+QUAN TRỌNG: 
+- Nếu không tìm thấy thông tin, để trống "" thay vì "N/A"
+- Skills phải là array các string
+- Trả về ĐÚNG định dạng JSON, không thêm markdown ```json
 
-CV content:
-{text[:3000]}
+Trả về JSON với cấu trúc:
+{{
+  "name": "tên ứng viên",
+  "email": "email",
+  "phone": "số điện thoại",
+  "address": "địa chỉ",
+  "skills": ["skill1", "skill2", "skill3"],
+  "experience": "kinh nghiệm làm việc",
+  "education": "học vấn",
+  "university": "tên trường"
+}}
+
+CV Content:
+{text[:4000]}
 """
 
+        # Gọi GPT-4o
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="openai/gpt-4o",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000,
-            temperature=0.3,
+            max_tokens=1500,
+            temperature=0.1,  # Giảm temperature để chính xác hơn
         )
 
         result_text = response.choices[0].message.content.strip()
+        logger.info(f"🤖 GPT Response: {result_text}")
         
-        # Parse JSON từ response
+        # Parse JSON
         try:
             # Xóa markdown nếu có
             if result_text.startswith("```json"):
                 result_text = result_text.replace("```json", "").replace("```", "").strip()
+            elif result_text.startswith("```"):
+                result_text = result_text.replace("```", "").strip()
             
             parsed_json = json.loads(result_text)
-        except json.JSONDecodeError:
-            logger.error(f"Cannot parse JSON from OpenAI: {result_text}")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ Cannot parse JSON: {e}")
+            logger.error(f"Raw response: {result_text}")
+            # Fallback: trả về empty data
             parsed_json = {}
 
         # Chuẩn hóa dữ liệu
-        name = parsed_json.get("name", "unknown")
-        email = parsed_json.get("email", "unknown")
-        phone = parsed_json.get("phone", "unknown")
-        address = parsed_json.get("address", "unknown")
+        name = parsed_json.get("name", "")
+        email = parsed_json.get("email", "")
+        phone = parsed_json.get("phone", "")
+        address = parsed_json.get("address", "")
         skills = parsed_json.get("skills", [])
         experience = parsed_json.get("experience", "")
         education = parsed_json.get("education", "")
@@ -105,6 +154,8 @@ CV content:
         # Đảm bảo skills là array
         if isinstance(skills, str):
             skills = [s.strip() for s in skills.split(",") if s.strip()]
+
+        logger.info(f"✅ Parsed: name={name}, email={email}, skills={skills}")
 
         return {
             "success": True,
@@ -117,7 +168,7 @@ CV content:
                 "experience": experience,
                 "education": education,
                 "university": university,
-                "fullText": text,
+                "fullText": text[:1000],  # Trả về 1000 ký tự đầu
                 "parseQuality": "good",
                 "extractedFields": {
                     "name": name,
@@ -133,14 +184,14 @@ CV content:
             "metadata": {
                 "tokens_count": response.usage.total_tokens,
                 "confidence": 0.85,
-                "model": "gpt-4o-mini"
+                "model": "openai/gpt-4o"
             }
         }
 
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"Lỗi khi xử lý CV: {str(e)}")
+        logger.error(f"❌ Lỗi khi xử lý CV: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý CV: {str(e)}")
 
 
@@ -173,6 +224,6 @@ async def batch_parse_cv(files: list[UploadFile]):
 # =========================================
 if __name__ == "__main__":
     import uvicorn
-    logger.info("✅ Đã nạp OpenAI API key thành công.")
-    logger.info("✅ Client OpenAI đã được khởi tạo thành công.")
+    logger.info("✅ Đã nạp OpenRouter API key thành công.")
+    logger.info("✅ Client OpenRouter với GPT-4o đã được khởi tạo.")
     uvicorn.run(app, host="0.0.0.0", port=8000)
