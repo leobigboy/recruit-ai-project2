@@ -18,7 +18,7 @@ import {
   SelectItem
 } from "@/components/ui/select";
 import { SkillsInput } from "@/components/ui/skills-input";
-import { CVUploadZone } from "./CVUploadZone";
+import CVUploadZone  from "./CVUploadZone";
 import type { ParsedCV } from "@/utils/advancedCVParser";
 
 export interface CandidateFormData {
