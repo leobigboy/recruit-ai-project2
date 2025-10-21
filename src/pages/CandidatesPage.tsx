@@ -27,6 +27,8 @@ import { getCandidateSkills } from "@/utils/skillsHelper";
 import { CandidateList } from "@/components/candidates/CandidateList";
 import { CandidateFormDialog, type CandidateFormData } from "@/components/candidates/CandidateFormDialog";
 import { CVAnalysisDialog } from "@/components/candidates/CVAnalysisDialog";
+import { CandidateDetailDialog } from "@/components/candidates/CandidateDetailDialog";
+import { CVViewDialog } from "@/components/candidates/CVViewDialog";
 import { useCandidates, type Candidate } from "@/hooks/useCandidates";
 import type { ParsedCV } from "@/utils/advancedCVParser";
 
@@ -77,7 +79,8 @@ export function CandidatesPage() {
   const [formInitialData, setFormInitialData] = useState<Partial<CandidateFormData>>();
   const [deleteDialogCandidate, setDeleteDialogCandidate] = useState<Candidate | null>(null);
   const [analyzeCandidate, setAnalyzeCandidate] = useState<Candidate | null>(null);
-  const [isLoadingAction, setIsLoadingAction] = useState(false);
+  const [viewCandidate, setViewCandidate] = useState<Candidate | null>(null);
+  const [cvViewCandidate, setCvViewCandidate] = useState<Candidate | null>(null);
 
   useEffect(() => {
     async function loadJobs() {
@@ -106,12 +109,25 @@ export function CandidatesPage() {
     setIsFormDialogOpen(true);
   };
 
-  const handleEditCandidate = async (candidate: Candidate) => {
-    setIsLoadingAction(true);
+  const handleViewCandidate = async (candidate: Candidate) => {
     try {
       const completeCandidate = await getCandidateById(candidate.id);
       if (!completeCandidate) {
-        alert('Không thể tải thông tin ứng viên');
+        alert('❌ Không thể tải thông tin ứng viên');
+        return;
+      }
+      setViewCandidate(completeCandidate);
+    } catch (err) {
+      console.error('Error:', err);
+      alert('❌ Có lỗi xảy ra khi tải thông tin');
+    }
+  };
+
+  const handleEditCandidate = async (candidate: Candidate) => {
+    try {
+      const completeCandidate = await getCandidateById(candidate.id);
+      if (!completeCandidate) {
+        alert('❌ Không thể tải thông tin ứng viên');
         return;
       }
 
@@ -142,38 +158,44 @@ export function CandidatesPage() {
       setIsFormDialogOpen(true);
     } catch (err) {
       console.error('Error:', err);
-      alert('Có lỗi xảy ra');
-    } finally {
-      setIsLoadingAction(false);
+      alert('❌ Có lỗi xảy ra');
     }
   };
 
-  const handleViewCV = (candidate: Candidate) => {
+  const handleViewCV = async (candidate: Candidate) => {
     if (!candidate.cv_url) {
-      alert('Ứng viên chưa có CV');
+      alert('⚠️ Ứng viên chưa có CV');
       return;
     }
-    window.open(candidate.cv_url, '_blank');
-  };
 
-  const handleAnalyzeCV = async (candidate: Candidate) => {
-    setIsLoadingAction(true);
     try {
       const completeCandidate = await getCandidateById(candidate.id);
       if (!completeCandidate) {
-        alert('Không thể tải dữ liệu phân tích CV');
+        alert('❌ Không thể tải CV');
+        return;
+      }
+      setCvViewCandidate(completeCandidate);
+    } catch (err) {
+      console.error('Error:', err);
+      alert('❌ Có lỗi xảy ra');
+    }
+  };
+
+  const handleAnalyzeCV = async (candidate: Candidate) => {
+    try {
+      const completeCandidate = await getCandidateById(candidate.id);
+      if (!completeCandidate) {
+        alert('❌ Không thể tải dữ liệu phân tích CV');
         return;
       }
       if (!completeCandidate.cv_parsed_data && !completeCandidate.cv_url) {
-        alert('Ứng viên chưa có CV để phân tích');
+        alert('⚠️ Ứng viên chưa có CV để phân tích');
         return;
       }
       setAnalyzeCandidate(completeCandidate);
     } catch (err) {
       console.error('Error:', err);
-      alert('Có lỗi xảy ra');
-    } finally {
-      setIsLoadingAction(false);
+      alert('❌ Có lỗi xảy ra');
     }
   };
 
@@ -186,9 +208,9 @@ export function CandidatesPage() {
     const result = await deleteCandidate(deleteDialogCandidate.id, deleteDialogCandidate.cv_url);
     if (result.success) {
       setDeleteDialogCandidate(null);
-      alert('✓ Đã xóa ứng viên thành công!');
+      alert('✅ Đã xóa ứng viên thành công!');
     } else {
-      alert('Lỗi khi xóa: ' + (result.error || 'Không xác định'));
+      alert('❌ Lỗi khi xóa: ' + (result.error || 'Không xác định'));
     }
   };
 
@@ -252,7 +274,7 @@ export function CandidatesPage() {
       <CandidateList
         candidates={candidates}
         loading={loading}
-        onView={(candidate) => alert(`Ứng viên: ${candidate.full_name}\nEmail: ${candidate.email}\nVị trí: ${candidate.cv_jobs?.title || 'N/A'}\nTrạng thái: ${candidate.status}`)}
+        onView={handleViewCandidate}
         onEdit={handleEditCandidate}
         onViewCV={handleViewCV}
         onAnalyzeCV={handleAnalyzeCV}
@@ -289,6 +311,7 @@ export function CandidatesPage() {
         </div>
       </div>
 
+      {/* Dialogs */}
       <CandidateFormDialog
         open={isFormDialogOpen}
         onOpenChange={setIsFormDialogOpen}
@@ -298,7 +321,23 @@ export function CandidatesPage() {
         mode={formMode}
       />
 
-      <CVAnalysisDialog candidate={analyzeCandidate} isLoading={isLoadingAction} onClose={() => setAnalyzeCandidate(null)} />
+      <CandidateDetailDialog
+        candidate={viewCandidate}
+        open={!!viewCandidate}
+        onClose={() => setViewCandidate(null)}
+      />
+
+      <CVViewDialog
+        candidate={cvViewCandidate}
+        open={!!cvViewCandidate}
+        onClose={() => setCvViewCandidate(null)}
+      />
+
+      <CVAnalysisDialog 
+        candidate={analyzeCandidate} 
+        isLoading={false} 
+        onClose={() => setAnalyzeCandidate(null)} 
+      />
 
       <AlertDialog open={!!deleteDialogCandidate} onOpenChange={() => setDeleteDialogCandidate(null)}>
         <AlertDialogContent>
