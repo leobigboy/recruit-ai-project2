@@ -1,3 +1,4 @@
+
 // src/pages/CandidatesPage.tsx
 "use client"
 import { useState, useEffect } from "react"

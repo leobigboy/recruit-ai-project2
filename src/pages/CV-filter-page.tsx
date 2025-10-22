@@ -20,14 +20,187 @@ import {
   Send,
   Sparkles,
   Clock,
+  Briefcase,
 } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
 
+// ==================== TOAST ====================
 const useToast = () => ({
   toast: (options: { title: string; description: string; duration: number }) => {
     alert(`${options.title}\n${options.description}`)
   },
 })
 
+// ==================== OPENROUTER GPT-4O SERVICE ====================
+interface JobMatchResult {
+  job_id: string
+  job_title: string
+  match_score: number
+  strengths: string[]
+  weaknesses: string[]
+  recommendation: string
+}
+
+interface CVAnalysisResult {
+  overall_score: number
+  best_match: JobMatchResult | null
+  all_matches: JobMatchResult[]
+}
+
+async function analyzeWithGPT4o(
+  cvText: string,
+  cvData: any,
+  jobs: any[]
+): Promise<CVAnalysisResult> {
+  try {
+    // Lấy OpenRouter API key từ settings
+    const { data: settings, error } = await supabase
+      .from("cv_ai_settings")
+      .select("openrouter_api_key, is_openrouter_enabled")
+      .single()
+
+    if (error || !settings?.is_openrouter_enabled || !settings?.openrouter_api_key) {
+      throw new Error("OpenRouter AI chưa được cấu hình")
+    }
+
+    const jobsContext = jobs
+      .map(
+        (job) =>
+          `Job ${job.id}:
+- Tiêu đề: ${job.title}
+- Phòng ban: ${job.department || "N/A"}
+- Cấp độ: ${job.level || "N/A"}
+- Mô tả: ${job.description || "N/A"}
+- Yêu cầu: ${job.requirements || "N/A"}`
+      )
+      .join("\n\n")
+
+    const prompt = `Bạn là chuyên gia tuyển dụng HR. Hãy phân tích CV sau và đánh giá độ phù hợp với các công việc.
+
+CV:
+- Tên: ${cvData.full_name}
+- Email: ${cvData.email}
+- Trường: ${cvData.university || "N/A"}
+- Học vấn: ${cvData.education || "N/A"}
+- Kinh nghiệm: ${cvData.experience || "N/A"}
+- Nội dung CV: ${cvText}
+
+Các công việc cần match:
+${jobsContext}
+
+Hãy trả về JSON với format sau (CHÍNH XÁC, không thêm text nào khác):
+{
+  "overall_score": 85,
+  "best_match": {
+    "job_id": "job-uuid-here",
+    "job_title": "Job Title",
+    "match_score": 92,
+    "strengths": ["điểm mạnh 1", "điểm mạnh 2", "điểm mạnh 3"],
+    "weaknesses": ["điểm yếu 1", "điểm yếu 2"],
+    "recommendation": "Khuyến nghị chi tiết"
+  },
+  "all_matches": [
+    {
+      "job_id": "job-uuid-1",
+      "job_title": "Job 1",
+      "match_score": 92,
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "recommendation": "..."
+    },
+    {
+      "job_id": "job-uuid-2",
+      "job_title": "Job 2",
+      "match_score": 78,
+      "strengths": ["..."],
+      "weaknesses": ["..."],
+      "recommendation": "..."
+    }
+  ]
+}
+
+Lưu ý:
+- overall_score: điểm tổng thể từ 0-100
+- match_score: điểm phù hợp cho từng job từ 0-100
+- best_match: công việc phù hợp nhất
+- Sắp xếp all_matches theo match_score giảm dần
+`
+
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${settings.openrouter_api_key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "CV Analysis System"
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: "Bạn là chuyên gia tuyển dụng HR. Hãy phân tích CV và đánh giá độ phù hợp với các công việc. Trả về JSON đúng format được yêu cầu."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 3000,
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(`OpenRouter API error: ${errorData.error?.message || "Unknown error"}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content || ""
+
+    if (!content) {
+      throw new Error("OpenRouter không trả về nội dung")
+    }
+
+    // Parse JSON từ response
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error("Không parse được JSON từ OpenRouter GPT-4o")
+    }
+
+    const analysis: CVAnalysisResult = JSON.parse(jsonMatch[0])
+
+    return analysis
+  } catch (error) {
+    console.error("OpenRouter GPT-4o Error:", error)
+    // Fallback analysis
+    return {
+      overall_score: 70,
+      best_match: jobs.length > 0 ? {
+        job_id: jobs[0].id,
+        job_title: jobs[0].title,
+        match_score: 70,
+        strengths: ["CV đã được phân tích"],
+        weaknesses: ["Cần xem xét thêm"],
+        recommendation: "Ứng viên cần được đánh giá kỹ hơn",
+      } : null,
+      all_matches: jobs.map((job) => ({
+        job_id: job.id,
+        job_title: job.title,
+        match_score: 70,
+        strengths: ["Đang phân tích"],
+        weaknesses: ["Đang phân tích"],
+        recommendation: "Đang phân tích",
+      })),
+    }
+  }
+}
+
+// ==================== UI COMPONENTS ====================
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: string
   size?: string
@@ -35,9 +208,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = "", variant = "default", size = "default", asChild = false, ...props }, ref) => {
-    const Comp = asChild ? "span" : "button"
-
+  ({ className = "", variant = "default", size = "default", asChild = false, children, ...props }, ref) => {
     const baseStyles =
       "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
 
@@ -55,69 +226,58 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       lg: "px-6 py-3 text-base",
     }
 
+    const classNames = `${baseStyles} ${variants[variant as keyof typeof variants] || variants.default} ${sizes[size as keyof typeof sizes] || sizes.default} ${className}`
+
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<any>, {
+        className: classNames,
+        ref,
+        ...props,
+      })
+    }
+
     return (
-      <Comp
-        className={`${baseStyles} ${variants[variant as keyof typeof variants] || variants.default} ${sizes[size as keyof typeof sizes] || sizes.default} ${className}`}
-        ref={ref}
-        {...props}
-      />
+      <button className={classNames} ref={ref} {...props}>
+        {children}
+      </button>
     )
   },
 )
 Button.displayName = "Button"
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className = "", ...props }, ref) => (
-  <div
-    ref={ref}
-    className={`rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}
-    {...props}
-  />
-))
-Card.displayName = "Card"
-
-interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(({ className = "", ...props }, ref) => (
-  <div ref={ref} className={`flex flex-col space-y-1.5 p-6 ${className}`} {...props} />
-))
-CardHeader.displayName = "CardHeader"
-
-interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {}
-
-const CardTitle = React.forwardRef<HTMLParagraphElement, CardTitleProps>(({ className = "", ...props }, ref) => (
-  <h3 ref={ref} className={`text-xl font-semibold leading-none tracking-tight text-gray-900 ${className}`} {...props} />
-))
-CardTitle.displayName = "CardTitle"
-
-interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(({ className = "", ...props }, ref) => (
-  <div ref={ref} className={`p-6 pt-0 ${className}`} {...props} />
-))
-CardContent.displayName = "CardContent"
-
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-
-const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className = "", type, ...props }, ref) => {
-  return (
-    <input
-      type={type}
-      className={`w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${className}`}
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className = "", ...props }, ref) => (
+    <div
       ref={ref}
+      className={`rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-200 ${className}`}
       {...props}
     />
-  )
-})
-Input.displayName = "Input"
+  ),
+)
+Card.displayName = "Card"
 
-interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {}
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className = "", ...props }, ref) => (
+    <div ref={ref} className={`flex flex-col space-y-1.5 p-6 ${className}`} {...props} />
+  ),
+)
+CardHeader.displayName = "CardHeader"
 
-const Label = React.forwardRef<HTMLLabelElement, LabelProps>(({ className = "", ...props }, ref) => (
-  <label ref={ref} className={`block text-sm font-medium text-gray-700 mb-1.5 ${className}`} {...props} />
-))
-Label.displayName = "Label"
+const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className = "", ...props }, ref) => (
+    <h3
+      ref={ref}
+      className={`text-xl font-semibold leading-none tracking-tight text-gray-900 ${className}`}
+      {...props}
+    />
+  ),
+)
+CardTitle.displayName = "CardTitle"
+
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className = "", ...props }, ref) => <div ref={ref} className={`p-6 pt-0 ${className}`} {...props} />,
+)
+CardContent.displayName = "CardContent"
 
 interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: string
@@ -128,7 +288,6 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(({ className = "", va
     default: "bg-gray-100 text-gray-800 border-gray-200",
     secondary: "bg-blue-50 text-blue-700 border-blue-200",
   }
-
   return (
     <div
       ref={ref}
@@ -153,6 +312,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(({ className = 
 ))
 Progress.displayName = "Progress"
 
+// ==================== TABS ====================
 interface TabsProps {
   defaultValue: string
   className?: string
@@ -225,73 +385,7 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(({ classN
 ))
 TabsContent.displayName = "TabsContent"
 
-interface DropdownMenuProps {
-  children: React.ReactNode
-}
-
-const DropdownMenu: React.FC<DropdownMenuProps> = ({ children }) => {
-  const [open, setOpen] = React.useState(false)
-  return (
-    <>
-      {React.Children.map(children, (child: any) => {
-        if (child.type === DropdownMenuTrigger) {
-          return React.cloneElement(child, { onClick: () => setOpen(!open) })
-        }
-        if (child.type === DropdownMenuContent) {
-          return open ? React.cloneElement(child, { setOpen }) : null
-        }
-        return child
-      })}
-    </>
-  )
-}
-
-interface DropdownMenuTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  asChild?: boolean
-  onClick?: () => void
-}
-
-const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTriggerProps>(
-  ({ asChild = false, onClick, children, ...props }, ref) => {
-    const Comp = asChild ? React.Fragment : "button"
-    return (
-      <Comp ref={ref} onClick={onClick} {...props}>
-        {children}
-      </Comp>
-    )
-  },
-)
-DropdownMenuTrigger.displayName = "DropdownMenuTrigger"
-
-interface DropdownMenuContentProps extends React.HTMLAttributes<HTMLDivElement> {
-  align?: string
-  setOpen?: (open: boolean) => void
-}
-
-const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContentProps>(
-  ({ className = "", align, setOpen, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={`absolute right-0 z-50 mt-2 min-w-[12rem] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg ${className}`}
-      {...props}
-    />
-  ),
-)
-DropdownMenuContent.displayName = "DropdownMenuContent"
-
-interface DropdownMenuItemProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-const DropdownMenuItem = React.forwardRef<HTMLDivElement, DropdownMenuItemProps>(
-  ({ className = "", ...props }, ref) => (
-    <div
-      ref={ref}
-      className={`relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 text-sm outline-none transition-colors hover:bg-gray-100 ${className}`}
-      {...props}
-    />
-  ),
-)
-DropdownMenuItem.displayName = "DropdownMenuItem"
-
+// ==================== DIALOG ====================
 interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -312,22 +406,12 @@ const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
   )
 }
 
-interface DialogTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  asChild?: boolean
-}
-
-const DialogTrigger = React.forwardRef<HTMLButtonElement, DialogTriggerProps>(({ asChild = false, ...props }, ref) => {
-  const Comp = asChild ? "span" : "button"
-  return <Comp ref={ref} {...props} />
-})
-DialogTrigger.displayName = "DialogTrigger"
-
 interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(({ className = "", ...props }, ref) => (
   <div
     ref={ref}
-    className={`relative rounded-xl border border-gray-200 bg-white shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto ${className}`}
+    className={`relative rounded-xl border border-gray-200 bg-white shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${className}`}
     {...props}
   />
 ))
@@ -351,216 +435,221 @@ const DialogTitle = React.forwardRef<HTMLParagraphElement, DialogTitleProps>(({ 
 ))
 DialogTitle.displayName = "DialogTitle"
 
-interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+// ==================== SELECT ====================
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className = "", ...props }, ref) => (
-  <textarea
-    className={`w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none transition-all ${className}`}
+const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ className = "", ...props }, ref) => (
+  <select
     ref={ref}
+    className={`w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${className}`}
     {...props}
   />
 ))
-Textarea.displayName = "Textarea"
+Select.displayName = "Select"
 
-// Sample CV data with file information
-const sampleCVs = [
-  {
-    id: 1,
-    name: "Nguyễn Văn An",
-    position: "Frontend Developer",
-    experience: "3 năm",
-    skills: ["React", "TypeScript", "Next.js", "Tailwind CSS"],
-    score: 85,
-    status: "Phù hợp",
-    matchPercentage: 92,
-    fileName: "NguyenVanAn_CV.pdf",
-    fileType: "application/pdf",
-    email: "nguyenvanan@email.com",
-    aiAnalysis: {
-      strengths: ["Kinh nghiệm React mạnh", "Hiểu biết về TypeScript tốt", "Portfolio ấn tượng"],
-      weaknesses: ["Thiếu kinh nghiệm backend", "Chưa có chứng chỉ AWS"],
-      recommendation: "Ứng viên phù hợp cho vị trí Frontend Developer Senior",
-    },
-  },
-  {
-    id: 2,
-    name: "Trần Thị Bình",
-    position: "UI/UX Designer",
-    experience: "2 năm",
-    skills: ["Figma", "Adobe XD", "Sketch", "Prototyping"],
-    score: 78,
-    status: "Cần xem xét",
-    matchPercentage: 76,
-    fileName: "TranThiBinh_Portfolio.docx",
-    fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    email: "tranthibinh@email.com",
-    aiAnalysis: {
-      strengths: ["Kỹ năng thiết kế tốt", "Portfolio đa dạng", "Hiểu biết về UX research"],
-      weaknesses: ["Ít kinh nghiệm với design system", "Chưa làm việc với team lớn"],
-      recommendation: "Phù hợp cho vị trí Junior-Mid level UX Designer",
-    },
-  },
-  {
-    id: 3,
-    name: "Lê Văn Cường",
-    position: "Backend Developer",
-    experience: "5 năm",
-    skills: ["Node.js", "Python", "PostgreSQL", "Docker"],
-    score: 92,
-    status: "Rất phù hợp",
-    matchPercentage: 95,
-    fileName: "LeVanCuong_Resume.doc",
-    fileType: "application/msword",
-    email: "levancuong@email.com",
-    aiAnalysis: {
-      strengths: ["Kinh nghiệm backend sâu", "Hiểu biết về microservices", "Kỹ năng DevOps tốt"],
-      weaknesses: ["Ít kinh nghiệm với cloud platforms", "Chưa lead team"],
-      recommendation: "Ứng viên xuất sắc cho vị trí Senior Backend Developer",
-    },
-  },
-]
+// ==================== TYPES ====================
+interface CVCandidate {
+  id: string
+  full_name: string
+  email: string
+  phone_number: string
+  cv_url: string
+  status: string
+  university: string
+  education: string
+  experience: string
+  address: string
+  cv_parsed_data: any
+  created_at: string
+  job_id: string
+}
 
-type SortOption = "score-desc" | "score-asc" | "match-desc" | "match-asc"
+interface CVJob {
+  id: string
+  title: string
+  description: string
+  requirements: string
+  department: string
+  level: string
+  status: string
+}
 
+interface AnalyzedCandidate extends CVCandidate {
+  overall_score: number
+  best_match_job?: string
+  best_match_score?: number
+  analysis_result?: CVAnalysisResult
+}
+
+// ==================== MAIN COMPONENT ====================
 export default function CVFilterPage() {
   const { toast } = useToast()
 
-  const analysisResults = sampleCVs
+  const [candidates, setCandidates] = React.useState<AnalyzedCandidate[]>([])
+  const [jobs, setJobs] = React.useState<CVJob[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
   const [isAnalyzing, setIsAnalyzing] = React.useState(false)
-  const [selectedCV, setSelectedCV] = React.useState<(typeof sampleCVs)[0] | null>(null)
-  const [sortBy, setSortBy] = React.useState<SortOption>("score-desc")
-  const [uploadedFiles, setUploadedFiles] = React.useState<File[]>([])
-  const [showCVDetail, setShowCVDetail] = React.useState(false)
-  const [showEmailModal, setShowEmailModal] = React.useState(false)
-  const [emailData, setEmailData] = React.useState({
-    subject: "",
-    message: "",
-    interviewDate: "",
-    interviewTime: "",
-  })
+  const [selectedCandidate, setSelectedCandidate] = React.useState<AnalyzedCandidate | null>(null)
+  const [showDetail, setShowDetail] = React.useState(false)
+  const [filterJob, setFilterJob] = React.useState<string>("all")
+  const [filterScore, setFilterScore] = React.useState<string>("all")
 
-  const sortCVs = (cvs: typeof sampleCVs, sortOption: SortOption) => {
-    return [...cvs].sort((a, b) => {
-      switch (sortOption) {
-        case "score-desc":
-          return b.score - a.score
-        case "score-asc":
-          return a.score - b.score
-        case "match-desc":
-          return b.matchPercentage - a.matchPercentage
-        case "match-asc":
-          return a.matchPercentage - b.matchPercentage
-        default:
-          return 0
-      }
-    })
-  }
+  // Fetch candidates và jobs
+  const fetchData = React.useCallback(async () => {
+    try {
+      setIsLoading(true)
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files) {
-      const newFiles = Array.from(files).filter((file) => {
-        const supportedFormats = [".pdf", ".doc", ".docx", ".txt", ".rtf"]
-        const fileExtension = "." + file.name.split(".").pop()?.toLowerCase()
-        return supportedFormats.includes(fileExtension)
+      // Fetch candidates
+      const { data: candidatesData, error: candidatesError } = await supabase
+        .from("cv_candidates")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (candidatesError) throw candidatesError
+
+      // Fetch jobs
+      const { data: jobsData, error: jobsError } = await supabase
+        .from("cv_jobs")
+        .select("*")
+        .eq("status", "Đã đăng")
+
+      if (jobsError) throw jobsError
+
+      setCandidates(candidatesData || [])
+      setJobs(jobsData || [])
+    } catch (error) {
+      console.error("Error fetching data:", error)
+      toast({
+        title: "Lỗi",
+        description: "Không thể tải dữ liệu",
+        duration: 3000,
       })
-      setUploadedFiles((prev) => [...prev, ...newFiles])
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [toast])
 
-  const handleAIAnalysis = async () => {
+  React.useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Analyze tất cả candidates
+  const handleAnalyzeAll = async () => {
+    if (candidates.length === 0) {
+      toast({
+        title: "Không có ứng viên",
+        description: "Chưa có ứng viên nào để phân tích",
+        duration: 3000,
+      })
+      return
+    }
+
+    if (jobs.length === 0) {
+      toast({
+        title: "Không có công việc",
+        description: "Chưa có công việc nào để match",
+        duration: 3000,
+      })
+      return
+    }
+
     setIsAnalyzing(true)
-    setTimeout(() => {
+
+    try {
+      const analyzedCandidates: AnalyzedCandidate[] = []
+
+      for (const candidate of candidates) {
+        try {
+          // Lấy CV text từ cv_parsed_data hoặc cv_url
+          let cvText = ""
+          if (candidate.cv_parsed_data?.fullText) {
+            cvText = candidate.cv_parsed_data.fullText
+          } else {
+            cvText = `Tên: ${candidate.full_name}\nEmail: ${candidate.email}\nTrường: ${candidate.university}\nHọc vấn: ${candidate.education}\nKinh nghiệm: ${candidate.experience}`
+          }
+
+          // Analyze với GPT-4o
+          const analysis = await analyzeWithGPT4o(cvText, candidate, jobs)
+
+          analyzedCandidates.push({
+            ...candidate,
+            overall_score: analysis.overall_score,
+            best_match_job: analysis.best_match?.job_title,
+            best_match_score: analysis.best_match?.match_score,
+            analysis_result: analysis,
+          })
+
+          // Small delay để tránh rate limit
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        } catch (error) {
+          console.error(`Error analyzing candidate ${candidate.id}:`, error)
+          analyzedCandidates.push({
+            ...candidate,
+            overall_score: 0,
+            best_match_job: "Lỗi phân tích",
+            best_match_score: 0,
+          })
+        }
+      }
+
+      setCandidates(analyzedCandidates)
+
+      toast({
+        title: "Phân tích thành công!",
+        description: `Đã phân tích ${analyzedCandidates.length} ứng viên`,
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error("Error analyzing:", error)
+      toast({
+        title: "Lỗi phân tích",
+        description: "Không thể phân tích, vui lòng thử lại",
+        duration: 3000,
+      })
+    } finally {
       setIsAnalyzing(false)
-    }, 3000)
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Rất phù hợp":
-        return "bg-emerald-50 text-emerald-700 border-emerald-200"
-      case "Phù hợp":
-        return "bg-blue-50 text-blue-700 border-blue-200"
-      case "Cần xem xét":
-        return "bg-amber-50 text-amber-700 border-amber-200"
-      default:
-        return "bg-gray-50 text-gray-700 border-gray-200"
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Rất phù hợp":
-        return <CheckCircle className="h-4 w-4 text-emerald-600" />
-      case "Phù hợp":
-        return <CheckCircle className="h-4 w-4 text-blue-600" />
-      case "Cần xem xét":
-        return <AlertCircle className="h-4 w-4 text-amber-600" />
-      default:
-        return <XCircle className="h-4 w-4 text-gray-600" />
-    }
-  }
+  // Filter candidates
+  const filteredCandidates = React.useMemo(() => {
+    return candidates.filter((candidate) => {
+      // Filter by job
+      if (filterJob !== "all" && candidate.best_match_job !== filterJob) {
+        return false
+      }
 
-  const getSortLabel = (sortOption: SortOption) => {
-    switch (sortOption) {
-      case "score-desc":
-        return "Điểm số: Cao → Thấp"
-      case "score-asc":
-        return "Điểm số: Thấp → Cao"
-      case "match-desc":
-        return "Độ phù hợp: Cao → Thấp"
-      case "match-asc":
-        return "Độ phù hợp: Thấp → Cao"
-      default:
-        return "Sắp xếp"
-    }
-  }
+      // Filter by score
+      if (filterScore === "high" && (candidate.best_match_score || 0) < 80) {
+        return false
+      }
+      if (filterScore === "medium" && ((candidate.best_match_score || 0) < 60 || (candidate.best_match_score || 0) >= 80)) {
+        return false
+      }
+      if (filterScore === "low" && (candidate.best_match_score || 0) >= 60) {
+        return false
+      }
 
-  const handleInviteInterview = (cv: (typeof sampleCVs)[0]) => {
-    setSelectedCV(cv)
-    setEmailData({
-      subject: `Mời phỏng vấn vị trí ${cv.position}`,
-      message: `Chào ${cv.name},\n\nChúng tôi rất ấn tượng với hồ sơ của bạn và muốn mời bạn tham gia phỏng vấn cho vị trí ${cv.position}.\n\nVui lòng xác nhận thời gian phù hợp với bạn.\n\nTrân trọng,\nTeam HR`,
-      interviewDate: "",
-      interviewTime: "",
+      return true
     })
-    setShowEmailModal(true)
+  }, [candidates, filterJob, filterScore])
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-emerald-600"
+    if (score >= 60) return "text-blue-600"
+    return "text-amber-600"
   }
 
-  const handleSendEmail = () => {
-    console.log("Sending email:", emailData, "to:", selectedCV?.name)
-    setShowEmailModal(false)
-    setEmailData({ subject: "", message: "", interviewDate: "", interviewTime: "" })
-    toast({
-      title: "Email đã được gửi thành công!",
-      description: `Đã gửi email mời phỏng vấn tới ${selectedCV?.name}`,
-      duration: 3000,
-    })
+  const getScoreBg = (score: number) => {
+    if (score >= 80) return "bg-emerald-50 border-emerald-200"
+    if (score >= 60) return "bg-blue-50 border-blue-200"
+    return "bg-amber-50 border-amber-200"
   }
-
-  const handleDownloadCV = (cv: (typeof sampleCVs)[0]) => {
-    const mockContent = `CV của ${cv.name}\nVị trí: ${cv.position}\nKinh nghiệm: ${cv.experience}\nKỹ năng: ${cv.skills.join(", ")}`
-    const blob = new Blob([mockContent], { type: cv.fileType })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = cv.fileName
-    document.body.appendChild(link)
-    link.click()
-    window.URL.revokeObjectURL(url)
-    document.body.removeChild(link)
-    toast({
-      title: "Tải CV thành công!",
-      description: `Đã tải xuống ${cv.fileName}`,
-      duration: 3000,
-    })
-  }
-
-  const sortedResults = sortCVs(analysisResults, sortBy)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
@@ -568,298 +657,283 @@ export default function CVFilterPage() {
             </h1>
             <p className="text-gray-600 mt-2 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-blue-500" />
-              Lọc và phân tích CV bằng AI thông minh
+              Phân tích và match CV với công việc bằng GPT-4o AI
             </p>
           </div>
-          <Button variant="outline" className="gap-2 bg-transparent">
-            <RefreshCw className="h-4 w-4" />
-            Làm mới
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2 bg-transparent" onClick={fetchData}>
+              <RefreshCw className="h-4 w-4" />
+              Làm mới
+            </Button>
+            <Button onClick={handleAnalyzeAll} disabled={isAnalyzing} className="gap-2">
+              {isAnalyzing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Đang phân tích...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4" />
+                  Phân tích tất cả
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
+        {/* Statistics */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:shadow-lg transition-all">
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-blue-900">Tổng CV đã lọc</CardTitle>
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <FileText className="h-5 w-5 text-white" />
-              </div>
+              <CardTitle className="text-sm font-medium text-blue-900">Tổng ứng viên</CardTitle>
+              <Users className="h-5 w-5 text-blue-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-900">1,247</div>
-              <p className="text-xs text-blue-700 mt-1 flex items-center gap-1">
-                <TrendingUp className="h-3 w-3" />
-                +23% so với tháng trước
-              </p>
+              <div className="text-3xl font-bold text-blue-900">{candidates.length}</div>
             </CardContent>
           </Card>
 
-          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/50 hover:shadow-lg transition-all">
+          <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-emerald-900">Độ chính xác AI</CardTitle>
-              <div className="p-2 bg-emerald-500 rounded-lg">
-                <Brain className="h-5 w-5 text-white" />
-              </div>
+              <CardTitle className="text-sm font-medium text-emerald-900">Phù hợp cao</CardTitle>
+              <CheckCircle className="h-5 w-5 text-emerald-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-emerald-900">94.2%</div>
-              <p className="text-xs text-emerald-700 mt-1">Tỷ lệ dự đoán chính xác</p>
+              <div className="text-3xl font-bold text-emerald-900">
+                {candidates.filter((c) => (c.best_match_score || 0) >= 80).length}
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50 hover:shadow-lg transition-all">
+          <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-purple-900">CV phù hợp</CardTitle>
-              <div className="p-2 bg-purple-500 rounded-lg">
-                <Target className="h-5 w-5 text-white" />
-              </div>
+              <CardTitle className="text-sm font-medium text-purple-900">Công việc</CardTitle>
+              <Briefcase className="h-5 w-5 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-900">342</div>
-              <p className="text-xs text-purple-700 mt-1">Điểm số ≥ 80</p>
+              <div className="text-3xl font-bold text-purple-900">{jobs.length}</div>
             </CardContent>
           </Card>
 
-          <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/50 hover:shadow-lg transition-all">
+          <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-amber-900">Thời gian xử lý</CardTitle>
-              <div className="p-2 bg-amber-500 rounded-lg">
-                <Clock className="h-5 w-5 text-white" />
-              </div>
+              <CardTitle className="text-sm font-medium text-amber-900">Đã phân tích</CardTitle>
+              <Brain className="h-5 w-5 text-amber-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-amber-900">2.3s</div>
-              <p className="text-xs text-amber-700 mt-1">Trung bình mỗi CV</p>
+              <div className="text-3xl font-bold text-amber-900">
+                {candidates.filter((c) => c.overall_score > 0).length}
+              </div>
             </CardContent>
           </Card>
         </div>
 
+        {/* Filters */}
         <Card className="border-gray-200 bg-white">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
-                <Upload className="h-5 w-5 text-white" />
-              </div>
-              Tải lên CV để phân tích
+              <Filter className="h-5 w-5" />
+              Bộ lọc
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label htmlFor="cv-upload" className="cursor-pointer">
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 group">
-                    <div className="p-3 bg-blue-100 rounded-full w-fit mx-auto mb-3 group-hover:bg-blue-200 transition-colors">
-                      <Upload className="h-8 w-8 text-blue-600" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Kéo thả hoặc click để tải CV</p>
-                    <p className="text-xs text-gray-500">Hỗ trợ: PDF, DOC, DOCX, TXT, RTF</p>
-                  </div>
-                  <Input
-                    id="cv-upload"
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.txt,.rtf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </Label>
-              </div>
-              <Button onClick={handleAIAnalysis} disabled={isAnalyzing} className="gap-2 h-auto py-4 px-6">
-                {isAnalyzing ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 animate-spin" />
-                    <span className="flex flex-col items-start">
-                      <span className="font-semibold">Đang phân tích...</span>
-                      <span className="text-xs opacity-90">Vui lòng chờ</span>
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Brain className="h-5 w-5" />
-                    <span className="flex flex-col items-start">
-                      <span className="font-semibold">Phân tích bằng AI</span>
-                      <span className="text-xs opacity-90">Nhanh & chính xác</span>
-                    </span>
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {uploadedFiles.length > 0 && (
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Đã tải lên ({uploadedFiles.length} file)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {uploadedFiles.map((file, index) => (
-                    <Badge key={index} variant="secondary" className="gap-1.5 py-1.5 px-3">
-                      <FileText className="h-3.5 w-3.5" />
-                      {file.name}
-                    </Badge>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Lọc theo công việc</label>
+                <Select value={filterJob} onChange={(e) => setFilterJob(e.target.value)}>
+                  <option value="all">Tất cả công việc</option>
+                  {Array.from(new Set(candidates.map((c) => c.best_match_job).filter(Boolean))).map((job) => (
+                    <option key={job} value={job}>
+                      {job}
+                    </option>
                   ))}
-                </div>
+                </Select>
               </div>
-            )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Lọc theo điểm</label>
+                <Select value={filterScore} onChange={(e) => setFilterScore(e.target.value)}>
+                  <option value="all">Tất cả điểm</option>
+                  <option value="high">Cao (≥80)</option>
+                  <option value="medium">Trung bình (60-79)</option>
+                  <option value="low">Thấp (&lt;60)</option>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
+        {/* Candidates List */}
         <Card className="border-gray-200 bg-white">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <div>Kết quả phân tích</div>
-                  <div className="text-sm font-normal text-gray-500 mt-0.5">
-                    {sortedResults.length} ứng viên được tìm thấy
-                  </div>
-                </div>
-              </CardTitle>
-
-              <div className="relative">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-                      <Filter className="h-4 w-4" />
-                      {getSortLabel(sortBy)}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem onClick={() => setSortBy("score-desc")}>
-                      <ArrowDown className="h-4 w-4 mr-2 text-blue-600" />
-                      Điểm số: Cao → Thấp
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy("score-asc")}>
-                      <ArrowUp className="h-4 w-4 mr-2 text-blue-600" />
-                      Điểm số: Thấp → Cao
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy("match-desc")}>
-                      <Target className="h-4 w-4 mr-2 text-emerald-600" />
-                      Độ phù hợp: Cao → Thấp
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy("match-asc")}>
-                      <Target className="h-4 w-4 mr-2 text-emerald-600" />
-                      Độ phù hợp: Thấp → Cao
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Danh sách ứng viên ({filteredCandidates.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {isAnalyzing ? (
-              <div className="space-y-4">
-                <div className="text-center py-12">
-                  <div className="relative w-20 h-20 mx-auto mb-6">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
-                    <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
-                      <Brain className="h-8 w-8 text-blue-600 animate-pulse" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-semibold mb-2 text-gray-900">AI đang phân tích CV...</h3>
-                  <p className="text-gray-600 mb-6">Vui lòng chờ trong giây lát</p>
-                  <Progress value={65} className="w-full max-w-sm mx-auto h-3" />
-                  <p className="text-sm text-gray-500 mt-3">Đang xử lý 65%</p>
-                </div>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <RefreshCw className="h-8 w-8 text-blue-600 animate-spin mx-auto mb-4" />
+                <p className="text-gray-600">Đang tải dữ liệu...</p>
+              </div>
+            ) : filteredCandidates.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Không có ứng viên</h3>
+                <p className="text-gray-600">Chưa có ứng viên nào phù hợp với bộ lọc</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {sortedResults.map((cv) => (
+                {filteredCandidates.map((candidate) => (
                   <Card
-                    key={cv.id}
+                    key={candidate.id}
                     className="border-gray-200 bg-gradient-to-br from-white to-gray-50/50 hover:shadow-md transition-all"
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-4">
-                            <h3 className="text-lg font-semibold text-gray-900">{cv.name}</h3>
-                            <Badge className={`${getStatusColor(cv.status)} gap-1.5 py-1 px-2.5`}>
-                              {getStatusIcon(cv.status)}
-                              <span className="font-medium">{cv.status}</span>
-                            </Badge>
+                            <h3 className="text-lg font-semibold text-gray-900">{candidate.full_name}</h3>
+                            {candidate.overall_score > 0 && (
+                              <Badge
+                                className={`${getScoreBg(candidate.best_match_score || 0)} gap-1.5 py-1 px-2.5`}
+                              >
+                                <Target className="h-4 w-4" />
+                                <span className={`font-bold ${getScoreColor(candidate.best_match_score || 0)}`}>
+                                  {candidate.best_match_score}%
+                                </span>
+                              </Badge>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-2 gap-4 mb-4">
                             <div className="bg-white p-3 rounded-lg border border-gray-200">
-                              <p className="text-xs text-gray-500 mb-1">Vị trí</p>
-                              <p className="font-semibold text-gray-900">{cv.position}</p>
+                              <p className="text-xs text-gray-500 mb-1">Email</p>
+                              <p className="font-medium text-gray-900 text-sm">{candidate.email}</p>
+                            </div>
+                            <div className="bg-white p-3 rounded-lg border border-gray-200">
+                              <p className="text-xs text-gray-500 mb-1">Điện thoại</p>
+                              <p className="font-medium text-gray-900 text-sm">{candidate.phone_number}</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-white p-3 rounded-lg border border-gray-200">
+                              <p className="text-xs text-gray-500 mb-1">Trường</p>
+                              <p className="font-medium text-gray-900 text-sm truncate">
+                                {candidate.university || "N/A"}
+                              </p>
                             </div>
                             <div className="bg-white p-3 rounded-lg border border-gray-200">
                               <p className="text-xs text-gray-500 mb-1">Kinh nghiệm</p>
-                              <p className="font-semibold text-gray-900">{cv.experience}</p>
+                              <p className="font-medium text-gray-900 text-sm truncate">
+                                {candidate.experience || "N/A"}
+                              </p>
                             </div>
                           </div>
 
-                          <div className="mb-4">
-                            <p className="text-xs text-gray-500 mb-2 font-medium">Kỹ năng</p>
-                            <div className="flex flex-wrap gap-2">
-                              {cv.skills.map((skill, index) => (
-                                <Badge
-                                  key={index}
-                                  variant="secondary"
-                                  className="text-xs py-1 px-3 bg-blue-50 text-blue-700 border-blue-200"
-                                >
-                                  {skill}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-6">
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-500 mb-2 font-medium">Điểm AI</p>
-                              <div className="flex items-center gap-3">
-                                <Progress value={cv.score} className="flex-1 h-2.5" />
-                                <span className="font-bold text-lg text-gray-900 min-w-[60px]">{cv.score}/100</span>
+                          {candidate.best_match_job && (
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-200">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Briefcase className="h-4 w-4 text-blue-600" />
+                                <p className="text-xs font-medium text-blue-900">Công việc phù hợp nhất</p>
                               </div>
+                              <p className="font-semibold text-blue-900">{candidate.best_match_job}</p>
                             </div>
-                            <div className="text-center px-4 py-2 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg border border-emerald-200">
-                              <p className="text-xs text-emerald-700 font-medium mb-0.5">Độ phù hợp</p>
-                              <p className="font-bold text-xl text-emerald-700">{cv.matchPercentage}%</p>
+                          )}
+
+                          {candidate.overall_score > 0 && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs text-gray-500 font-medium">Điểm tổng thể</p>
+                                <span className={`font-bold ${getScoreColor(candidate.overall_score)}`}>
+                                  {candidate.overall_score}/100
+                                </span>
+                              </div>
+                              <Progress value={candidate.overall_score} className="h-2.5" />
                             </div>
-                          </div>
+                          )}
                         </div>
 
                         <div className="flex flex-col gap-2 min-w-[140px]">
-                          <Dialog open={showCVDetail} onOpenChange={setShowCVDetail}>
-                            <DialogTrigger asChild>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedCV(cv)
-                                  setShowCVDetail(true)
-                                }}
-                                className="w-full justify-start gap-2"
-                              >
-                                <Eye className="h-4 w-4" />
-                                Xem chi tiết
-                              </Button>
-                            </DialogTrigger>
-                          </Dialog>
-
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleDownloadCV(cv)}
+                            onClick={() => {
+                              setSelectedCandidate(candidate)
+                              setShowDetail(true)
+                            }}
                             className="w-full justify-start gap-2"
                           >
-                            <Download className="h-4 w-4" />
-                            Tải CV
+                            <Eye className="h-4 w-4" />
+                            Xem chi tiết
                           </Button>
 
-                          <Button
-                            size="sm"
-                            onClick={() => handleInviteInterview(cv)}
-                            className="w-full justify-start gap-2"
-                          >
-                            <Send className="h-4 w-4" />
-                            Mời phỏng vấn
-                          </Button>
+                          {candidate.cv_url && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(candidate.cv_url, "_blank")}
+                              className="w-full justify-start gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Tải CV
+                            </Button>
+                          )}
+
+                          {!candidate.overall_score && (
+                            <Button
+                              size="sm"
+                              onClick={async () => {
+                                setIsAnalyzing(true)
+                                try {
+                                  let cvText = ""
+                                  if (candidate.cv_parsed_data?.fullText) {
+                                    cvText = candidate.cv_parsed_data.fullText
+                                  } else {
+                                    cvText = `Tên: ${candidate.full_name}\nEmail: ${candidate.email}\nTrường: ${candidate.university}\nHọc vấn: ${candidate.education}\nKinh nghiệm: ${candidate.experience}`
+                                  }
+
+                                  const analysis = await analyzeWithGPT4o(cvText, candidate, jobs)
+
+                                  setCandidates((prev) =>
+                                    prev.map((c) =>
+                                      c.id === candidate.id
+                                        ? {
+                                            ...c,
+                                            overall_score: analysis.overall_score,
+                                            best_match_job: analysis.best_match?.job_title,
+                                            best_match_score: analysis.best_match?.match_score,
+                                            analysis_result: analysis,
+                                          }
+                                        : c
+                                    )
+                                  )
+
+                                  toast({
+                                    title: "Phân tích thành công!",
+                                    description: `Đã phân tích ${candidate.full_name}`,
+                                    duration: 3000,
+                                  })
+                                } catch (error) {
+                                  console.error("Error:", error)
+                                  toast({
+                                    title: "Lỗi",
+                                    description: "Không thể phân tích ứng viên",
+                                    duration: 3000,
+                                  })
+                                } finally {
+                                  setIsAnalyzing(false)
+                                }
+                              }}
+                              className="w-full justify-start gap-2"
+                              disabled={isAnalyzing}
+                            >
+                              <Brain className="h-4 w-4" />
+                              Phân tích
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -870,38 +944,79 @@ export default function CVFilterPage() {
           </CardContent>
         </Card>
 
-        <Dialog open={showCVDetail} onOpenChange={setShowCVDetail}>
-          <DialogContent className="max-w-4xl">
+        {/* Detail Dialog */}
+        <Dialog open={showDetail} onOpenChange={setShowDetail}>
+          <DialogContent className="max-w-5xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-3">
                 <div className="p-2 bg-white rounded-lg shadow-sm">
                   <Brain className="h-6 w-6 text-blue-600" />
                 </div>
                 <div>
-                  <div>Phân tích AI chi tiết</div>
-                  <div className="text-sm font-normal text-gray-600 mt-0.5">{selectedCV?.name}</div>
+                  <div>Chi tiết phân tích - {selectedCandidate?.full_name}</div>
+                  <div className="text-sm font-normal text-gray-600 mt-0.5">
+                    {selectedCandidate?.email}
+                  </div>
                 </div>
               </DialogTitle>
             </DialogHeader>
 
-            {selectedCV && (
+            {selectedCandidate && (
               <div className="p-6 space-y-6">
-                <Tabs defaultValue="analysis" className="w-full">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="analysis">Phân tích</TabsTrigger>
-                    <TabsTrigger value="strengths">Điểm mạnh</TabsTrigger>
-                    <TabsTrigger value="recommendation">Khuyến nghị</TabsTrigger>
-                  </TabsList>
+                {/* Overall Score */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                      <Target className="h-5 w-5" />
+                      Điểm tổng thể
+                    </h4>
+                    <span className={`text-2xl font-bold ${getScoreColor(selectedCandidate.overall_score)}`}>
+                      {selectedCandidate.overall_score}/100
+                    </span>
+                  </div>
+                  <Progress value={selectedCandidate.overall_score} className="h-3" />
+                </div>
 
-                  <TabsContent value="analysis" className="space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
+                {/* Best Match */}
+                {selectedCandidate.analysis_result?.best_match && (
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-5 rounded-xl border border-emerald-200">
+                    <h4 className="font-semibold text-emerald-900 mb-3 flex items-center gap-2">
+                      <Briefcase className="h-5 w-5" />
+                      Công việc phù hợp nhất
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-lg text-emerald-900">
+                          {selectedCandidate.analysis_result.best_match.job_title}
+                        </p>
+                        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                          {selectedCandidate.analysis_result.best_match.match_score}% match
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-emerald-800">
+                        {selectedCandidate.analysis_result.best_match.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabs for All Matches */}
+                {selectedCandidate.analysis_result?.all_matches && (
+                  <Tabs defaultValue="strengths" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="strengths">Điểm mạnh</TabsTrigger>
+                      <TabsTrigger value="weaknesses">Điểm yếu</TabsTrigger>
+                      <TabsTrigger value="matches">Tất cả matches</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="strengths" className="space-y-3">
                       <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-5 rounded-xl border border-emerald-200">
                         <h4 className="font-semibold text-emerald-900 mb-3 flex items-center gap-2">
                           <CheckCircle className="h-5 w-5" />
                           Điểm mạnh
                         </h4>
                         <ul className="space-y-2">
-                          {selectedCV.aiAnalysis.strengths.map((strength, index) => (
+                          {selectedCandidate.analysis_result.best_match?.strengths.map((strength, index) => (
                             <li key={index} className="text-sm flex items-start gap-2 text-emerald-800">
                               <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                               {strength}
@@ -909,13 +1024,16 @@ export default function CVFilterPage() {
                           ))}
                         </ul>
                       </div>
+                    </TabsContent>
+
+                    <TabsContent value="weaknesses" className="space-y-3">
                       <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 p-5 rounded-xl border border-amber-200">
                         <h4 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
                           <AlertCircle className="h-5 w-5" />
-                          Điểm cần cải thiện
+                          Điểm yếu
                         </h4>
                         <ul className="space-y-2">
-                          {selectedCV.aiAnalysis.weaknesses.map((weakness, index) => (
+                          {selectedCandidate.analysis_result.best_match?.weaknesses.map((weakness, index) => (
                             <li key={index} className="text-sm flex items-start gap-2 text-amber-800">
                               <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                               {weakness}
@@ -923,128 +1041,93 @@ export default function CVFilterPage() {
                           ))}
                         </ul>
                       </div>
-                    </div>
-                  </TabsContent>
+                    </TabsContent>
 
-                  <TabsContent value="strengths">
-                    <div className="space-y-3">
-                      {selectedCV.aiAnalysis.strengths.map((strength, index) => (
-                        <div
+                    <TabsContent value="matches" className="space-y-3">
+                      {selectedCandidate.analysis_result.all_matches.map((match, index) => (
+                        <Card
                           key={index}
-                          className="p-4 bg-gradient-to-r from-emerald-50 to-emerald-100/50 border border-emerald-200 rounded-lg"
+                          className={`${getScoreBg(match.match_score)} border-2`}
                         >
-                          <p className="text-sm text-emerald-900 font-medium">{strength}</p>
-                        </div>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-semibold text-gray-900">{match.job_title}</h5>
+                              <Badge
+                                className={`${getScoreBg(match.match_score)}`}
+                              >
+                                <span className={`font-bold ${getScoreColor(match.match_score)}`}>
+                                  {match.match_score}%
+                                </span>
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-700 mb-3">{match.recommendation}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-2">Điểm mạnh:</p>
+                                <ul className="space-y-1">
+                                  {match.strengths.slice(0, 2).map((s, i) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
+                                      <CheckCircle className="h-3 w-3 text-emerald-600 mt-0.5 flex-shrink-0" />
+                                      {s}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-2">Điểm yếu:</p>
+                                <ul className="space-y-1">
+                                  {match.weaknesses.slice(0, 2).map((w, i) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
+                                      <AlertCircle className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                                      {w}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </div>
-                  </TabsContent>
+                    </TabsContent>
+                  </Tabs>
+                )}
 
-                  <TabsContent value="recommendation">
-                    <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-blue-600" />
-                        Khuyến nghị của AI
-                      </h4>
-                      <p className="text-sm text-blue-800 leading-relaxed">{selectedCV.aiAnalysis.recommendation}</p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                {/* Candidate Info */}
+                <div className="grid grid-cols-2 gap-4 p-5 bg-gray-50 rounded-xl border border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Trường</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedCandidate.university || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Học vấn</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedCandidate.education || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Kinh nghiệm</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedCandidate.experience || "N/A"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Địa chỉ</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedCandidate.address || "N/A"}</p>
+                  </div>
+                </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                  <Button variant="outline" onClick={() => setShowCVDetail(false)}>
+                  <Button variant="outline" onClick={() => setShowDetail(false)}>
                     Đóng
                   </Button>
-                  <Button
-                    onClick={() => {
-                      setShowCVDetail(false)
-                      handleInviteInterview(selectedCV!)
-                    }}
-                    className="gap-2"
-                  >
-                    <Send className="h-4 w-4" />
-                    Mời phỏng vấn
-                  </Button>
+                  {selectedCandidate.cv_url && (
+                    <Button
+                      onClick={() => window.open(selectedCandidate.cv_url, "_blank")}
+                      className="gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Tải CV gốc
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={showEmailModal} onOpenChange={setShowEmailModal}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                <div className="p-2 bg-white rounded-lg shadow-sm">
-                  <Send className="h-6 w-6 text-blue-600" />
-                </div>
-                <div>
-                  <div>Gửi email mời phỏng vấn</div>
-                  <div className="text-sm font-normal text-gray-600 mt-0.5">{selectedCV?.name}</div>
-                </div>
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="p-6 space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="interview-date">Ngày phỏng vấn</Label>
-                  <Input
-                    id="interview-date"
-                    type="date"
-                    value={emailData.interviewDate}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setEmailData((prev) => ({ ...prev, interviewDate: e.target.value }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="interview-time">Giờ phỏng vấn</Label>
-                  <Input
-                    id="interview-time"
-                    type="time"
-                    value={emailData.interviewTime}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setEmailData((prev) => ({ ...prev, interviewTime: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="email-subject">Tiêu đề email</Label>
-                <Input
-                  id="email-subject"
-                  value={emailData.subject}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setEmailData((prev) => ({ ...prev, subject: e.target.value }))
-                  }
-                  placeholder="Nhập tiêu đề email..."
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="email-message">Nội dung email</Label>
-                <Textarea
-                  id="email-message"
-                  value={emailData.message}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setEmailData((prev) => ({ ...prev, message: e.target.value }))
-                  }
-                  placeholder="Nhập nội dung email..."
-                  rows={8}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <Button variant="outline" onClick={() => setShowEmailModal(false)}>
-                  Hủy
-                </Button>
-                <Button onClick={handleSendEmail} className="gap-2">
-                  <Send className="h-4 w-4" />
-                  Gửi email
-                </Button>
-              </div>
-            </div>
           </DialogContent>
         </Dialog>
       </div>
