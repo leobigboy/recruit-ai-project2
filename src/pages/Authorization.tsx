@@ -1,4 +1,3 @@
-// src/pages/Authorization.tsx
 "use client"
 
 import React, { useEffect, useState } from "react"
@@ -110,14 +109,14 @@ export default function Authorization({ children }: AuthorizationProps) {
 
     try {
       // 1) attempt to read modules table
+      let loadedModules = defaultModules
       const { data: modulesData, error: modulesErr } = await supabase.from("modules").select("id,name,icon")
       if (modulesErr) {
         console.warn("modules read error, using defaults:", modulesErr.message)
       } else if (modulesData && modulesData.length) {
-        setModules(
-          modulesData.map((m: any) => ({ id: m.id, name: m.name, icon: m.icon })) as Module[],
-        )
+        loadedModules = modulesData.map((m: any) => ({ id: m.id, name: m.name, icon: m.icon })) as Module[]
       }
+      setModules(loadedModules)
 
       // 2) read roles
       const { data: rolesData, error: rolesErr } = await supabase.from("roles").select("id,name,description,color,icon")
@@ -140,6 +139,15 @@ export default function Authorization({ children }: AuthorizationProps) {
         fetchedRoles = getDefaultRoles()
       }
 
+      // Initialize permissions for all roles and modules
+      fetchedRoles = fetchedRoles.map((r) => ({
+        ...r,
+        permissions: loadedModules.reduce((acc, m) => ({ 
+          ...acc, 
+          [m.id]: { view: false, create: false, edit: false, delete: false } 
+        }), {} as RolePermissions),
+      }))
+
       // 3) read role_permissions table
       const { data: permsData, error: permsErr } = await supabase
         .from("role_permissions")
@@ -147,13 +155,6 @@ export default function Authorization({ children }: AuthorizationProps) {
 
       if (permsErr) {
         console.warn("role_permissions read error:", permsErr.message)
-        fetchedRoles = fetchedRoles.map((r) => ({
-          ...r,
-          permissions: modules.reduce((acc, m) => ({ 
-            ...acc, 
-            [m.id]: { view: false, create: false, edit: false, delete: false } 
-          }), {} as RolePermissions),
-        }))
       } else if (permsData) {
         const permMap: Record<string, RolePermissions> = {}
         permsData.forEach((p: any) => {
@@ -168,10 +169,10 @@ export default function Authorization({ children }: AuthorizationProps) {
 
         fetchedRoles = fetchedRoles.map((r) => ({
           ...r,
-          permissions: permMap[r.id] || modules.reduce((acc, m) => ({ 
-            ...acc, 
-            [m.id]: { view: false, create: false, edit: false, delete: false } 
-          }), {} as RolePermissions),
+          permissions: {
+            ...r.permissions,
+            ...permMap[r.id],
+          },
         }))
       }
 
@@ -258,14 +259,16 @@ export default function Authorization({ children }: AuthorizationProps) {
 
     try {
       const { error: upsertErr } = await supabase.from("roles").upsert(
-        {
-          id: editingRole.id,
-          name: editingRole.name,
-          description: editingRole.description,
-          color: editingRole.color,
-          icon: typeof editingRole.icon === "string" ? editingRole.icon : undefined,
-        },
-        { returning: "minimal" },
+        [
+          {
+            id: editingRole.id,
+            name: editingRole.name,
+            description: editingRole.description,
+            color: editingRole.color,
+            icon: typeof editingRole.icon === "string" ? editingRole.icon : undefined,
+          },
+        ],
+        { onConflict: "id" },
       )
       if (upsertErr) throw upsertErr
 
@@ -284,7 +287,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         })
       })
       if (inserts.length) {
-        const { error: insertErr } = await supabase.from("role_permissions").insert(inserts, { returning: "minimal" })
+        const { error: insertErr } = await supabase.from("role_permissions").insert(inserts)
         if (insertErr) console.warn("failed to insert perms:", insertErr.message)
       }
     } catch (e) {
@@ -300,13 +303,19 @@ export default function Authorization({ children }: AuthorizationProps) {
     setRoles(
       roles.map((role) => {
         if (role.id === roleId) {
+          const currentPerms = role.permissions[moduleId] || {
+            view: false,
+            create: false,
+            edit: false,
+            delete: false,
+          }
           return {
             ...role,
             permissions: {
               ...role.permissions,
               [moduleId]: {
-                ...role.permissions[moduleId],
-                [permission]: !role.permissions[moduleId]?.[permission],
+                ...currentPerms,
+                [permission]: !currentPerms[permission],
               },
             },
           }

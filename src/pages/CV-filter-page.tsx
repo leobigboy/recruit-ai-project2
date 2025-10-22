@@ -25,11 +25,12 @@ import {
 import { supabase } from "@/lib/supabaseClient"
 
 // ==================== TOAST ====================
-const useToast = () => ({
-  toast: (options: { title: string; description: string; duration: number }) => {
+const useToast = () => {
+  const toast = React.useCallback((options: { title: string; description: string; duration: number }) => {
     alert(`${options.title}\n${options.description}`)
-  },
-})
+  }, []);
+  return { toast };
+}
 
 // ==================== OPENROUTER GPT-4O SERVICE ====================
 interface JobMatchResult {
@@ -882,7 +883,7 @@ export default function CVFilterPage() {
                             </Button>
                           )}
 
-                          {!candidate.overall_score && (
+                          {candidate.overall_score === 0 && (
                             <Button
                               size="sm"
                               onClick={async () => {
