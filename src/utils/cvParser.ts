@@ -1,4 +1,3 @@
-
 // src/utils/cvParser.ts
 import mammoth from 'mammoth';
 
@@ -62,135 +61,39 @@ async function parseTXT(file: File): Promise<string> {
   }
 }
 
-// ✅ FIXED: AI-POWERED extraction với error handling tốt hơn
+// ✅ FIXED: Không gọi AI nữa - dùng regex parsing mạnh mẽ
+// Nếu muốn dùng AI, cần tạo backend API endpoint
 async function extractInfoWithAI(text: string): Promise<ParsedCV> {
-  try {
-    console.log('🤖 Using AI to parse CV (text length: ' + text.length + ')...');
-    
-    // ✅ FIX: Thêm x-api-key header (nếu cần) và timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-    
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        // ✅ Nếu cần API key, uncomment dòng này:
-        // "x-api-key": "YOUR_API_KEY_HERE"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1500,
-        messages: [
-          {
-            role: "user",
-            content: `Bạn là AI chuyên trích xuất thông tin từ CV ứng viên.
-
-Phân tích CV sau và trả về JSON với CHÍNH XÁC các trường sau:
-
-{
-  "fullName": "Họ và tên ĐẦY ĐỦ (VD: Võ Huỳnh Thái Bảo)",
-  "email": "Email (VD: vothaibao50@gmail.com)",
-  "phone": "Số điện thoại (giữ nguyên định dạng: +84 945 446 761)",
-  "address": "Thành phố/Tỉnh (VD: TP. Hồ Chí Minh hoặc TP.HCM)",
-  "university": "Tên trường ĐẦY ĐỦ (VD: Đại học Bách Khoa TP.HCM)",
-  "education": "Học vấn ĐẦY ĐỦ (VD: Cử nhân Công nghệ Thông tin, GPA: 3.5/4.0)",
-  "experience": "Kinh nghiệm ĐẦY ĐỦ (VD: 2022-2024 Frontend Developer, ABC Company - Xây dựng SPA..., tối đa 200 ký tự)",
-  "skills": ["Danh sách kỹ năng", "từng", "kỹ", "năng"]
+  console.log('⚠️ AI parsing tạm thời disabled (cần backend API)');
+  console.log('🔄 Sử dụng regex parsing...');
+  return extractInfoWithRegex(text);
 }
 
-QUY TẮC QUAN TRỌNG:
-- Nếu KHÔNG TÌM THẤY thông tin, để giá trị null
-- CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN (không có \`\`\`json)
-- Trả về CHÍNH XÁC format JSON hợp lệ
-- Với "experience": gộp tất cả kinh nghiệm thành 1 đoạn văn ngắn gọn
-- Với "education": gộp học vị + GPA + năm (nếu có)
-
-CV:
----
-${text.substring(0, 4000)}
----
-
-Trả về JSON:`
-          }
-        ]
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`AI API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const aiResponse = data.content
-      .map((item: any) => (item.type === "text" ? item.text : ""))
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-
-    console.log('🤖 AI Raw Response:', aiResponse);
-
-    // Clean response (remove markdown if present)
-    let cleanResponse = aiResponse
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
-
-    console.log('🧹 Cleaned Response:', cleanResponse);
-
-    // Parse JSON
-    const parsed = JSON.parse(cleanResponse);
-    
-    console.log('✅ Parsed JSON:', parsed);
-
-    return {
-      fullText: text,
-      fullName: parsed.fullName || undefined,
-      email: parsed.email || undefined,
-      phone: parsed.phone || undefined,
-      address: parsed.address || undefined,
-      university: parsed.university || undefined,
-      education: parsed.education || undefined,
-      experience: parsed.experience || undefined,
-      skills: parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0 
-        ? parsed.skills 
-        : undefined
-    };
-
-  } catch (error: any) {
-    console.error('❌ AI parsing failed:', error);
-    if (error.name === 'AbortError') {
-      console.log('⏱️ AI request timeout - using regex fallback');
-    }
-    console.log('⚠️ Falling back to regex-based parsing...');
-    return extractInfoWithRegex(text);
-  }
-}
-
-// ✅ IMPROVED: Fallback regex MẠNH HƠN cho CV tiếng Việt
+// ✅ IMPROVED: Regex parser MẠNH HƠN cho CV tiếng Việt
 function extractInfoWithRegex(text: string): ParsedCV {
   const parsed: ParsedCV = {
     fullText: text
   };
   
   console.log('🔍 Starting regex extraction...');
-  console.log('📄 Full text:', text.substring(0, 500));
+  console.log('📄 Text length:', text.length);
   
   const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   
   // ========== 1. FULL NAME ==========
-  // Tìm ở đầu file, dòng có 2-5 từ, chỉ chữ cái tiếng Việt
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  // Chiến lược: Tìm ở 10 dòng đầu, chỉ chữ cái tiếng Việt, 2-5 từ
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
     const line = lines[i].trim();
     const words = line.split(/\s+/);
     
-    // Điều kiện: 2-5 từ, mỗi từ viết hoa chữ đầu, tổng 10-50 ký tự
+    // Bỏ qua dòng có số, email, hoặc ký tự đặc biệt
+    if (/\d|@|[^\p{L}\s]/u.test(line)) continue;
+    
+    // Điều kiện: 2-5 từ, mỗi từ viết hoa chữ đầu, 10-50 ký tự
     if (words.length >= 2 && words.length <= 5 && line.length >= 10 && line.length <= 50) {
-      const isValidName = words.every(word => /^[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ][a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]*$/.test(word));
+      const isValidName = words.every(word => 
+        /^[\p{Lu}][\p{Ll}]*$/u.test(word) // Unicode-aware: chữ đầu hoa, còn lại thường
+      );
       
       if (isValidName) {
         parsed.fullName = line;
@@ -209,11 +112,12 @@ function extractInfoWithRegex(text: string): ParsedCV {
   }
   
   // ========== 3. PHONE ==========
-  // Tìm pattern +84 hoặc 0 theo sau bởi 9-10 số
-  const phoneRegex = /(?:\+84|84|0)[\s.-]?(\d{1,3})[\s.-]?(\d{3,4})[\s.-]?(\d{3,4})/g;
+  // Pattern linh hoạt: +84, 84, 0, với hoặc không dấu cách/gạch ngang
+  const phoneRegex = /(?:\+?84|0)[\s.-]?[1-9]\d{1,2}[\s.-]?\d{3,4}[\s.-]?\d{3,4}/g;
   const phones = text.match(phoneRegex);
   if (phones && phones.length > 0) {
-    parsed.phone = phones[0].replace(/\s+/g, ' ');
+    // Chuẩn hóa: giữ dấu cách, xóa gạch ngang
+    parsed.phone = phones[0].replace(/[-]/g, '').replace(/\s+/g, ' ').trim();
     console.log('✅ Found phone:', parsed.phone);
   }
   
@@ -221,45 +125,74 @@ function extractInfoWithRegex(text: string): ParsedCV {
   const addressPatterns = [
     /TP\.?\s*H[ồô]\s*Ch[íi]\s*Minh/gi,
     /TP\.?\s*HCM/gi,
+    /Th[àả]nh\s*ph[ốồ]\s*H[ồô]\s*Ch[íi]\s*Minh/gi,
     /H[àồ]\s*N[ộô]i/gi,
     /[ĐĐ][àả]\s*N[ẵẳ]ng/gi,
-    /C[ầấ]n\s*Th[ơơ]/gi
+    /C[ầấ]n\s*Th[ơơ]/gi,
+    /H[ảả]i\s*Ph[òó]ng/gi,
+    /Nha\s*Trang/gi
   ];
   
   for (const pattern of addressPatterns) {
     const match = text.match(pattern);
     if (match) {
-      parsed.address = match[0];
+      // Chuẩn hóa
+      let addr = match[0];
+      if (/HCM/i.test(addr)) {
+        addr = 'TP. Hồ Chí Minh';
+      }
+      parsed.address = addr;
       console.log('✅ Found address:', parsed.address);
       break;
     }
   }
   
   // ========== 5. UNIVERSITY ==========
-  const universityKeywords = [
-    /(?:trường\s+)?đại\s+học\s+[^\n]{5,80}/gi,
-    /(?:trường\s+)?university\s+[^\n]{5,80}/gi,
-    /(?:trường\s+)?học\s+viện\s+[^\n]{5,80}/gi
+  const universityPatterns = [
+    /(?:trường\s+)?đại\s+học\s+[^\n.,;]{5,100}/gi,
+    /(?:trường\s+)?university\s+[^\n.,;]{5,100}/gi,
+    /(?:trường\s+)?học\s+viện\s+[^\n.,;]{5,100}/gi,
+    /(?:trường\s+)?cao\s+đẳng\s+[^\n.,;]{5,100}/gi
   ];
   
-  for (const pattern of universityKeywords) {
+  for (const pattern of universityPatterns) {
     const matches = text.match(pattern);
     if (matches && matches.length > 0) {
-      // Lấy match dài nhất (thường là tên đầy đủ)
-      parsed.university = matches.reduce((a, b) => a.length > b.length ? a : b).trim();
+      // Lấy match dài nhất (thường là tên đầy đủ nhất)
+      const longest = matches.reduce((a, b) => a.length > b.length ? a : b);
+      // Clean: xóa khoảng trắng thừa
+      parsed.university = longest.trim().replace(/\s+/g, ' ');
       console.log('✅ Found university:', parsed.university);
       break;
     }
   }
   
   // ========== 6. EDUCATION ==========
-  // Tìm dòng có "Cử nhân", "Bachelor", "GPA"
+  // Tìm dòng có từ khóa học vấn
+  const educationKeywords = [
+    /cử\s*nhân/gi, 
+    /bachelor/gi, 
+    /thạc\s*sĩ/gi, 
+    /master/gi, 
+    /tiến\s*sĩ/gi,
+    /phd|ph\.d/gi,
+    /gpa/gi,
+    /major/gi,
+    /chuyên\s*ngành/gi
+  ];
+  
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/cử\s*nhân|bachelor|thạc\s*sĩ|master|gpa/gi.test(line)) {
-      // Lấy 1-2 dòng context
-      const context = lines.slice(i, Math.min(i + 2, lines.length)).join(' ').trim();
-      if (context.length >= 20 && context.length <= 250) {
+    const hasKeyword = educationKeywords.some(pattern => pattern.test(line));
+    
+    if (hasKeyword) {
+      // Lấy 1-3 dòng context
+      const context = lines.slice(i, Math.min(i + 3, lines.length))
+        .join(' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+      
+      if (context.length >= 20 && context.length <= 300) {
         parsed.education = context;
         console.log('✅ Found education:', parsed.education);
         break;
@@ -268,80 +201,115 @@ function extractInfoWithRegex(text: string): ParsedCV {
   }
   
   // ========== 7. EXPERIENCE ==========
-  // Tìm section "Kinh nghiệm làm việc" hoặc các keyword
+  // Tìm dòng có năm + chức danh
   const experienceKeywords = [
-    'frontend developer',
-    'backend developer',
-    'full stack',
-    'software engineer',
-    'lập trình viên',
-    'developer',
-    'engineer'
+    'developer', 'engineer', 'programmer', 'lập trình viên',
+    'frontend', 'backend', 'full stack', 'fullstack',
+    'software', 'web', 'mobile', 'internship', 'thực tập'
   ];
+  
+  let experienceParts: string[] = [];
   
   for (let i = 0; i < lines.length; i++) {
     const lineLower = lines[i].toLowerCase();
     
-    // Kiểm tra có năm và chức danh
-    const hasYear = /20\d{2}/.test(lines[i]);
+    // Kiểm tra có năm (2019-2024) và chức danh
+    const hasYear = /20[12]\d/.test(lines[i]);
     const hasJobTitle = experienceKeywords.some(keyword => lineLower.includes(keyword));
     
     if (hasYear && hasJobTitle) {
-      // Lấy 2-4 dòng context
-      const context = lines.slice(i, Math.min(i + 4, lines.length)).join(' ').trim();
-      if (context.length >= 30) {
-        parsed.experience = context.substring(0, 250);
-        console.log('✅ Found experience:', parsed.experience);
-        break;
+      // Lấy 2-4 dòng làm 1 đoạn kinh nghiệm
+      const segment = lines.slice(i, Math.min(i + 4, lines.length))
+        .join(' ')
+        .trim()
+        .replace(/\s+/g, ' ');
+      
+      if (segment.length >= 30) {
+        experienceParts.push(segment);
+        i += 3; // Skip những dòng đã lấy
       }
     }
   }
   
+  if (experienceParts.length > 0) {
+    // Gộp tất cả, giới hạn 300 ký tự
+    parsed.experience = experienceParts.join('. ').substring(0, 300);
+    console.log('✅ Found experience:', parsed.experience);
+  }
+  
   // ========== 8. SKILLS ==========
   const skillKeywords = [
-    'javascript', 'typescript', 'react', 'vue', 'angular', 'node.js', 'nodejs',
-    'python', 'django', 'flask', 'java', 'spring', 'html', 'css', 'sass',
-    'tailwind', 'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'git',
-    'github', 'docker', 'kubernetes', 'aws', 'azure', 'agile', 'restful', 'api',
-    'redux', 'next.js', 'express', 'fastapi', 'graphql', 'webpack', 'vite'
+    'javascript', 'typescript', 'react', 'vue', 'angular', 'svelte',
+    'node.js', 'nodejs', 'express', 'nest.js', 'next.js', 'nuxt',
+    'python', 'django', 'flask', 'fastapi', 
+    'java', 'spring', 'spring boot',
+    'c#', 'c++', 'go', 'rust', 'php', 'laravel',
+    'html', 'css', 'sass', 'scss', 'tailwind', 'bootstrap',
+    'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch',
+    'git', 'github', 'gitlab', 'docker', 'kubernetes', 'jenkins',
+    'aws', 'azure', 'gcp', 'firebase', 
+    'agile', 'scrum', 'restful', 'graphql', 'api',
+    'redux', 'mobx', 'zustand', 'webpack', 'vite', 'babel'
   ];
   
   const textLower = text.toLowerCase();
-  const foundSkills = skillKeywords.filter(skill => {
+  const foundSkills: string[] = [];
+  
+  for (const skill of skillKeywords) {
+    // Word boundary check (tránh match "express" trong "expression")
     const regex = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-    return regex.test(textLower);
-  });
+    if (regex.test(textLower)) {
+      foundSkills.push(skill);
+    }
+  }
   
   if (foundSkills.length > 0) {
-    // Capitalize và remove duplicates
-    parsed.skills = [...new Set(foundSkills)].map(s => {
-      // Giữ nguyên case đặc biệt
-      const specialCase: Record<string, string> = {
-        'javascript': 'JavaScript',
-        'typescript': 'TypeScript',
-        'nodejs': 'Node.js',
-        'node.js': 'Node.js',
-        'postgresql': 'PostgreSQL',
-        'mongodb': 'MongoDB',
-        'restful': 'RESTful',
-        'api': 'API',
-        'html': 'HTML',
-        'css': 'CSS',
-        'sql': 'SQL',
-        'aws': 'AWS',
-        'azure': 'Azure',
-        'next.js': 'Next.js',
-        'vue': 'Vue',
-        'fastapi': 'FastAPI',
-        'graphql': 'GraphQL'
-      };
-      
-      return specialCase[s.toLowerCase()] || (s.charAt(0).toUpperCase() + s.slice(1));
-    });
+    // Capitalize đúng cách
+    const capitalizeMap: Record<string, string> = {
+      'javascript': 'JavaScript',
+      'typescript': 'TypeScript',
+      'nodejs': 'Node.js',
+      'node.js': 'Node.js',
+      'next.js': 'Next.js',
+      'nest.js': 'Nest.js',
+      'nuxt': 'Nuxt.js',
+      'postgresql': 'PostgreSQL',
+      'mongodb': 'MongoDB',
+      'mysql': 'MySQL',
+      'restful': 'RESTful',
+      'graphql': 'GraphQL',
+      'api': 'API',
+      'html': 'HTML',
+      'css': 'CSS',
+      'sass': 'SASS',
+      'scss': 'SCSS',
+      'sql': 'SQL',
+      'aws': 'AWS',
+      'gcp': 'GCP',
+      'azure': 'Azure',
+      'fastapi': 'FastAPI',
+      'vue': 'Vue.js',
+      'c#': 'C#',
+      'c++': 'C++',
+      'spring boot': 'Spring Boot',
+      'elasticsearch': 'Elasticsearch'
+    };
+    
+    parsed.skills = [...new Set(foundSkills)].map(s => 
+      capitalizeMap[s.toLowerCase()] || (s.charAt(0).toUpperCase() + s.slice(1))
+    );
+    
     console.log('✅ Found skills:', parsed.skills);
   }
   
-  console.log('📊 Final regex result:', parsed);
+  console.log('📊 Final parsed result:', {
+    fullName: parsed.fullName,
+    email: parsed.email,
+    phone: parsed.phone,
+    address: parsed.address,
+    university: parsed.university?.substring(0, 50) + '...',
+    skillsCount: parsed.skills?.length
+  });
   
   return parsed;
 }
@@ -354,7 +322,7 @@ export async function parseCV(file: File): Promise<ParsedCV> {
   const fileName = file.name.toLowerCase();
   
   try {
-    // Extract text
+    // Extract text based on file type
     if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
       console.log('📄 Parsing PDF...');
       text = await parsePDF(file);
@@ -371,20 +339,12 @@ export async function parseCV(file: File): Promise<ParsedCV> {
       throw new Error('Định dạng file không được hỗ trợ');
     }
     
-    console.log('✅ Text extracted:', text.length, 'chars');
-    console.log('📝 First 500 chars:', text.substring(0, 500));
+    console.log('✅ Text extracted:', text.length, 'characters');
     
-    // ✅ TRY AI FIRST, fallback to regex if fail
-    let result: ParsedCV;
+    // ✅ Chỉ dùng regex parsing (AI tạm disabled)
+    const result = extractInfoWithRegex(text);
     
-    try {
-      result = await extractInfoWithAI(text);
-    } catch (error) {
-      console.warn('⚠️ AI failed, using regex only');
-      result = extractInfoWithRegex(text);
-    }
-    
-    console.log('📊 Final Parsed Result:', result);
+    console.log('📊 Parse complete!');
     
     return result;
     
@@ -406,7 +366,7 @@ export function validateCVFile(file: File): { valid: boolean; error?: string } {
   const fileName = file.name.toLowerCase();
   const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
   
-  const maxSize = 5 * 1024 * 1024;
+  const maxSize = 5 * 1024 * 1024; // 5MB
   
   if (!allowedTypes.includes(file.type) && !hasValidExtension) {
     return { valid: false, error: 'Chỉ chấp nhận file PDF, DOCX hoặc TXT' };

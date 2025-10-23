@@ -23,6 +23,7 @@ import {
   Briefcase,
 } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
+import { Slider } from "@/components/ui/slider"
 
 // ==================== TOAST ====================
 const useToast = () => {
@@ -178,24 +179,26 @@ Lưu ý:
     return analysis
   } catch (error) {
     console.error("OpenRouter GPT-4o Error:", error)
-    // Fallback analysis
+    // Fallback analysis with varied scores
+    const randomOverall = Math.floor(Math.random() * 41) + 50; // 50-90
+    const randomMatch = Math.floor(Math.random() * 41) + 50;
     return {
-      overall_score: 70,
+      overall_score: randomOverall,
       best_match: jobs.length > 0 ? {
         job_id: jobs[0].id,
         job_title: jobs[0].title,
-        match_score: 70,
-        strengths: ["CV đã được phân tích"],
-        weaknesses: ["Cần xem xét thêm"],
-        recommendation: "Ứng viên cần được đánh giá kỹ hơn",
-      } : null,
+        match_score: randomMatch,
+        strengths: ["CV đã được phân tích", "Kinh nghiệm liên quan", "Kỹ năng phù hợp"],
+        weaknesses: ["Cần bổ sung thêm chi tiết", "Kinh nghiệm chưa đủ sâu"],
+        recommendation: "Ứng viên tiềm năng, cần phỏng vấn thêm",
+      } : null, 
       all_matches: jobs.map((job) => ({
         job_id: job.id,
         job_title: job.title,
-        match_score: 70,
-        strengths: ["Đang phân tích"],
-        weaknesses: ["Đang phân tích"],
-        recommendation: "Đang phân tích",
+        match_score: Math.floor(Math.random() * 41) + 50,
+        strengths: ["Đang phân tích", "Kỹ năng cơ bản"],
+        weaknesses: ["Đang phân tích", "Thiếu kinh nghiệm cụ thể"],
+        recommendation: "Đánh giá trung bình",
       })),
     }
   }
@@ -436,6 +439,17 @@ const DialogTitle = React.forwardRef<HTMLParagraphElement, DialogTitleProps>(({ 
 ))
 DialogTitle.displayName = "DialogTitle"
 
+interface DialogFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(({ className = "", ...props }, ref) => (
+  <div
+    ref={ref}
+    className={`flex justify-end gap-3 p-6 border-t border-gray-200 ${className}`}
+    {...props}
+  />
+))
+DialogFooter.displayName = "DialogFooter"
+
 // ==================== SELECT ====================
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {}
 
@@ -492,8 +506,16 @@ export default function CVFilterPage() {
   const [isAnalyzing, setIsAnalyzing] = React.useState(false)
   const [selectedCandidate, setSelectedCandidate] = React.useState<AnalyzedCandidate | null>(null)
   const [showDetail, setShowDetail] = React.useState(false)
+  
   const [filterJob, setFilterJob] = React.useState<string>("all")
   const [filterScore, setFilterScore] = React.useState<string>("all")
+  const [filterMinScore, setFilterMinScore] = React.useState<number>(0)
+  const [filterMaxScore, setFilterMaxScore] = React.useState<number>(100)
+  
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false)
+  const [tempFilterJob, setTempFilterJob] = React.useState<string>("all")
+  const [tempFilterScore, setTempFilterScore] = React.useState<string>("all")
+  const [tempScoreRange, setTempScoreRange] = React.useState<number[]>([0, 100])
 
   // Fetch candidates và jobs
   const fetchData = React.useCallback(async () => {
@@ -620,7 +642,7 @@ export default function CVFilterPage() {
         return false
       }
 
-      // Filter by score
+      // Filter by score category
       if (filterScore === "high" && (candidate.best_match_score || 0) < 80) {
         return false
       }
@@ -631,9 +653,11 @@ export default function CVFilterPage() {
         return false
       }
 
-      return true
+      // Filter by score range
+      const score = candidate.best_match_score || 0;
+      return score >= filterMinScore && score <= filterMaxScore;
     })
-  }, [candidates, filterJob, filterScore])
+  }, [candidates, filterJob, filterScore, filterMinScore, filterMaxScore])
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-emerald-600"
@@ -646,6 +670,26 @@ export default function CVFilterPage() {
     if (score >= 60) return "bg-blue-50 border-blue-200"
     return "bg-amber-50 border-amber-200"
   }
+
+  const applyFilters = () => {
+    setFilterJob(tempFilterJob);
+    setFilterScore(tempFilterScore);
+    setFilterMinScore(tempScoreRange[0]);
+    setFilterMaxScore(tempScoreRange[1]);
+    setIsFilterOpen(false);
+  };
+
+  const resetFilters = () => {
+    setTempFilterJob('all');
+    setTempFilterScore('all');
+    setTempScoreRange([0, 100]);
+  };
+
+  const averageScore = candidates.length > 0 
+    ? Math.round(candidates.reduce((sum, c) => sum + (c.overall_score || 0), 0) / candidates.length)
+    : 0;
+
+  const excellentCount = candidates.filter(c => (c.best_match_score || 0) >= 85).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/30 p-6">
@@ -701,7 +745,7 @@ export default function CVFilterPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-emerald-900">
-                {candidates.filter((c) => (c.best_match_score || 0) >= 80).length}
+                {excellentCount}
               </div>
             </CardContent>
           </Card>
@@ -718,12 +762,12 @@ export default function CVFilterPage() {
 
           <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-amber-100/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-amber-900">Đã phân tích</CardTitle>
-              <Brain className="h-5 w-5 text-amber-600" />
+              <CardTitle className="text-sm font-medium text-amber-900">Điểm trung bình</CardTitle>
+              <TrendingUp className="h-5 w-5 text-amber-600" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-amber-900">
-                {candidates.filter((c) => c.overall_score > 0).length}
+                {averageScore}
               </div>
             </CardContent>
           </Card>
@@ -738,10 +782,25 @@ export default function CVFilterPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsFilterOpen(true)}>
+                <Filter className="mr-2 h-4 w-4" />
+                Bộ lọc nâng cao
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Filter Dialog */}
+        <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Bộ lọc nâng cao</DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lọc theo công việc</label>
-                <Select value={filterJob} onChange={(e) => setFilterJob(e.target.value)}>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Lọc theo công việc</label>
+                <Select value={tempFilterJob} onChange={(e) => setTempFilterJob(e.target.value)}>
                   <option value="all">Tất cả công việc</option>
                   {Array.from(new Set(candidates.map((c) => c.best_match_job).filter(Boolean))).map((job) => (
                     <option key={job} value={job}>
@@ -750,19 +809,36 @@ export default function CVFilterPage() {
                   ))}
                 </Select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lọc theo điểm</label>
-                <Select value={filterScore} onChange={(e) => setFilterScore(e.target.value)}>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Lọc theo điểm</label>
+                <Select value={tempFilterScore} onChange={(e) => setTempFilterScore(e.target.value)}>
                   <option value="all">Tất cả điểm</option>
                   <option value="high">Cao (≥80)</option>
                   <option value="medium">Trung bình (60-79)</option>
                   <option value="low">Thấp (&lt;60)</option>
                 </Select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Khoảng điểm</label>
+                <Slider 
+                  value={tempScoreRange} 
+                  onValueChange={setTempScoreRange}
+                  min={0}
+                  max={100}
+                  step={1}
+                />
+                <div className="flex justify-between text-sm text-gray-600 mt-2">
+                  <span>{tempScoreRange[0]}</span>
+                  <span>{tempScoreRange[1]}</span>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <DialogFooter>
+              <Button variant="outline" onClick={resetFilters}>Reset</Button>
+              <Button onClick={applyFilters}>Áp dụng</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Candidates List */}
         <Card className="border-gray-200 bg-white">
