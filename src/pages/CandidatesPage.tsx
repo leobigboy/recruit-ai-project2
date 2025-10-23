@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X } from 'lucide-react'
+import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X, Star, Award } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { saveCandidateSkills, getCandidateSkills, type Skill } from "@/utils/skillsHelper"
@@ -28,6 +28,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   AlertDialog,
@@ -40,17 +41,35 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { Slider } from "@/components/ui/slider"
 import { supabase } from "@/lib/supabaseClient"
 import { parseCV, validateCVFile, type ParsedCV } from "@/utils/cvParser"
+import { calculateCVScore, getScoreBadgeClass, getScoreIcon, type ScoreResult } from "@/utils/cvScoringHelper"
 
 const getStatusBadge = (status: string) => {
-  if (status === "Mới") return <Badge variant="outline" className="text-blue-600 border-blue-600 bg-blue-50">new</Badge>
-  if (status === "Sàng lọc") return <Badge variant="outline" className="text-yellow-600 border-yellow-600 bg-yellow-50">screening</Badge>
-  if (status === "Phỏng vấn") return <Badge variant="outline" className="text-purple-600 border-purple-600 bg-purple-50">interview</Badge>
-  if (status === "Chấp nhận") return <Badge variant="outline" className="text-green-600 border-green-600 bg-green-50">accepted</Badge>
-  if (status === "Từ chối") return <Badge variant="outline" className="text-red-600 border-red-600 bg-red-50">rejected</Badge>
+  if (status === "Mới") return <Badge variant="outline" className="text-blue-600 border-blue-600 bg-blue-50">Mới</Badge>
+  if (status === "Sàng lọc") return <Badge variant="outline" className="text-yellow-600 border-yellow-600 bg-yellow-50">Sàng lọc</Badge>
+  if (status === "Phỏng vấn") return <Badge variant="outline" className="text-purple-600 border-purple-600 bg-purple-50">Phỏng vấn</Badge>
+  if (status === "Chấp nhận") return <Badge variant="outline" className="text-green-600 border-green-600 bg-green-50">Chấp nhận</Badge>
+  if (status === "Từ chối") return <Badge variant="outline" className="text-red-600 border-red-600 bg-red-50">Từ chối</Badge>
   return <Badge variant="secondary">{status}</Badge>
 }
+
+// Component hiển thị badge điểm
+const ScoreBadge = ({ score, size = 'md' }: { score: number; size?: 'sm' | 'md' | 'lg' }) => {
+  const sizeClasses = {
+    sm: 'text-xs px-2 py-1',
+    md: 'text-sm px-3 py-1.5',
+    lg: 'text-base px-4 py-2'
+  };
+  
+  return (
+    <div className={`inline-flex items-center gap-1.5 rounded-full border-2 font-bold ${getScoreBadgeClass(score)} ${sizeClasses[size]}`}>
+      <span className="text-base">{getScoreIcon(score)}</span>
+      <span>{score}/100</span>
+    </div>
+  );
+};
 
 interface Candidate {
   id: string;
@@ -103,10 +122,26 @@ export function CandidatesPage() {
   const [viewCVCandidate, setViewCVCandidate] = useState<Candidate | null>(null);
   const [analyzeCVCandidate, setAnalyzeCVCandidate] = useState<Candidate | null>(null);
   
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterPosition, setFilterPosition] = useState<string>('all');
+  const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterMinScore, setFilterMinScore] = useState<number>(0);
+  const [filterMaxScore, setFilterMaxScore] = useState<number>(100);
+  
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [tempFilterStatus, setTempFilterStatus] = useState<string>('all');
+  const [tempFilterPosition, setTempFilterPosition] = useState<string>('all');
+  const [tempFilterLevel, setTempFilterLevel] = useState<string>('all');
+  const [tempScoreRange, setTempScoreRange] = useState<number[]>([0, 100]);
+  
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
   const [isLoadingCV, setIsLoadingCV] = useState(false);
   const [isLoadingAnalyze, setIsLoadingAnalyze] = useState(false);
+  
+  // State mới cho điểm số
+  const [candidateScores, setCandidateScores] = useState<Map<string, ScoreResult>>(new Map());
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -157,7 +192,27 @@ export function CandidatesPage() {
       .order('created_at', { ascending: false });
 
     if (data) {
-      setCandidates(data as Candidate[]);
+      const candidatesData = data as Candidate[];
+      setCandidates(candidatesData);
+      
+      // Tính điểm cho tất cả ứng viên
+      const scores = new Map<string, ScoreResult>();
+      candidatesData.forEach(candidate => {
+        const jobReq = candidate.cv_jobs ? {
+          title: candidate.cv_jobs.title,
+          level: candidate.cv_jobs.level
+        } : undefined;
+        
+        const scoreData = calculateCVScore({
+          skills: candidate.cv_candidate_skills,
+          experience: candidate.experience,
+          university: candidate.university,
+          cv_jobs: candidate.cv_jobs
+        }, jobReq);
+        
+        scores.set(candidate.id, scoreData);
+      });
+      setCandidateScores(scores);
     }
     if (error) {
       console.error('Error fetching candidates:', error);
@@ -192,141 +247,130 @@ export function CandidatesPage() {
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const file = event.target.files?.[0];
-  if (!file) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-  const validation = validateCVFile(file);
-  if (!validation.valid) {
-    alert(validation.error);
-    event.target.value = '';
-    return;
-  }
-
-  setSelectedFile(file);
-
-  try {
-    setIsUploading(true);
-    
-    console.log('=== BẮT ĐẦU PARSE CV ===');
-    const parsed = await parseCV(file);
-    console.log('=== KẾT QUẢ PARSE ===', parsed);
-    
-    setParsedData(parsed);
-
-    // ✅ Đếm số trường được điền
-    let filledCount = 0;
-    const foundInfo = [];
-
-    // Điền Họ và tên
-    if (parsed.fullName) {
-      console.log('✅ Điền Họ và tên:', parsed.fullName);
-      handleInputChange('full_name', parsed.fullName);
-      foundInfo.push(`👤 Họ tên: ${parsed.fullName}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Họ và tên');
+    const validation = validateCVFile(file);
+    if (!validation.valid) {
+      alert(validation.error);
+      event.target.value = '';
+      return;
     }
 
-    // Điền Email
-    if (parsed.email) {
-      console.log('✅ Điền Email:', parsed.email);
-      handleInputChange('email', parsed.email);
-      foundInfo.push(`📧 Email: ${parsed.email}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Email');
+    setSelectedFile(file);
+
+    try {
+      setIsUploading(true);
+      
+      console.log('=== BẮT ĐẦU PARSE CV ===');
+      const parsed = await parseCV(file);
+      console.log('=== KẾT QUẢ PARSE ===', parsed);
+      
+      setParsedData(parsed);
+
+      let filledCount = 0;
+      const foundInfo = [];
+
+      if (parsed.fullName) {
+        console.log('✅ Điền Họ và tên:', parsed.fullName);
+        handleInputChange('full_name', parsed.fullName);
+        foundInfo.push(`👤 Họ tên: ${parsed.fullName}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Họ và tên');
+      }
+
+      if (parsed.email) {
+        console.log('✅ Điền Email:', parsed.email);
+        handleInputChange('email', parsed.email);
+        foundInfo.push(`📧 Email: ${parsed.email}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Email');
+      }
+
+      if (parsed.phone) {
+        console.log('✅ Điền SĐT:', parsed.phone);
+        handleInputChange('phone_number', parsed.phone);
+        foundInfo.push(`📱 SĐT: ${parsed.phone}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy SĐT');
+      }
+
+      if (parsed.address) {
+        console.log('✅ Điền Địa chỉ:', parsed.address);
+        handleInputChange('address', parsed.address);
+        foundInfo.push(`📍 Địa chỉ: ${parsed.address}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Địa chỉ');
+      }
+
+      if (parsed.university) {
+        console.log('✅ Điền Trường học:', parsed.university);
+        handleInputChange('university', parsed.university);
+        foundInfo.push(`🎓 Trường: ${parsed.university}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Trường học');
+      }
+
+      if (parsed.education) {
+        console.log('✅ Điền Học vấn:', parsed.education);
+        handleInputChange('education', parsed.education);
+        foundInfo.push(`📚 Học vấn: ${parsed.education}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Học vấn');
+      }
+
+      if (parsed.experience) {
+        console.log('✅ Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
+        handleInputChange('experience', parsed.experience);
+        const expPreview = parsed.experience.length > 50 
+          ? parsed.experience.substring(0, 50) + '...' 
+          : parsed.experience;
+        foundInfo.push(`💼 Kinh nghiệm: ${expPreview}`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Kinh nghiệm');
+      }
+
+      if (parsed.skills && parsed.skills.length > 0) {
+        console.log('✅ Điền Skills:', parsed.skills);
+        handleInputChange('skills', parsed.skills);
+        foundInfo.push(`🛠️ Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
+        filledCount++;
+      } else {
+        console.log('❌ Không tìm thấy Skills');
+      }
+
+      console.log('=== TỔNG KẾT ===');
+      console.log(`Đã điền: ${filledCount}/8 trường`);
+
+      const message = filledCount > 0
+        ? `✅ Đã phân tích CV thành công!\n\n` +
+          `Tự động điền ${filledCount}/8 trường:\n${foundInfo.join('\n')}\n\n` +
+          `${filledCount < 8 ? '⚠️ Vui lòng bổ sung các trường còn thiếu.' : '✓ Tất cả thông tin đã được điền!'}`
+        : `⚠️ Không thể trích xuất thông tin từ CV.\n\n` +
+          `Vui lòng nhập thủ công hoặc thử file CV khác.`;
+
+      alert(message);
+
+      if (filledCount > 0) {
+        setTimeout(() => {
+          setCurrentTab('basic');
+        }, 300);
+      }
+
+    } catch (error: any) {
+      console.error('❌ Lỗi parse CV:', error);
+      alert('⚠ Không thể phân tích CV:\n' + (error.message || 'Lỗi không xác định'));
+    } finally {
+      setIsUploading(false);
     }
-
-    // Điền Số điện thoại
-    if (parsed.phone) {
-      console.log('✅ Điền SĐT:', parsed.phone);
-      handleInputChange('phone_number', parsed.phone);
-      foundInfo.push(`📱 SĐT: ${parsed.phone}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy SĐT');
-    }
-
-    // Điền Địa chỉ
-    if (parsed.address) {
-      console.log('✅ Điền Địa chỉ:', parsed.address);
-      handleInputChange('address', parsed.address);
-      foundInfo.push(`📍 Địa chỉ: ${parsed.address}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Địa chỉ');
-    }
-
-    // Điền Trường học
-    if (parsed.university) {
-      console.log('✅ Điền Trường học:', parsed.university);
-      handleInputChange('university', parsed.university);
-      foundInfo.push(`🎓 Trường: ${parsed.university}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Trường học');
-    }
-
-    // Điền Học vấn
-    if (parsed.education) {
-      console.log('✅ Điền Học vấn:', parsed.education);
-      handleInputChange('education', parsed.education);
-      foundInfo.push(`📚 Học vấn: ${parsed.education}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Học vấn');
-    }
-
-    // Điền Kinh nghiệm
-    if (parsed.experience) {
-      console.log('✅ Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
-      handleInputChange('experience', parsed.experience);
-      const expPreview = parsed.experience.length > 50 
-        ? parsed.experience.substring(0, 50) + '...' 
-        : parsed.experience;
-      foundInfo.push(`💼 Kinh nghiệm: ${expPreview}`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Kinh nghiệm');
-    }
-
-    // Điền Kỹ năng
-    if (parsed.skills && parsed.skills.length > 0) {
-      console.log('✅ Điền Skills:', parsed.skills);
-      handleInputChange('skills', parsed.skills);
-      foundInfo.push(`🛠️ Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
-      filledCount++;
-    } else {
-      console.log('❌ Không tìm thấy Skills');
-    }
-
-    console.log('=== TỔNG KẾT ===');
-    console.log(`Đã điền: ${filledCount}/8 trường`);
-
-    // Hiển thị thông báo
-    const message = filledCount > 0
-      ? `✅ Đã phân tích CV thành công!\n\n` +
-        `Tự động điền ${filledCount}/8 trường:\n${foundInfo.join('\n')}\n\n` +
-        `${filledCount < 8 ? '⚠️ Vui lòng bổ sung các trường còn thiếu.' : '✓ Tất cả thông tin đã được điền!'}`
-      : `⚠️ Không thể trích xuất thông tin từ CV.\n\n` +
-        `Vui lòng nhập thủ công hoặc thử file CV khác.`;
-
-    alert(message);
-
-    // Tự động chuyển về tab "Thông tin cơ bản"
-    if (filledCount > 0) {
-      setTimeout(() => {
-        setCurrentTab('basic');
-      }, 300);
-    }
-
-  } catch (error: any) {
-    console.error('❌ Lỗi parse CV:', error);
-    alert('⚠ Không thể phân tích CV:\n' + (error.message || 'Lỗi không xác định'));
-  } finally {
-    setIsUploading(false);
-  }
-};
+  };
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
@@ -397,6 +441,23 @@ export function CandidatesPage() {
 
       if (fullData) {
         setCandidates(prev => [fullData as Candidate, ...prev]);
+        
+        // Tính điểm cho ứng viên mới
+        const newCandidate = fullData as Candidate;
+        const jobReq = newCandidate.cv_jobs ? {
+          title: newCandidate.cv_jobs.title,
+          level: newCandidate.cv_jobs.level
+        } : undefined;
+        
+        const scoreData = calculateCVScore({
+          skills: newCandidate.cv_candidate_skills,
+          experience: newCandidate.experience,
+          university: newCandidate.university,
+          cv_jobs: newCandidate.cv_jobs
+        }, jobReq);
+        
+        setCandidateScores(prev => new Map(prev).set(newCandidate.id, scoreData));
+        
         setIsDialogOpen(false);
         resetForm();
         alert('✓ Thêm ứng viên thành công!');
@@ -412,7 +473,6 @@ export function CandidatesPage() {
     if (!editCandidate) return;
     setIsSaving(true);
     try {
-      // Update candidate (without skills column)
       const { data, error } = await supabase
         .from('cv_candidates')
         .update({
@@ -434,10 +494,8 @@ export function CandidatesPage() {
 
       if (error) throw error;
 
-      // Update skills in junction table
       await saveCandidateSkills(editCandidate.id, formData.skills);
 
-      // Fetch complete updated data with skills
       const { data: completeData } = await supabase
         .from('cv_candidates')
         .select(`
@@ -451,9 +509,26 @@ export function CandidatesPage() {
         .single();
 
       if (completeData) {
+        const updatedCandidate = completeData as Candidate;
         setCandidates(prev =>
-          prev.map(c => (c.id === editCandidate.id ? completeData as Candidate : c))
+          prev.map(c => (c.id === editCandidate.id ? updatedCandidate : c))
         );
+        
+        // Tính lại điểm sau khi update
+        const jobReq = updatedCandidate.cv_jobs ? {
+          title: updatedCandidate.cv_jobs.title,
+          level: updatedCandidate.cv_jobs.level
+        } : undefined;
+        
+        const scoreData = calculateCVScore({
+          skills: updatedCandidate.cv_candidate_skills,
+          experience: updatedCandidate.experience,
+          university: updatedCandidate.university,
+          cv_jobs: updatedCandidate.cv_jobs
+        }, jobReq);
+        
+        setCandidateScores(prev => new Map(prev).set(updatedCandidate.id, scoreData));
+        
         setEditCandidate(null);
         resetForm();
         alert('✓ Cập nhật thông tin thành công!');
@@ -475,7 +550,7 @@ export function CandidatesPage() {
       full_name: candidate.full_name || '',
       email: candidate.email || '',
       phone_number: candidate.phone_number || '',
-      job_id: '', // Không cập nhật job_id trong edit
+      job_id: '',
       address: candidate.address || '',
       experience: candidate.experience || '',
       education: candidate.education || '',
@@ -522,7 +597,7 @@ export function CandidatesPage() {
     try {
       const { data, error } = await supabase
         .from('cv_candidates')
-        .select('id, full_name, cv_url, cv_parsed_data, status')
+        .select('id, full_name, cv_url, cv_parsed_data, status, cv_candidate_skills ( cv_skills ( id, name, category ) )')
         .eq('id', candidate.id)
         .single();
 
@@ -537,7 +612,7 @@ export function CandidatesPage() {
           alert('Ứng viên chưa có CV để phân tích');
           return;
         }
-        setAnalyzeCVCandidate(data as Candidate);
+        setAnalyzeCVCandidate(data as unknown as Candidate);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -562,7 +637,6 @@ export function CandidatesPage() {
         }
       }
 
-      // Delete cascade will handle cv_candidate_skills automatically
       const { error } = await supabase
         .from('cv_candidates')
         .delete()
@@ -571,12 +645,89 @@ export function CandidatesPage() {
       if (error) throw error;
 
       setCandidates(prev => prev.filter(c => c.id !== deleteCandidate.id));
+      setCandidateScores(prev => {
+        const newScores = new Map(prev);
+        newScores.delete(deleteCandidate.id);
+        return newScores;
+      });
       setDeleteCandidate(null);
       alert('✓ Đã xóa ứng viên thành công!');
     } catch (err: any) {
       alert('Lỗi khi xóa: ' + (err.message || 'Không xác định'));
     }
   };
+
+  const applyFilters = () => {
+    setFilterStatus(tempFilterStatus);
+    setFilterPosition(tempFilterPosition);
+    setFilterLevel(tempFilterLevel);
+    setFilterMinScore(tempScoreRange[0]);
+    setFilterMaxScore(tempScoreRange[1]);
+    setIsFilterOpen(false);
+  };
+
+  const resetFilters = () => {
+    setTempFilterStatus('all');
+    setTempFilterPosition('all');
+    setTempFilterLevel('all');
+    setTempScoreRange([0, 100]);
+  };
+
+  const exportCSV = () => {
+    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Status', 'Source', 'Position', 'Level', 'Score'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredCandidates.map(c => {
+        const score = candidateScores.get(c.id)?.total || 'N/A';
+        return [
+          c.id,
+          `"${c.full_name.replace(/"/g, '""')}"`,
+          c.email,
+          c.phone_number || '',
+          c.status,
+          c.source,
+          c.cv_jobs?.title || '',
+          c.cv_jobs?.level || '',
+          score
+        ].join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'candidates.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const uniquePositions = Array.from(new Set(candidates.map(c => c.cv_jobs?.title).filter((v): v is string => !!v)));
+  const uniqueLevels = Array.from(new Set(candidates.map(c => c.cv_jobs?.level).filter((v): v is string => !!v)));
+  const uniqueStatuses = ['Mới', 'Sàng lọc', 'Phỏng vấn', 'Chấp nhận', 'Từ chối'];
+
+  const filteredCandidates = candidates.filter(candidate => {
+    const matchesSearch = searchQuery === '' || 
+      candidate.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      candidate.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (candidate.cv_jobs?.title && candidate.cv_jobs.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesStatus = filterStatus === 'all' || candidate.status === filterStatus;
+    const matchesPosition = filterPosition === 'all' || candidate.cv_jobs?.title === filterPosition;
+    const matchesLevel = filterLevel === 'all' || candidate.cv_jobs?.level === filterLevel;
+    const score = candidateScores.get(candidate.id)?.total || 0;
+    const matchesScore = score >= filterMinScore && score <= filterMaxScore;
+
+    return matchesSearch && matchesStatus && matchesPosition && matchesLevel && matchesScore;
+  });
+
+  // Tính điểm trung bình
+  const averageScore = candidateScores.size > 0 
+    ? Math.round(Array.from(candidateScores.values()).reduce((sum, s) => sum + s.total, 0) / candidateScores.size)
+    : 0;
+  
+  // Số lượng ứng viên xuất sắc
+  const excellentCount = Array.from(candidateScores.values()).filter(s => s.total >= 85).length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -681,7 +832,7 @@ export function CandidatesPage() {
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Chọn vị trí" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectContent className="bg-white z-50 shadow-lg border border-gray-200 max-h-[300px]">
                         {jobs.map((job) => (
                           <SelectItem key={job.id} value={job.id}>
                             {job.title} - {job.level}
@@ -771,7 +922,6 @@ export function CandidatesPage() {
                   </div>
                 </div>
 
-                {/* SỬA: Thay Textarea bằng SkillsInput */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Kỹ năng</label>
                   <SkillsInput
@@ -887,17 +1037,64 @@ export function CandidatesPage() {
           ) : viewCandidate ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4 pb-4 border-b">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="text-2xl">
-                    {viewCandidate.full_name.split(' ').map(n => n[0]).join('')}
+                <Avatar className="h-16 w-16 border-2 border-blue-200">
+                  <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                    {viewCandidate.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-xl font-bold">{viewCandidate.full_name}</h3>
                   <p className="text-sm text-gray-500">{viewCandidate.cv_jobs?.title || 'N/A'}</p>
-                  {getStatusBadge(viewCandidate.status)}
+                  <div className="flex items-center gap-2 mt-1">
+                    {getStatusBadge(viewCandidate.status)}
+                    {candidateScores.get(viewCandidate.id) && (
+                      <ScoreBadge score={candidateScores.get(viewCandidate.id)!.total} size="sm" />
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Hiển thị Score Breakdown */}
+              {candidateScores.get(viewCandidate.id) && (
+                <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
+                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-blue-600" />
+                    Phân tích điểm số
+                  </h4>
+                  <div className="space-y-2">
+                    {Object.entries(candidateScores.get(viewCandidate.id)!.breakdown).map(([key, value]) => {
+                      const labels: Record<string, string> = {
+                        skills: '🛠️ Kỹ năng',
+                        experience: '💼 Kinh nghiệm',
+                        education: '🎓 Học vấn',
+                        level: '📊 Cấp độ',
+                        position: '🎯 Vị trí'
+                      };
+                      const maxScores: Record<string, number> = {
+                        skills: 40,
+                        experience: 25,
+                        education: 15,
+                        level: 10,
+                        position: 10
+                      };
+                      return (
+                        <div key={key}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-gray-700">{labels[key]}</span>
+                            <span className="text-sm font-bold text-gray-900">{value}/{maxScores[key]}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
+                              style={{ width: `${(value / maxScores[key]) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-sm font-medium text-gray-500">Email</label><p className="text-gray-900">{viewCandidate.email}</p></div>
@@ -911,7 +1108,6 @@ export function CandidatesPage() {
               <div><label className="text-sm font-medium text-gray-500">Kinh nghiệm</label><p className="text-gray-900 mt-1">{viewCandidate.experience || 'Chưa có thông tin'}</p></div>
               <div><label className="text-sm font-medium text-gray-500">Học vấn</label><p className="text-gray-900 mt-1">{viewCandidate.education || 'Chưa có thông tin'}</p></div>
               
-              {/* SỬA: Hiển thị skills từ junction table */}
               <div>
                 <label className="text-sm font-medium text-gray-500">Kỹ năng</label>
                 <div className="mt-1">
@@ -995,7 +1191,6 @@ export function CandidatesPage() {
                 </div>
               </div>
 
-              {/* SỬA: Thay Textarea bằng SkillsInput */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Kỹ năng</label>
                 <SkillsInput
@@ -1070,7 +1265,6 @@ export function CandidatesPage() {
                   {analyzeCVCandidate.cv_parsed_data.phone && <div><span className="font-medium">Số điện thoại:</span> {analyzeCVCandidate.cv_parsed_data.phone}</div>}
                   {analyzeCVCandidate.cv_parsed_data.university && <div><span className="font-medium">Trường học:</span> {analyzeCVCandidate.cv_parsed_data.university}</div>}
                   
-                  {/* SỬA: Hiển thị skills từ parsed data */}
                   {analyzeCVCandidate.cv_parsed_data.skills && analyzeCVCandidate.cv_parsed_data.skills.length > 0 && (
                     <div>
                       <span className="font-medium">Kỹ năng phát hiện từ CV:</span>
@@ -1084,7 +1278,6 @@ export function CandidatesPage() {
                 </div>
               </div>
 
-              {/* THÊM: Hiển thị skills đã lưu trong DB */}
               {analyzeCVCandidate.cv_candidate_skills && analyzeCVCandidate.cv_candidate_skills.length > 0 && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <h4 className="font-semibold text-green-900 mb-2">Kỹ năng đã lưu trong hệ thống</h4>
@@ -1118,217 +1311,291 @@ export function CandidatesPage() {
           ) : (
             <div className="text-center py-12">
               <Brain className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500 mb-4">Chưa có dữ liệu phân tích CV</p>
-              <p className="text-sm text-gray-400">CV của ứng viên chưa được parse hoặc chưa upload</p>
+              <p className="text-gray-500">Chưa có dữ liệu phân tích CV</p>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* AlertDialog Xóa ứng viên */}
+      {/* Dialog Bộ lọc */}
+      <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Bộ lọc nâng cao</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Trạng thái</label>
+              <Select value={tempFilterStatus} onValueChange={setTempFilterStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tất cả trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  {uniqueStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Vị trí</label>
+              <Select value={tempFilterPosition} onValueChange={setTempFilterPosition}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tất cả vị trí" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả vị trí</SelectItem>
+                  {uniquePositions.map(pos => (
+                    <SelectItem key={pos} value={pos}>{pos}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cấp độ</label>
+              <Select value={tempFilterLevel} onValueChange={setTempFilterLevel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tất cả cấp độ" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả cấp độ</SelectItem>
+                  {uniqueLevels.map(level => (
+                    <SelectItem key={level} value={level}>{level}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Khoảng điểm CV</label>
+              <Slider 
+                value={tempScoreRange} 
+                onValueChange={setTempScoreRange}
+                min={0}
+                max={100}
+                step={1}
+              />
+              <div className="flex justify-between text-sm text-gray-600 mt-2">
+                <span>{tempScoreRange[0]}</span>
+                <span>{tempScoreRange[1]}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetFilters}>Reset</Button>
+            <Button onClick={applyFilters}>Áp dụng</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cards thống kê */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="shadow-sm border-2 border-gray-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Tổng ứng viên</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{candidates.length}</div>
+            <p className="text-xs text-muted-foreground">
+              <TrendingUp className="inline h-4 w-4 mr-1 text-green-500" />
+              +20.1% so với tháng trước
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-2 border-gray-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Ứng viên mới</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{candidates.filter(c => c.status === 'Mới').length}</div>
+            <p className="text-xs text-muted-foreground">
+              <Users className="inline h-4 w-4 mr-1 text-blue-500" />
+              Trong tuần này
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-2 border-gray-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Tỷ lệ chấp nhận</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">24%</div>
+            <p className="text-xs text-muted-foreground">
+              <UserCheck className="inline h-4 w-4 mr-1 text-purple-500" />
+              Từ 120 ứng viên
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="shadow-sm border-2 border-gray-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Điểm CV trung bình</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              <ScoreBadge score={averageScore} size="md" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              <TrendingUp className="inline h-4 w-4 mr-1 text-green-500" />
+              Cập nhật từ {candidates.length} ứng viên
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm border-2 border-gray-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-500">Ứng viên xuất sắc</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{excellentCount}</div>
+            <p className="text-xs text-muted-foreground">
+              <Star className="inline h-4 w-4 mr-1 text-yellow-500" />
+              Điểm từ 85/100 trở lên
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bộ lọc và nút chức năng */}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex flex-wrap gap-4 items-center flex-1">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              className="pl-9"
+              placeholder="Tìm theo tên, email, vị trí..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" onClick={() => setIsFilterOpen(true)}>
+            <Filter className="mr-2 h-4 w-4" />
+            Bộ lọc nâng cao
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Xuất CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Bảng ứng viên */}
+      {loading ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-500 mt-4">Đang tải dữ liệu ứng viên...</p>
+        </div>
+      ) : filteredCandidates.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+          <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900">Không tìm thấy ứng viên</h3>
+          <p className="text-sm text-gray-500 mt-1">Thử thay đổi bộ lọc hoặc thêm ứng viên mới</p>
+        </div>
+      ) : (
+        <Card className="shadow-sm border-2 border-gray-100 overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="w-[250px]">Ứng viên</TableHead>
+                <TableHead>Vị trí</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Điểm CV</TableHead>
+                <TableHead>Kỹ năng</TableHead>
+                <TableHead className="text-right">Hành động</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCandidates.map((candidate) => (
+                <TableRow key={candidate.id} className="hover:bg-gray-50 transition-colors">
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8 border-2 border-blue-200">
+                        <AvatarFallback className="text-sm bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+                          {candidate.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="font-medium text-gray-900">{candidate.full_name}</div>
+                        <div className="text-sm text-gray-500">{candidate.email}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {candidate.cv_jobs ? (
+                      <div>
+                        <div className="font-medium">{candidate.cv_jobs.title}</div>
+                        <div className="text-sm text-gray-500">{candidate.cv_jobs.level}</div>
+                      </div>
+                    ) : 'N/A'}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(candidate.status)}</TableCell>
+                  <TableCell>
+                    {candidateScores.get(candidate.id) ? (
+                      <ScoreBadge score={candidateScores.get(candidate.id)!.total} size="sm" />
+                    ) : (
+                      <Badge variant="outline" className="text-gray-600 border-gray-600 bg-gray-50">N/A</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1 max-w-[300px]">
+                      {candidate.cv_candidate_skills?.slice(0, 4).map((item, idx) => (
+                        <Badge key={idx} variant="secondary" className="text-xs">
+                          {item.cv_skills.name}
+                        </Badge>
+                      ))}
+                      {candidate.cv_candidate_skills && candidate.cv_candidate_skills.length > 4 && (
+                        <Badge variant="secondary" className="text-xs">+{candidate.cv_candidate_skills.length - 4}</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => handleViewCandidate(candidate)}>
+                        <Eye className="h-4 w-4 text-blue-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleEditCandidate(candidate)}>
+                        <Edit className="h-4 w-4 text-green-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleViewCV(candidate)}>
+                        <FileText className="h-4 w-4 text-purple-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleAnalyzeCV(candidate)}>
+                        <Brain className="h-4 w-4 text-orange-600" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteCandidate(candidate)}>
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+
+      {/* Alert Dialog Xóa */}
       <AlertDialog open={!!deleteCandidate} onOpenChange={() => setDeleteCandidate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Xác nhận xóa ứng viên</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa ứng viên <strong>{deleteCandidate?.full_name}</strong>? Hành động này không thể hoàn tác.
+              Bạn chắc chắn muốn xóa ứng viên "{deleteCandidate?.full_name}"? Hành động này không thể hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">Xóa</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Xóa
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Thống kê Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tổng ứng viên</CardTitle>
-            <div className="bg-blue-100 p-2 rounded-full"><Users className="h-4 w-4 text-blue-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{candidates.length}</div>
-            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Đang phỏng vấn</CardTitle>
-            <div className="bg-purple-100 p-2 rounded-full"><UserCheck className="h-4 w-4 text-purple-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{candidates.filter(c => c.status === 'Phỏng vấn').length}</div>
-            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Đã qua sàng lọc</CardTitle>
-            <div className="bg-green-100 p-2 rounded-full"><Filter className="h-4 w-4 text-green-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{candidates.filter(c => c.status === 'Sàng lọc').length}</div>
-            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tỷ lệ thành công</CardTitle>
-            <div className="bg-red-100 p-2 rounded-full"><TrendingUp className="h-4 w-4 text-red-600" /></div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {candidates.length > 0 ? Math.round((candidates.filter(c => c.status === 'Chấp nhận').length / candidates.length) * 100) : 0}%
-            </div>
-            <p className="text-xs text-muted-foreground">+0% so với tháng trước</p>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="flex items-center text-sm text-muted-foreground gap-4 bg-white p-4 rounded-lg border">
-        <span>Hiển thị {candidates.length} / {candidates.length} ứng viên</span>
-        <span>•</span>
-        <span>Cập nhật lần cuối: {new Date().toLocaleTimeString('vi-VN')}</span>
-        <span className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-500"></div>
-          Đã đồng bộ
-        </span>
-      </div>
-
-      {/* Filters Card */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Tìm kiếm theo tên, email hoặc vị trí..." className="pl-10" />
-            </div>
-            <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả trạng thái" /></SelectTrigger><SelectContent></SelectContent></Select>
-            <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả vị trí" /></SelectTrigger><SelectContent></SelectContent></Select>
-            <Select><SelectTrigger className="w-full md:w-[160px]"><SelectValue placeholder="Tất cả cấp độ" /></SelectTrigger><SelectContent></SelectContent></Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table danh sách ứng viên */}
-      <div className="border rounded-lg bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ứng viên</TableHead>
-              <TableHead>Vị trí</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Cấp độ</TableHead>
-              <TableHead>Ngày ứng tuyển</TableHead>
-              <TableHead>Thao tác</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={6} className="h-24 text-center">Đang tải dữ liệu...</TableCell></TableRow>
-            ) : candidates.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="h-24 text-center"><p className="font-medium">Chưa có ứng viên nào</p><p className="text-sm text-muted-foreground">Hãy bắt đầu bằng cách thêm ứng viên đầu tiên!</p></TableCell></TableRow>
-            ) : (
-              candidates.map((candidate) => (
-                <TableRow key={candidate.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10"><AvatarFallback>{candidate.full_name.split(' ').map(n => n[0]).join('')}</AvatarFallback></Avatar>
-                      <div>
-                        <div className="font-medium">{candidate.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{candidate.email || candidate.phone_number}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>{candidate.cv_jobs?.title || 'N/A'}</div>
-                    {/* SỬA: Hiển thị số lượng skills thay vì kinh nghiệm */}
-                    <div className="text-sm text-muted-foreground">
-                      {candidate.cv_candidate_skills && candidate.cv_candidate_skills.length > 0 
-                        ? `${candidate.cv_candidate_skills.length} kỹ năng` 
-                        : 'Chưa có kỹ năng'}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(candidate.status)}</TableCell>
-                  <TableCell>{candidate.cv_jobs?.level || 'N/A'}</TableCell>
-                  <TableCell>
-                    <div>{new Date(candidate.created_at).toLocaleDateString('vi-VN')}</div>
-                    <div className="text-sm text-muted-foreground">Nguồn: {candidate.source}</div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" title="Xem thông tin ứng viên" onClick={() => handleViewCandidate(candidate)} disabled={isLoadingView}><Eye className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-50" title="Chỉnh sửa" onClick={() => handleEditCandidate(candidate)} disabled={isLoadingEdit}><Edit className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" title="Xem CV" onClick={() => handleViewCV(candidate)} disabled={isLoadingCV}><FileText className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50" title="Phân tích CV" onClick={() => handleAnalyzeCV(candidate)} disabled={isLoadingAnalyze}><Brain className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50" title="Xóa" onClick={() => handleDeleteCandidate(candidate)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Quick Actions */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4">Thao tác nhanh</h3>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-blue-100 p-3 rounded-full">
-                <Bot className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="font-semibold">AI Analysis</p>
-                <p className="text-sm text-muted-foreground">Phân tích tất cả CV</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-green-100 p-3 rounded-full">
-                <Download className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="font-semibold">Xuất dữ liệu</p>
-                <p className="text-sm text-muted-foreground">Tải xuống Excel</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-purple-100 p-3 rounded-full">
-                <ListChecks className="h-6 w-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="font-semibold">Hành động hàng loạt</p>
-                <p className="text-sm text-muted-foreground">Cập nhật nhiều ứng viên</p>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-            <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-orange-100 p-3 rounded-full">
-                <TriangleAlert className="h-6 w-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="font-semibold">Báo cáo</p>
-                <p className="text-sm text-muted-foreground">Thống kê chi tiết</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
     </div>
-  )
+  );
 }
+
+export default CandidatesPage;
