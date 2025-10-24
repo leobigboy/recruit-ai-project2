@@ -1,6 +1,7 @@
 // src/App.tsx
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { MainLayout } from "./components/layout/MainLayout";
 import { LoginPage } from "./pages/LoginPage";
@@ -13,6 +14,7 @@ import { ReviewsPage } from "./pages/ReviewsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { EmailPage } from "./pages/EmailPage";
 import './i18n/config';
+
 const router = createBrowserRouter([
   // Public Routes (Authentication)
   {
@@ -71,9 +73,11 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

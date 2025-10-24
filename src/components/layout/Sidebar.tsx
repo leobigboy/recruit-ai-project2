@@ -25,10 +25,10 @@ interface NavItemProps {
 const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
   <Link
     to={to}
-    className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+    className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
       isActive
-        ? "bg-blue-600 text-white"
-        : "text-gray-700 hover:bg-blue-50"
+        ? "bg-primary text-primary-foreground shadow-md"
+        : "text-sidebar-text hover:bg-primary/10 hover:translate-x-1"
     }`}
   >
     <Icon className="w-5 h-5 mr-3" />
@@ -98,22 +98,34 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className="w-64 h-screen bg-white shadow-md flex flex-col p-4 fixed">
+    <aside 
+      className="w-64 h-screen bg-gradient-to-b from-primary to-primary/90 shadow-xl flex flex-col p-4 fixed"
+      style={{
+        background: `linear-gradient(180deg, 
+          var(--sidebar-bg, hsl(var(--primary))) 0%, 
+          var(--sidebar-bg, hsl(var(--primary))) 100%)`
+      }}
+    >
       {/* Company Header */}
-      <div className="px-4 py-3 mb-4 border-b border-gray-100">
+      <div className="px-4 py-3 mb-6 border-b border-white/20">
         <div className="flex items-center gap-2 mb-1">
-          <Building2 className="w-5 h-5 text-blue-600" />
-          <h1 className="text-xl font-bold text-blue-600 truncate" title={companyName}>
+          <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
+            <Building2 className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <h1 
+            className="text-xl font-bold text-primary-foreground truncate drop-shadow-sm" 
+            title={companyName}
+          >
             {loading ? 'Loading...' : companyName}
           </h1>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-primary-foreground/80 ml-9">
           {t('dashboard.subtitle')}
         </p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-2 overflow-y-auto">
+      <nav className="flex-1 space-y-1.5 overflow-y-auto scrollbar-thin">
         {navItems.map((item) => (
           <NavItem
             key={item.to}
@@ -126,9 +138,12 @@ export function Sidebar() {
       </nav>
 
       {/* User Profile Section */}
-      <div className="mt-auto pt-4 border-t border-gray-200">
+      <div className="mt-auto pt-4 border-t border-white/20">
         <UserMenu />
       </div>
+
+      {/* Decorative gradient overlay */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
     </aside>
   );
 }
