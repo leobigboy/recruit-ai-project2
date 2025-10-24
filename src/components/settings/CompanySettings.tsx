@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Upload, Building2, Globe, Languages, Palette, RefreshCw, Check } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Upload, Building2, Globe, Languages, Palette, RefreshCw, Check, X, Image as ImageIcon } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
 import { useTranslation } from 'react-i18next'
 
 interface CompanySettingsProps {
@@ -66,7 +66,6 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   root.style.setProperty('--secondary-foreground', secondaryForeground);
   
   // ============ ACCENT COLOR (Sidebar, Highlights) ============
-  // Accent sẽ dùng màu primary nhưng nhạt hơn cho sidebar
   const accentL = Math.min(buttonHSL.l + 45, 95);
   root.style.setProperty('--accent', `${buttonHSL.h} ${Math.max(buttonHSL.s - 20, 30)}% ${accentL}%`);
   root.style.setProperty('--accent-foreground', `${buttonHSL.h} ${buttonHSL.s}% ${buttonHSL.l}%`);
@@ -84,18 +83,16 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   root.style.setProperty('--border', `${menuHSL.h} ${Math.max(menuHSL.s - 20, 15)}% ${borderL}%`);
   
   // ============ CUSTOM CSS VARIABLES cho Sidebar và UI Components ============
-  // Sidebar background
   root.style.setProperty('--sidebar-bg', buttonColor);
   root.style.setProperty('--sidebar-text', primaryForeground === '0 0% 10%' ? '#000000' : '#FFFFFF');
   root.style.setProperty('--sidebar-active', `${buttonHSL.h} ${Math.min(buttonHSL.s + 10, 100)}% ${Math.min(buttonHSL.l + 10, 90)}%`);
   root.style.setProperty('--sidebar-hover', `${buttonHSL.h} ${buttonHSL.s}% ${Math.min(buttonHSL.l + 5, 85)}%`);
   
-  // Card highlights
   root.style.setProperty('--card-highlight', menuColor);
   root.style.setProperty('--card-border', `hsl(${menuHSL.h} ${Math.max(menuHSL.s - 15, 0)}% ${Math.max(menuHSL.l - 10, 80)}%)`);
 };
 
-// Lưu và load từ localStorage
+// Lưu và load màu sắc từ localStorage
 const saveColors = (buttonColor: string, menuColor: string) => {
   localStorage.setItem('theme-button-color', buttonColor);
   localStorage.setItem('theme-menu-color', menuColor);
@@ -108,12 +105,32 @@ const loadColors = () => {
   };
 };
 
+// Lưu và load logo từ localStorage
+const saveLogo = (logoDataUrl: string) => {
+  localStorage.setItem('company-logo', logoDataUrl);
+};
+
+const loadLogo = (): string | null => {
+  return localStorage.getItem('company-logo');
+};
+
+const removeLogo = () => {
+  localStorage.removeItem('company-logo');
+};
+
 export function CompanySettings({ profile, handleInputChange }: CompanySettingsProps) {
   const { t, i18n } = useTranslation();
   const savedColors = loadColors();
   const [buttonColor, setButtonColor] = useState(savedColors.buttonColor);
   const [menuColor, setMenuColor] = useState(savedColors.menuColor);
   const [isApplied, setIsApplied] = useState(false);
+  
+  // Logo states
+  const [logo, setLogo] = useState<string | null>(loadLogo());
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoError, setLogoError] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Áp dụng màu đã lưu khi component mount
   useEffect(() => {
@@ -143,6 +160,72 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     setMenuColor(defaultMenuColor);
     applyThemeColors(defaultButtonColor, defaultMenuColor);
     saveColors(defaultButtonColor, defaultMenuColor);
+  };
+
+  // Xử lý upload logo
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Kiểm tra loại file
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+    if (!validTypes.includes(file.type)) {
+      setLogoError(
+        i18n.language === 'vi' 
+          ? 'Vui lòng chọn file ảnh hợp lệ (PNG, JPG, SVG)' 
+          : 'Please select a valid image file (PNG, JPG, SVG)'
+      );
+      return;
+    }
+
+    // Kiểm tra kích thước file (max 2MB)
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxSize) {
+      setLogoError(
+        i18n.language === 'vi' 
+          ? 'Kích thước file không được vượt quá 2MB' 
+          : 'File size must not exceed 2MB'
+      );
+      return;
+    }
+
+    setLogoError('');
+    setIsUploading(true);
+    setLogoFile(file);
+
+    // Đọc file và chuyển thành base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setLogo(result);
+      saveLogo(result);
+      setIsUploading(false);
+    };
+    reader.onerror = () => {
+      setLogoError(
+        i18n.language === 'vi' 
+          ? 'Có lỗi xảy ra khi tải ảnh' 
+          : 'Error occurred while uploading image'
+      );
+      setIsUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Xóa logo
+  const handleRemoveLogo = () => {
+    setLogo(null);
+    setLogoFile(null);
+    setLogoError('');
+    removeLogo();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Trigger file input click
+  const handleLogoButtonClick = () => {
+    fileInputRef.current?.click();
   };
 
   // Preset màu sắc chuyên nghiệp
@@ -250,17 +333,189 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
         </CardContent>
       </Card>
 
-      {/* Logo công ty */}
+      {/* Logo công ty - HOÀN THIỆN */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('settings.logo.title')}</CardTitle>
-          <CardDescription>{t('settings.logo.description')}</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                <CardTitle>{t('settings.logo.title')}</CardTitle>
+              </div>
+              <CardDescription className="mt-1">
+                {t('settings.logo.description')}
+              </CardDescription>
+            </div>
+            {logo && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleRemoveLogo}
+                className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+              >
+                <X className="w-4 h-4" />
+                {i18n.language === 'vi' ? 'Xóa logo' : 'Remove'}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center hover:border-primary/50 transition-colors">
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <Button variant="outline" className="mt-4">{t('settings.logo.change')}</Button>
-            <p className="text-xs text-muted-foreground mt-2">{t('settings.logo.format')}</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+            onChange={handleLogoUpload}
+            className="hidden"
+          />
+          
+          {logo ? (
+            // Hiển thị logo đã upload
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row items-center gap-6 p-6 rounded-lg border-2 bg-gradient-to-br from-muted/30 to-background">
+                {/* Logo preview lớn */}
+                <div className="flex-shrink-0 w-48 h-48 rounded-lg border-2 border-dashed border-primary/30 bg-white p-4 flex items-center justify-center shadow-md">
+                  <img 
+                    src={logo} 
+                    alt="Company Logo" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+                
+                {/* Thông tin logo */}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-1">
+                      {i18n.language === 'vi' ? 'Logo hiện tại' : 'Current Logo'}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {logoFile?.name || (i18n.language === 'vi' ? 'Logo đã lưu' : 'Saved logo')}
+                    </p>
+                  </div>
+                  
+                  {logoFile && (
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <p>
+                        <span className="font-medium">{i18n.language === 'vi' ? 'Kích thước:' : 'Size:'}</span>{' '}
+                        {(logoFile.size / 1024).toFixed(2)} KB
+                      </p>
+                      <p>
+                        <span className="font-medium">{i18n.language === 'vi' ? 'Định dạng:' : 'Format:'}</span>{' '}
+                        {logoFile.type.split('/')[1].toUpperCase()}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleLogoButtonClick}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {i18n.language === 'vi' ? 'Thay đổi logo' : 'Change Logo'}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleRemoveLogo}
+                      className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                      {i18n.language === 'vi' ? 'Xóa' : 'Remove'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logo preview sizes */}
+              <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+                <p className="text-sm font-medium">
+                  {i18n.language === 'vi' ? 'Xem trước các kích thước:' : 'Preview sizes:'}
+                </p>
+                <div className="flex flex-wrap items-center gap-6">
+                  <div className="space-y-2 text-center">
+                    <div className="w-16 h-16 border rounded bg-white p-2 flex items-center justify-center">
+                      <img src={logo} alt="Logo small" className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">64x64</p>
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <div className="w-24 h-24 border rounded bg-white p-3 flex items-center justify-center">
+                      <img src={logo} alt="Logo medium" className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">96x96</p>
+                  </div>
+                  <div className="space-y-2 text-center">
+                    <div className="w-32 h-32 border rounded bg-white p-4 flex items-center justify-center">
+                      <img src={logo} alt="Logo large" className="max-w-full max-h-full object-contain" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">128x128</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Upload area khi chưa có logo
+            <div 
+              onClick={handleLogoButtonClick}
+              className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
+            >
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                <Upload className="h-10 w-10 text-primary group-hover:scale-110 transition-transform" />
+              </div>
+              <h4 className="font-semibold mb-2">
+                {i18n.language === 'vi' ? 'Tải lên logo công ty' : 'Upload Company Logo'}
+              </h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                {i18n.language === 'vi' 
+                  ? 'Nhấp để chọn hoặc kéo thả file vào đây' 
+                  : 'Click to select or drag and drop file here'}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" className="pointer-events-none">
+                  {t('settings.logo.change')}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-4">
+                {t('settings.logo.format')}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {i18n.language === 'vi' ? 'Kích thước tối đa: 2MB' : 'Maximum size: 2MB'}
+              </p>
+            </div>
+          )}
+
+          {/* Error message */}
+          {logoError && (
+            <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
+              <X className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-destructive">{logoError}</p>
+            </div>
+          )}
+
+          {/* Upload progress */}
+          {isUploading && (
+            <div className="mt-3 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-primary font-medium">
+                  {i18n.language === 'vi' ? 'Đang tải lên...' : 'Uploading...'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Instructions */}
+          <div className="mt-4 text-xs space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="font-semibold text-blue-900 flex items-center gap-2">
+              <span>💡</span>
+              {i18n.language === 'vi' ? 'Hướng dẫn:' : 'Guidelines:'}
+            </p>
+            <ul className="space-y-1 ml-4 list-disc text-blue-800">
+              <li>{i18n.language === 'vi' ? 'Logo nên có nền trong suốt (PNG)' : 'Logo should have transparent background (PNG)'}</li>
+              <li>{i18n.language === 'vi' ? 'Tỉ lệ khuyến nghị: vuông (1:1)' : 'Recommended ratio: square (1:1)'}</li>
+              <li>{i18n.language === 'vi' ? 'Kích thước đề xuất: 512x512px' : 'Recommended size: 512x512px'}</li>
+              <li>{i18n.language === 'vi' ? 'Logo sẽ được lưu trong trình duyệt' : 'Logo will be saved in browser'}</li>
+            </ul>
           </div>
         </CardContent>
       </Card>
