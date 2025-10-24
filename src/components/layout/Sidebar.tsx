@@ -27,8 +27,8 @@ const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
     to={to}
     className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
       isActive
-        ? "bg-primary text-primary-foreground shadow-md"
-        : "text-sidebar-text hover:bg-primary/10 hover:translate-x-1"
+        ? "bg-white text-primary shadow-md font-semibold"
+        : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
     }`}
   >
     <Icon className="w-5 h-5 mr-3" />

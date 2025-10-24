@@ -13,6 +13,7 @@ import { InterviewsPage } from "./pages/InterviewsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { EmailPage } from "./pages/EmailPage";
+import { ProfileSettingsPage } from './pages/ProfileSettingsPage';
 import './i18n/config';
 
 const router = createBrowserRouter([
@@ -61,6 +62,10 @@ const router = createBrowserRouter([
       {
         path: "cai-dat",
         element: <SettingsPage />,
+      },
+      {
+        path: "profile-settings",
+        element: <ProfileSettingsPage />,
       },
     ],
   },

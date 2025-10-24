@@ -41,13 +41,14 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   // PRIMARY COLOR
   root.style.setProperty('--primary', `${buttonHSL.h} ${buttonHSL.s}% ${buttonHSL.l}%`);
   
-  const primaryForeground = buttonHSL.l > 50 ? '0 0% 10%' : '0 0% 98%';
+  // PRIMARY FOREGROUND - Luôn đảm bảo contrast cao (trắng cho background tối, đen cho background sáng)
+  const primaryForeground = buttonHSL.l > 55 ? '0 0% 10%' : '0 0% 100%';
   root.style.setProperty('--primary-foreground', primaryForeground);
   
   // SECONDARY COLOR
   root.style.setProperty('--secondary', `${menuHSL.h} ${menuHSL.s}% ${menuHSL.l}%`);
   
-  const secondaryForeground = menuHSL.l > 50 ? '222.2 47.4% 11.2%' : '0 0% 98%';
+  const secondaryForeground = menuHSL.l > 55 ? '222.2 47.4% 11.2%' : '0 0% 100%';
   root.style.setProperty('--secondary-foreground', secondaryForeground);
   
   // ACCENT COLOR
@@ -67,9 +68,9 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   const borderL = Math.min(menuHSL.l + 10, 95);
   root.style.setProperty('--border', `${menuHSL.h} ${Math.max(menuHSL.s - 20, 15)}% ${borderL}%`);
   
-  // SIDEBAR COLORS
+  // SIDEBAR COLORS - Luôn dùng màu trắng cho text trên sidebar
   root.style.setProperty('--sidebar-bg', buttonColor);
-  root.style.setProperty('--sidebar-text', primaryForeground === '0 0% 10%' ? '#000000' : '#FFFFFF');
+  root.style.setProperty('--sidebar-text', '#FFFFFF'); // Force white text
   root.style.setProperty('--sidebar-active', `${buttonHSL.h} ${Math.min(buttonHSL.s + 10, 100)}% ${Math.min(buttonHSL.l + 10, 90)}%`);
   root.style.setProperty('--sidebar-hover', `${buttonHSL.h} ${buttonHSL.s}% ${Math.min(buttonHSL.l + 5, 85)}%`);
   

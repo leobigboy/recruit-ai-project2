@@ -58,48 +58,130 @@ nav::-webkit-scrollbar-thumb:hover {
 }
 
 /* ============================================
-   BUTTONS STYLING
+   BUTTONS STYLING - FORCE VISIBLE TEXT
    ============================================ */
 
-/* Primary buttons - sử dụng màu primary */
-.btn-primary,
-button[class*="bg-primary"],
-button[class*="btn-primary"],
-[role="button"][class*="bg-primary"] {
-  background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
-  border-color: hsl(var(--primary)) !important;
+/* CRITICAL: Đảm bảo TẤT CẢ button text luôn hiển thị */
+button,
+[role="button"],
+[type="button"],
+[type="submit"],
+.btn,
+.button {
+  font-weight: 500 !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
 }
 
+/* Primary buttons - TEXT PHẢI TRẮNG */
+.btn-primary,
+button[class*="bg-primary"]:not([class*="outline"]),
+button[class*="btn-primary"],
+[role="button"][class*="bg-primary"],
+.bg-primary button,
+button.bg-primary {
+  background-color: hsl(var(--primary)) !important;
+  color: #FFFFFF !important;
+  border-color: hsl(var(--primary)) !important;
+  font-weight: 600 !important;
+}
+
+/* Force white text on primary buttons - OVERRIDE MỌI STYLE */
+button[class*="bg-primary"] *,
+.bg-primary button *,
+button.bg-primary * {
+  color: #FFFFFF !important;
+}
+
+/* Hover state */
 .btn-primary:hover,
 button[class*="bg-primary"]:hover,
 button[class*="btn-primary"]:hover {
-  opacity: 0.9;
+  opacity: 0.92 !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px hsla(var(--primary) / 0.3);
+  box-shadow: 0 4px 12px hsla(var(--primary) / 0.4);
 }
 
-/* Secondary buttons - sử dụng màu secondary */
+/* Disabled state - VẪN PHẢI THẤY TEXT */
+button:disabled,
+button[disabled],
+.btn:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  color: #FFFFFF !important;
+}
+
+button[class*="bg-primary"]:disabled,
+button[class*="bg-primary"][disabled] {
+  background-color: hsl(var(--primary)) !important;
+  color: #FFFFFF !important;
+  opacity: 0.7 !important;
+}
+
+/* Secondary buttons */
 .btn-secondary,
 button[class*="bg-secondary"],
 [role="button"][class*="bg-secondary"] {
   background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--secondary-foreground)) !important;
   border-color: hsl(var(--secondary)) !important;
+  font-weight: 600 !important;
 }
 
-/* Outline buttons */
+/* Outline buttons - TEXT PHẢI RÕ */
 .btn-outline,
 button[class*="outline"],
-button[variant="outline"] {
-  border-color: hsl(var(--primary)) !important;
+button[variant="outline"],
+.variant-outline {
+  border: 2px solid hsl(var(--primary)) !important;
   color: hsl(var(--primary)) !important;
+  background-color: transparent !important;
+  font-weight: 600 !important;
 }
 
 .btn-outline:hover,
 button[class*="outline"]:hover {
   background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
+  color: #FFFFFF !important;
+}
+
+/* Ghost buttons */
+button[variant="ghost"],
+.btn-ghost,
+.variant-ghost {
+  color: hsl(var(--primary)) !important;
+  background-color: transparent !important;
+  font-weight: 600 !important;
+}
+
+button[variant="ghost"]:hover {
+  background-color: hsl(var(--primary) / 0.1) !important;
+}
+
+/* Default button (shadcn/ui) */
+button[data-slot="button"],
+[role="button"] {
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Specific button colors - OVERRIDE */
+button[style*="background-color"],
+button[style*="backgroundColor"] {
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+}
+
+/* shadcn/ui Button component với bg-primary */
+[data-radix-button],
+[data-radix-trigger] {
+  font-weight: 600 !important;
+}
+
+[data-radix-button][class*="bg-primary"],
+[data-radix-trigger][class*="bg-primary"] {
+  color: #FFFFFF !important;
 }
 
 /* ============================================
@@ -259,8 +341,26 @@ progress {
 }
 
 /* ============================================
-   UTILITY CLASSES
+   UTILITY CLASSES - DỄ SỬ DỤNG
    ============================================ */
+
+/* Button với text luôn hiển thị */
+.btn-visible,
+.button-visible {
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+  background-color: hsl(var(--primary)) !important;
+}
+
+.btn-visible:hover {
+  opacity: 0.9 !important;
+}
+
+/* Button text must be white */
+.text-white-force,
+.text-white-force * {
+  color: #FFFFFF !important;
+}
 
 /* Background utilities */
 .bg-primary-light {
@@ -283,7 +383,14 @@ progress {
 /* Hover utilities */
 .hover-primary:hover {
   background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
+  color: #FFFFFF !important;
+}
+
+/* Text always visible utility */
+.always-visible,
+.always-visible * {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* ============================================

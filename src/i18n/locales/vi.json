@@ -422,5 +422,45 @@
       "saveError": "❌ Lỗi! Không thể lưu cài đặt AI.",
       "saveSuccess": "✅ Đã lưu cài đặt AI thành công!"
     }
+  },
+  "profile": {
+    "title": "Thông tin cá nhân",
+    "subtitle": "Quản lý thông tin tài khoản của bạn",
+    "personalInfo": {
+      "title": "Thông tin cá nhân",
+      "description": "Cập nhật thông tin cá nhân và ảnh đại diện",
+      "fullName": "Họ và tên",
+      "fullNamePlaceholder": "Nhập họ và tên",
+      "email": "Email",
+      "emailNote": "Email không thể thay đổi",
+      "phone": "Số điện thoại",
+      "phonePlaceholder": "Nhập số điện thoại",
+      "avatar": "Ảnh đại diện",
+      "changeAvatar": "Thay đổi ảnh",
+      "uploadAvatar": "Tải ảnh lên"
+    },
+    "security": {
+      "title": "Bảo mật",
+      "description": "Quản lý mật khẩu và bảo mật tài khoản",
+      "changePassword": "Đổi mật khẩu",
+      "currentPassword": "Mật khẩu hiện tại",
+      "newPassword": "Mật khẩu mới",
+      "confirmPassword": "Xác nhận mật khẩu mới",
+      "passwordRequirements": "Mật khẩu phải có ít nhất 6 ký tự"
+    },
+    "buttons": {
+      "backToHome": "Quay lại trang chủ",
+      "save": "Lưu thay đổi",
+      "saving": "Đang lưu...",
+      "cancel": "Hủy"
+    },
+    "messages": {
+      "saveSuccess": "✅ Đã lưu thông tin thành công!",
+      "saveError": "❌ Lỗi! Không thể lưu thông tin.",
+      "passwordChangeSuccess": "✅ Đã đổi mật khẩu thành công!",
+      "passwordChangeError": "❌ Lỗi! Không thể đổi mật khẩu.",
+      "passwordMismatch": "❌ Mật khẩu xác nhận không khớp!",
+      "nameRequired": "⚠️ Vui lòng nhập họ và tên!"
+    }
   }
 }

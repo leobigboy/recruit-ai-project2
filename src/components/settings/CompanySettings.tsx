@@ -573,24 +573,53 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                 </li>
               </ul>
             </div>
-            <Button
+            <button
               onClick={handleApplyColors}
-              size="lg"
-              className="flex items-center gap-2 min-w-[200px] justify-center bg-primary hover:opacity-90"
               disabled={isApplied}
+              style={{
+                backgroundColor: isApplied ? '#10b981' : buttonColor,
+                color: '#FFFFFF',
+                fontWeight: '600',
+                minWidth: '200px',
+                padding: '0.625rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: isApplied ? 'not-allowed' : 'pointer',
+                opacity: 1,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem'
+              }}
+              onMouseEnter={(e) => {
+                if (!isApplied) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)';
+              }}
             >
               {isApplied ? (
                 <>
-                  <Check className="w-5 h-5" />
-                  {i18n.language === 'vi' ? 'Đã áp dụng!' : 'Applied!'}
+                  <Check className="w-5 h-5" style={{ color: '#FFFFFF' }} />
+                  <span style={{ color: '#FFFFFF', fontSize: '0.875rem' }}>
+                    {i18n.language === 'vi' ? 'Đã áp dụng!' : 'Applied!'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <Palette className="w-5 h-5" />
-                  {i18n.language === 'vi' ? 'Áp dụng màu sắc' : 'Apply Colors'}
+                  <Palette className="w-5 h-5" style={{ color: '#FFFFFF' }} />
+                  <span style={{ color: '#FFFFFF', fontSize: '0.875rem' }}>
+                    {i18n.language === 'vi' ? 'Áp dụng màu sắc' : 'Apply Colors'}
+                  </span>
                 </>
               )}
-            </Button>
+            </button>
           </div>
 
           {/* Instructions */}

@@ -422,5 +422,45 @@
       "saveError": "❌ Error! Cannot save AI settings.",
       "saveSuccess": "✅ AI settings saved successfully!"
     }
+  },
+  "profile": {
+    "title": "Profile Settings",
+    "subtitle": "Manage your account information",
+    "personalInfo": {
+      "title": "Personal Information",
+      "description": "Update your personal information and avatar",
+      "fullName": "Full Name",
+      "fullNamePlaceholder": "Enter full name",
+      "email": "Email",
+      "emailNote": "Email cannot be changed",
+      "phone": "Phone Number",
+      "phonePlaceholder": "Enter phone number",
+      "avatar": "Avatar",
+      "changeAvatar": "Change Avatar",
+      "uploadAvatar": "Upload Avatar"
+    },
+    "security": {
+      "title": "Security",
+      "description": "Manage password and account security",
+      "changePassword": "Change Password",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "passwordRequirements": "Password must be at least 6 characters"
+    },
+    "buttons": {
+      "backToHome": "Back to Home",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "cancel": "Cancel"
+    },
+    "messages": {
+      "saveSuccess": "✅ Information saved successfully!",
+      "saveError": "❌ Error! Cannot save information.",
+      "passwordChangeSuccess": "✅ Password changed successfully!",
+      "passwordChangeError": "❌ Error! Cannot change password.",
+      "passwordMismatch": "❌ Password confirmation doesn't match!",
+      "nameRequired": "⚠️ Please enter your full name!"
+    }
   }
 }
