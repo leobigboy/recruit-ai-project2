@@ -105,9 +105,16 @@ const loadColors = () => {
   };
 };
 
-// Lưu và load logo từ localStorage
+// Lưu và load logo từ localStorage với event trigger
 const saveLogo = (logoDataUrl: string) => {
   localStorage.setItem('company-logo', logoDataUrl);
+  // Trigger event để các component khác update realtime
+  window.dispatchEvent(new Event('logo-updated'));
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: 'company-logo',
+    newValue: logoDataUrl,
+    url: window.location.href
+  }));
 };
 
 const loadLogo = (): string | null => {
@@ -116,6 +123,13 @@ const loadLogo = (): string | null => {
 
 const removeLogo = () => {
   localStorage.removeItem('company-logo');
+  // Trigger event để các component khác update realtime
+  window.dispatchEvent(new Event('logo-updated'));
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: 'company-logo',
+    newValue: null,
+    url: window.location.href
+  }));
 };
 
 export function CompanySettings({ profile, handleInputChange }: CompanySettingsProps) {
@@ -198,7 +212,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     reader.onloadend = () => {
       const result = reader.result as string;
       setLogo(result);
-      saveLogo(result);
+      saveLogo(result); // Đã có trigger event ở đây
       setIsUploading(false);
     };
     reader.onerror = () => {
@@ -217,7 +231,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     setLogo(null);
     setLogoFile(null);
     setLogoError('');
-    removeLogo();
+    removeLogo(); // Đã có trigger event ở đây
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -514,7 +528,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
               <li>{i18n.language === 'vi' ? 'Logo nên có nền trong suốt (PNG)' : 'Logo should have transparent background (PNG)'}</li>
               <li>{i18n.language === 'vi' ? 'Tỉ lệ khuyến nghị: vuông (1:1)' : 'Recommended ratio: square (1:1)'}</li>
               <li>{i18n.language === 'vi' ? 'Kích thước đề xuất: 512x512px' : 'Recommended size: 512x512px'}</li>
-              <li>{i18n.language === 'vi' ? 'Logo sẽ được lưu trong trình duyệt' : 'Logo will be saved in browser'}</li>
+              <li>{i18n.language === 'vi' ? 'Logo sẽ được lưu trong trình duyệt và hiển thị trên Sidebar' : 'Logo will be saved in browser and displayed on Sidebar'}</li>
             </ul>
           </div>
         </CardContent>

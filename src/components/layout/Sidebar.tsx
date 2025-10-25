@@ -36,6 +36,74 @@ const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
   </Link>
 );
 
+// Component hiển thị Logo công ty
+function CompanyLogo({ companyName }: { companyName: string }) {
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLogo = () => {
+      const savedLogo = localStorage.getItem('company-logo');
+      setLogo(savedLogo);
+    };
+
+    loadLogo();
+
+    // Listen for storage changes (cross-tab updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'company-logo') {
+        setLogo(e.newValue);
+      }
+    };
+
+    // Listen for custom event (same-tab updates)
+    const handleLogoUpdate = () => {
+      loadLogo();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('logo-updated', handleLogoUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('logo-updated', handleLogoUpdate);
+    };
+  }, []);
+
+  return (
+    <div className="flex items-center gap-3">
+      {/* Logo Container */}
+      <div className="w-11 h-11 flex-shrink-0 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 p-2 flex items-center justify-center shadow-lg">
+        {logo ? (
+          <img 
+            src={logo} 
+            alt="Company Logo" 
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <Building2 className="w-full h-full text-white" />
+        )}
+      </div>
+
+      {/* Company Name - CẢI TIẾN ĐỂ NỔI BẬT HỠN */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <h1 
+          className="text-2xl font-extrabold text-white tracking-tight truncate" 
+          style={{
+            textShadow: '0 2px 4px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
+            letterSpacing: '-0.02em'
+          }}
+          title={companyName}
+        >
+          {companyName}
+        </h1>
+        <p className="text-[11px] font-medium text-white/90 truncate tracking-wide uppercase mt-0.5">
+          Management System
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const location = useLocation();
   const { t } = useTranslation();
@@ -106,22 +174,19 @@ export function Sidebar() {
           var(--sidebar-bg, hsl(var(--primary))) 100%)`
       }}
     >
-      {/* Company Header */}
-      <div className="px-4 py-3 mb-6 border-b border-white/20">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
-            <Building2 className="w-5 h-5 text-primary-foreground" />
+      {/* Company Header với Logo */}
+      <div className="px-4 py-4 mb-6 border-b border-white/20">
+        {loading ? (
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/15 animate-pulse shadow-lg" />
+            <div className="flex-1 space-y-2.5">
+              <div className="h-6 bg-white/20 rounded animate-pulse w-36" />
+              <div className="h-3 bg-white/15 rounded animate-pulse w-28" />
+            </div>
           </div>
-          <h1 
-            className="text-xl font-bold text-primary-foreground truncate drop-shadow-sm" 
-            title={companyName}
-          >
-            {loading ? 'Loading...' : companyName}
-          </h1>
-        </div>
-        <p className="text-xs text-primary-foreground/80 ml-9">
-          {t('dashboard.subtitle')}
-        </p>
+        ) : (
+          <CompanyLogo companyName={companyName} />
+        )}
       </div>
 
       {/* Navigation */}
