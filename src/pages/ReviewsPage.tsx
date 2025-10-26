@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RefreshCw, FileText, Star, TrendingUp, MoreHorizontal, X } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useTranslation } from 'react-i18next'
 
@@ -52,37 +51,17 @@ export function ReviewsPage() {
   const { t, i18n } = useTranslation();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalReviews: 0, averageRating: 0, recommendationRate: 0 });
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [isReratingDialogOpen, setIsReratingDialogOpen] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
-  const [newRating, setNewRating] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
   const [stats, setStats] = useState({ 
     totalReviews: 0, 
     averageRating: 0, 
     recommendationRate: 0 
   });
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isReratingDialogOpen, setIsReratingDialogOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [newRating, setNewRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    getReviews();
-  }, []);
-
-  async function getReviews() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('cv_interview_reviews')
-      .select(`
-        *,
-        cv_interviews (
-          *,
-          cv_candidates (
-            full_name,
-            cv_jobs ( title )
-          )
-        )
-      `)
-      .order('created_at', { ascending: false });
   // Hàm để fetch reviews
   const fetchReviews = async () => {
     setLoading(true);
@@ -104,7 +83,9 @@ export function ReviewsPage() {
       setReviews(data as Review[]);
       const total = data.length;
       const sumOfRatings = data.reduce((sum, review) => sum + review.rating, 0);
-      const recommendedCount = data.filter(review => review.outcome === 'Vòng tiếp theo' || review.outcome === 'Đạt').length;
+      const recommendedCount = data.filter(review => 
+        review.outcome === 'Vòng tiếp theo' || review.outcome === 'Next Round' || review.outcome === 'Đạt'
+      ).length;
       
       setStats({
         totalReviews: total,
@@ -114,7 +95,11 @@ export function ReviewsPage() {
     }
     if (error) console.error('Error fetching reviews:', error);
     setLoading(false);
-  }
+  };
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
 
   // Hiển thị chi tiết
   const handleViewDetail = (review: Review) => {
@@ -146,7 +131,7 @@ export function ReviewsPage() {
       if (error) throw error;
 
       // Refresh data
-      await getReviews();
+      await fetchReviews();
 
       setIsReratingDialogOpen(false);
       setSelectedReview(null);
@@ -160,27 +145,6 @@ export function ReviewsPage() {
       setSubmitting(false);
     }
   };
-    if (data) {
-      setReviews(data as Review[]);
-      const total = data.length;
-      const sumOfRatings = data.reduce((sum, review) => sum + review.rating, 0);
-      const recommendedCount = data.filter(review => 
-        review.outcome === 'Vòng tiếp theo' || review.outcome === 'Next Round'
-      ).length;
-      
-      setStats({
-        totalReviews: total,
-        averageRating: total > 0 ? sumOfRatings / total : 0,
-        recommendationRate: total > 0 ? (recommendedCount / total) * 100 : 0,
-      });
-    }
-    if (error) console.error('Error fetching reviews:', error);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchReviews();
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -189,10 +153,6 @@ export function ReviewsPage() {
           <h1 className="text-2xl font-bold">{t('reviews.title')}</h1>
           <p className="text-sm text-muted-foreground">{t('reviews.subtitle')}</p>
         </div>
-        <Button variant="outline" onClick={getReviews}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Làm mới
-        </Button>
         <Button variant="outline" onClick={fetchReviews}>
           <RefreshCw className="w-4 h-4 mr-2" />
           {t('reviews.refresh')}
@@ -200,38 +160,6 @@ export function ReviewsPage() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Tổng số đánh giá</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground"/>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalReviews}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Đánh giá trung bình</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground"/>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold flex items-center gap-2">
-              {stats.averageRating.toFixed(1)} 
-              <StarRating rating={stats.averageRating} />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Tỷ lệ khuyên nghị</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground"/>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.recommendationRate.toFixed(0)}%</div>
-          </CardContent>
-        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">{t('reviews.stats.totalReviews')}</CardTitle>
@@ -268,9 +196,6 @@ export function ReviewsPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>Danh sách đánh giá</CardTitle>
-        </CardHeader>
-        <CardHeader>
           <CardTitle>{t('reviews.list.title')}</CardTitle>
         </CardHeader>
         <CardContent>
@@ -289,17 +214,11 @@ export function ReviewsPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">Đang tải dữ liệu...</TableCell>
-                </TableRow>
-                <TableRow>
                   <TableCell colSpan={7} className="text-center h-24">
                     {t('reviews.list.loading')}
                   </TableCell>
                 </TableRow>
               ) : reviews.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">Chưa có đánh giá nào</TableCell>
-                </TableRow>
                 <TableRow>
                   <TableCell colSpan={7} className="text-center h-24">
                     {t('reviews.list.noData')}
@@ -335,21 +254,11 @@ export function ReviewsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-white" style={{ zIndex: 50 }}>
                           <DropdownMenuItem onClick={() => handleViewDetail(review)}>
-                            Hiển thị
+                            {t('reviews.actions.viewDetails')}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleRerating(review)}>
-                            Đánh giá lại
+                            {t('reviews.actions.edit')}
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>{t('reviews.actions.viewDetails')}</DropdownMenuItem>
-                          <DropdownMenuItem>{t('reviews.actions.edit')}</DropdownMenuItem>
                           <DropdownMenuItem className="text-red-600">
                             {t('reviews.actions.delete')}
                           </DropdownMenuItem>
@@ -599,3 +508,5 @@ export function ReviewsPage() {
     </div>
   )
 }
+
+export default ReviewsPage

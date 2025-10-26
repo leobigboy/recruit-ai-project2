@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Search, Plus, MoreHorizontal, FileText, CheckCircle, Users, Eye, Edit, Trash2, Share2, Copy, Sparkles, PenTool, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -80,7 +81,6 @@ interface Job {
 export function JobsPage() {
   const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

@@ -1,6 +1,6 @@
 // src/components/layout/Sidebar.tsx
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -10,6 +10,8 @@ import {
   Mail,
   Settings,
   Building2,
+  Bot,
+  FileText,
 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { supabase } from "@/lib/supabaseClient";
@@ -30,9 +32,10 @@ const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
         ? "bg-white text-primary shadow-md font-semibold"
         : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
     }`}
+    aria-current={isActive ? 'page' : undefined}
   >
     <Icon className="w-5 h-5 mr-3" />
-    {label}
+    <span className="truncate">{label}</span>
   </Link>
 );
 
@@ -84,7 +87,7 @@ function CompanyLogo({ companyName }: { companyName: string }) {
         )}
       </div>
 
-      {/* Company Name - CẢI TIẾN ĐỂ NỔI BẬT HỠN */}
+      {/* Company Name */}
       <div className="flex flex-col flex-1 min-w-0">
         <h1 
           className="text-2xl font-extrabold text-white tracking-tight truncate" 
@@ -110,7 +113,7 @@ export function Sidebar() {
   const [companyName, setCompanyName] = useState('Recruit AI');
   const [loading, setLoading] = useState(true);
 
-  const navItems = [
+  const navItems: Array<{ to: string; label: string; icon: React.ElementType }> = [
     { to: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
     { to: "/mo-ta-cong-viec", label: t('nav.jobs'), icon: Briefcase },
     { to: "/ung-vien", label: t('nav.candidates'), icon: Users },
@@ -129,11 +132,11 @@ export function Sidebar() {
         .select('company_name')
         .single();
       
-      if (data && data.company_name) {
-        setCompanyName(data.company_name);
+      if (data && (data as any).company_name) {
+        setCompanyName((data as any).company_name);
       }
       
-      if (error && error.code !== 'PGRST116') {
+      if (error && (error as any).code !== 'PGRST116') {
         console.error("Error loading company name:", error);
       }
       
@@ -161,7 +164,17 @@ export function Sidebar() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      // removeChannel API depending on supabase client version:
+      // if removeChannel doesn't exist, you can call channel.unsubscribe()
+      // em giữ cả 2 để an toàn:
+      try {
+        // @ts-ignore
+        if (supabase.removeChannel) supabase.removeChannel(channel);
+      } catch (e) {
+        // fallback
+        // @ts-ignore
+        if (channel && channel.unsubscribe) channel.unsubscribe();
+      }
     };
   }, []);
 
@@ -191,14 +204,23 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1.5 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => (
-          <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
-        ))}
+        {navItems.map((item) => {
+          const active = location.pathname === item.to;
+          return (
+            <NavItem
+              key={item.to}
+              to={item.to}
+              icon={item.icon}
+              label={item.label}
+              isActive={active}
+            />
+          );
+        })}
 
         {/* Single AI parent link (opens AIToolsPage) */}
         <NavLink
           to="/app/ai"
-          className={({ isActive }) =>
+          className={({ isActive }: { isActive: boolean }) =>
             `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
               isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
             }`
@@ -211,7 +233,7 @@ export function Sidebar() {
         {/* Extra tools */}
         <NavLink
           to="/app/offers"
-          className={({ isActive }) =>
+          className={({ isActive }: { isActive: boolean }) =>
             `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
               isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
             }`
