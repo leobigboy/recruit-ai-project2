@@ -1,5 +1,6 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
+// src/components/layout/Sidebar.tsx
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -8,56 +9,188 @@ import {
   Star,
   Mail,
   Settings,
-  Filter,
-  Bot,
-  FileText,
+  Building2,
 } from "lucide-react";
-import { UserMenu } from "./UserMenu";  // Đã import, giờ sẽ dùng
+import { UserMenu } from "./UserMenu";
+import { supabase } from "@/lib/supabaseClient";
+import { useTranslation } from 'react-i18next';
 
 interface NavItemProps {
   to: string;
   icon: React.ElementType;
   label: string;
+  isActive: boolean;
 }
 
-/** Nav item using NavLink (absolute paths under /app) */
-const NavItem = ({ to, icon: Icon, label }: NavItemProps) => {
-  const baseClass =
-    "flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors";
-  const activeClass = "bg-blue-600 text-white";
-  const inactiveClass = "text-gray-700 hover:bg-blue-50";
+const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
+  <Link
+    to={to}
+    className={`flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+      isActive
+        ? "bg-white text-primary shadow-md font-semibold"
+        : "text-white/90 hover:bg-white/15 hover:text-white hover:translate-x-1"
+    }`}
+  >
+    <Icon className="w-5 h-5 mr-3" />
+    {label}
+  </Link>
+);
+
+// Component hiển thị Logo công ty
+function CompanyLogo({ companyName }: { companyName: string }) {
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLogo = () => {
+      const savedLogo = localStorage.getItem('company-logo');
+      setLogo(savedLogo);
+    };
+
+    loadLogo();
+
+    // Listen for storage changes (cross-tab updates)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'company-logo') {
+        setLogo(e.newValue);
+      }
+    };
+
+    // Listen for custom event (same-tab updates)
+    const handleLogoUpdate = () => {
+      loadLogo();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('logo-updated', handleLogoUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('logo-updated', handleLogoUpdate);
+    };
+  }, []);
 
   return (
-    <NavLink
-      to={to}
-      end={to === "/app"}
-      className={({ isActive }) => `${baseClass} ${isActive ? activeClass : inactiveClass}`}
-    >
-      <Icon className="w-5 h-5 mr-3" />
-      <span className="truncate">{label}</span>
-    </NavLink>
+    <div className="flex items-center gap-3">
+      {/* Logo Container */}
+      <div className="w-11 h-11 flex-shrink-0 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 p-2 flex items-center justify-center shadow-lg">
+        {logo ? (
+          <img 
+            src={logo} 
+            alt="Company Logo" 
+            className="w-full h-full object-contain"
+          />
+        ) : (
+          <Building2 className="w-full h-full text-white" />
+        )}
+      </div>
+
+      {/* Company Name - CẢI TIẾN ĐỂ NỔI BẬT HỠN */}
+      <div className="flex flex-col flex-1 min-w-0">
+        <h1 
+          className="text-2xl font-extrabold text-white tracking-tight truncate" 
+          style={{
+            textShadow: '0 2px 4px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
+            letterSpacing: '-0.02em'
+          }}
+          title={companyName}
+        >
+          {companyName}
+        </h1>
+        <p className="text-[11px] font-medium text-white/90 truncate tracking-wide uppercase mt-0.5">
+          Management System
+        </p>
+      </div>
+    </div>
   );
-};
+}
 
 export function Sidebar() {
-  const navItems: Array<NavItemProps> = [
-    { to: "/app", label: "Bảng điều khiển", icon: LayoutDashboard },
-    { to: "/app/mo-ta-cong-viec", label: "Mô tả công việc", icon: Briefcase },
-    { to: "/app/ung-vien", label: "Ứng viên", icon: Users },
-    { to: "/app/lich-phong-van", label: "Lịch phỏng vấn", icon: Calendar },
-    { to: "/app/danh-gia", label: "Đánh giá phỏng vấn", icon: Star },
-    { to: "/app/loc-cv", label: "Lọc CV", icon: Filter },
-    { to: "/app/quan-ly-email", label: "Quản lý email", icon: Mail },
-    { to: "/app/cai-dat", label: "Cài đặt", icon: Settings },
+  const location = useLocation();
+  const { t } = useTranslation();
+  const [companyName, setCompanyName] = useState('Recruit AI');
+  const [loading, setLoading] = useState(true);
+
+  const navItems = [
+    { to: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
+    { to: "/mo-ta-cong-viec", label: t('nav.jobs'), icon: Briefcase },
+    { to: "/ung-vien", label: t('nav.candidates'), icon: Users },
+    { to: "/lich-phong-van", label: t('nav.interviews'), icon: Calendar },
+    { to: "/danh-gia", label: t('nav.reviews'), icon: Star },
+    { to: "/quan-ly-email", label: t('nav.email'), icon: Mail },
+    { to: "/cai-dat", label: t('nav.settings'), icon: Settings },
   ];
 
+  useEffect(() => {
+    // Load company name từ database
+    async function loadCompanyName() {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('cv_company_profile')
+        .select('company_name')
+        .single();
+      
+      if (data && data.company_name) {
+        setCompanyName(data.company_name);
+      }
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error loading company name:", error);
+      }
+      
+      setLoading(false);
+    }
+    
+    loadCompanyName();
+    
+    // Subscribe để cập nhật real-time khi company name thay đổi
+    const channel = supabase
+      .channel('company_profile_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cv_company_profile'
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).company_name) {
+            setCompanyName((payload.new as any).company_name);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   return (
-    <aside className="w-64 h-screen bg-white shadow-md flex flex-col p-4 fixed z-10">
-      <div className="px-4 py-2 mb-4">
-        <h1 className="text-xl font-bold text-blue-600">Recruit AI</h1>
-        <p className="text-xs text-gray-500">Hệ thống quản lý tuyển dụng</p>
+    <aside 
+      className="w-64 h-screen bg-gradient-to-b from-primary to-primary/90 shadow-xl flex flex-col p-4 fixed"
+      style={{
+        background: `linear-gradient(180deg, 
+          var(--sidebar-bg, hsl(var(--primary))) 0%, 
+          var(--sidebar-bg, hsl(var(--primary))) 100%)`
+      }}
+    >
+      {/* Company Header với Logo */}
+      <div className="px-4 py-4 mb-6 border-b border-white/20">
+        {loading ? (
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-white/15 animate-pulse shadow-lg" />
+            <div className="flex-1 space-y-2.5">
+              <div className="h-6 bg-white/20 rounded animate-pulse w-36" />
+              <div className="h-3 bg-white/15 rounded animate-pulse w-28" />
+            </div>
+          </div>
+        ) : (
+          <CompanyLogo companyName={companyName} />
+        )}
       </div>
-      <nav className="flex-1 space-y-2 overflow-auto pr-2">
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1.5 overflow-y-auto scrollbar-thin">
         {navItems.map((item) => (
           <NavItem key={item.to} to={item.to} icon={item.icon} label={item.label} />
         ))}
@@ -89,10 +222,13 @@ export function Sidebar() {
         </NavLink>
       </nav>
 
-      <div className="mt-auto px-4 py-3">
-        {/* Tích hợp UserMenu thay vì info tĩnh */}
+      {/* User Profile Section */}
+      <div className="mt-auto pt-4 border-t border-white/20">
         <UserMenu />
       </div>
+
+      {/* Decorative gradient overlay */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
     </aside>
   );
 }

@@ -78,7 +78,9 @@ interface Job {
 }
 
 export function JobsPage() {
+  const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -454,7 +456,7 @@ export function JobsPage() {
   });
 
   const totalJobs = jobs.length;
-  const openJobs = jobs.filter(job => job.status === 'Đã đăng').length;
+  const openJobs = jobs.filter(job => job.status === 'Đã đăng' || job.status === 'Published').length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -465,7 +467,7 @@ export function JobsPage() {
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setIsDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Tạo JD mới
+          {t('jobs.createNew')}
         </Button>
       </div>
 
