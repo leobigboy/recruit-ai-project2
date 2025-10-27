@@ -103,6 +103,13 @@ interface Job {
   id: string;
   title: string;
   level: string;
+  department: string;
+  description: string;
+  requirements: string;
+  benefits: string;
+  job_type: string;
+  work_location: string;
+  location: string;
 }
 
 export function CandidatesPage() {
@@ -162,21 +169,23 @@ export function CandidatesPage() {
   }, []);
 
   useEffect(() => {
-    async function getJobs() {
-      const { data, error } = await supabase
-        .from('cv_jobs')
-        .select('id, title, level')
-        .order('title');
+  async function getJobs() {
+    const { data, error } = await supabase
+      .from('cv_jobs')
+      .select('id, title, level, department, description, requirements, benefits, job_type, work_location, location')  // ✅ Lấy ĐẦY ĐỦ 10 trường
+      .order('title');
 
-      if (data) {
-        setJobs(data);
-      }
-      if (error) {
-        console.error('Error fetching jobs:', error);
-      }
+    if (data) {
+      console.log('Fetched jobs with full data:', data.length, 'jobs');
+      console.log('Sample job data:', data[0]); // Log để verify
+      setJobs(data);
     }
-    getJobs();
-  }, []);
+    if (error) {
+      console.error('Error fetching jobs:', error);
+    }
+  }
+  getJobs();
+}, []);
 
   const fetchCandidates = async () => {
     setLoading(true);
