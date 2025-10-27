@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Building2, Globe, Languages, Palette, RefreshCw, Check, X, Image as ImageIcon } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from 'react-i18next'
+import { supabase } from "@/lib/supabaseClient"
 
 interface CompanySettingsProps {
   profile: any;
@@ -52,39 +53,29 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   const buttonHSL = hexToHSL(buttonColor);
   const menuHSL = hexToHSL(menuColor);
   
-  // ============ PRIMARY COLOR (Buttons, Active states, Links) ============
   root.style.setProperty('--primary', `${buttonHSL.h} ${buttonHSL.s}% ${buttonHSL.l}%`);
-  
-  // Màu text trên nền primary
-  const primaryForeground = buttonHSL.l > 50 ? '0 0% 10%' : '0 0% 98%';
+  const primaryForeground = buttonHSL.l > 55 ? '0 0% 10%' : '0 0% 100%';
   root.style.setProperty('--primary-foreground', primaryForeground);
   
-  // ============ SECONDARY COLOR (Cards, Hover states) ============
   root.style.setProperty('--secondary', `${menuHSL.h} ${menuHSL.s}% ${menuHSL.l}%`);
-  
-  const secondaryForeground = menuHSL.l > 50 ? '222.2 47.4% 11.2%' : '0 0% 98%';
+  const secondaryForeground = menuHSL.l > 55 ? '222.2 47.4% 11.2%' : '0 0% 100%';
   root.style.setProperty('--secondary-foreground', secondaryForeground);
   
-  // ============ ACCENT COLOR (Sidebar, Highlights) ============
   const accentL = Math.min(buttonHSL.l + 45, 95);
   root.style.setProperty('--accent', `${buttonHSL.h} ${Math.max(buttonHSL.s - 20, 30)}% ${accentL}%`);
   root.style.setProperty('--accent-foreground', `${buttonHSL.h} ${buttonHSL.s}% ${buttonHSL.l}%`);
   
-  // ============ MUTED COLOR (Backgrounds, Subtle elements) ============
   root.style.setProperty('--muted', `${menuHSL.h} ${Math.max(menuHSL.s - 10, 0)}% ${Math.min(menuHSL.l + 2, 98)}%`);
   const mutedForeground = menuHSL.l > 70 ? '215.4 16.3% 46.9%' : '0 0% 60%';
   root.style.setProperty('--muted-foreground', mutedForeground);
   
-  // ============ RING COLOR (Focus outlines) ============
   root.style.setProperty('--ring', `${buttonHSL.h} ${buttonHSL.s}% ${buttonHSL.l}%`);
   
-  // ============ BORDER COLOR ============
   const borderL = Math.min(menuHSL.l + 10, 95);
   root.style.setProperty('--border', `${menuHSL.h} ${Math.max(menuHSL.s - 20, 15)}% ${borderL}%`);
   
-  // ============ CUSTOM CSS VARIABLES cho Sidebar và UI Components ============
   root.style.setProperty('--sidebar-bg', buttonColor);
-  root.style.setProperty('--sidebar-text', primaryForeground === '0 0% 10%' ? '#000000' : '#FFFFFF');
+  root.style.setProperty('--sidebar-text', '#FFFFFF');
   root.style.setProperty('--sidebar-active', `${buttonHSL.h} ${Math.min(buttonHSL.s + 10, 100)}% ${Math.min(buttonHSL.l + 10, 90)}%`);
   root.style.setProperty('--sidebar-hover', `${buttonHSL.h} ${buttonHSL.s}% ${Math.min(buttonHSL.l + 5, 85)}%`);
   
@@ -92,7 +83,6 @@ const applyThemeColors = (buttonColor: string, menuColor: string) => {
   root.style.setProperty('--card-border', `hsl(${menuHSL.h} ${Math.max(menuHSL.s - 15, 0)}% ${Math.max(menuHSL.l - 10, 80)}%)`);
 };
 
-// Lưu và load màu sắc từ localStorage
 const saveColors = (buttonColor: string, menuColor: string) => {
   localStorage.setItem('theme-button-color', buttonColor);
   localStorage.setItem('theme-menu-color', menuColor);
@@ -105,33 +95,6 @@ const loadColors = () => {
   };
 };
 
-// Lưu và load logo từ localStorage với event trigger
-const saveLogo = (logoDataUrl: string) => {
-  localStorage.setItem('company-logo', logoDataUrl);
-  // Trigger event để các component khác update realtime
-  window.dispatchEvent(new Event('logo-updated'));
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'company-logo',
-    newValue: logoDataUrl,
-    url: window.location.href
-  }));
-};
-
-const loadLogo = (): string | null => {
-  return localStorage.getItem('company-logo');
-};
-
-const removeLogo = () => {
-  localStorage.removeItem('company-logo');
-  // Trigger event để các component khác update realtime
-  window.dispatchEvent(new Event('logo-updated'));
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'company-logo',
-    newValue: null,
-    url: window.location.href
-  }));
-};
-
 export function CompanySettings({ profile, handleInputChange }: CompanySettingsProps) {
   const { t, i18n } = useTranslation();
   const savedColors = loadColors();
@@ -140,13 +103,87 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
   const [isApplied, setIsApplied] = useState(false);
   
   // Logo states
-  const [logo, setLogo] = useState<string | null>(loadLogo());
+  const [logo, setLogo] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoError, setLogoError] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isSavingLogo, setIsSavingLogo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Áp dụng màu đã lưu khi component mount
+  // Load logo từ Supabase khi component mount
+  useEffect(() => {
+    loadLogoFromSupabase();
+  }, []);
+
+  const loadLogoFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cv_company_profile')
+        .select('company_logo_url')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error loading logo:", error);
+        return;
+      }
+      
+      if (data?.company_logo_url) {
+        setLogo(data.company_logo_url);
+        localStorage.setItem('company-logo', data.company_logo_url);
+      }
+    } catch (error) {
+      console.error("Error loading logo:", error);
+    }
+  };
+
+  const saveLogoToSupabase = async (logoDataUrl: string) => {
+    try {
+      const { error } = await supabase
+        .from('cv_company_profile')
+        .update({ company_logo_url: logoDataUrl })
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+      
+      localStorage.setItem('company-logo', logoDataUrl);
+      window.dispatchEvent(new Event('logo-updated'));
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'company-logo',
+        newValue: logoDataUrl,
+        url: window.location.href
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error("Error saving logo:", error);
+      return false;
+    }
+  };
+
+  const removeLogoFromSupabase = async () => {
+    try {
+      const { error } = await supabase
+        .from('cv_company_profile')
+        .update({ company_logo_url: null })
+        .eq('id', profile.id);
+      
+      if (error) throw error;
+      
+      localStorage.removeItem('company-logo');
+      window.dispatchEvent(new Event('logo-updated'));
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: 'company-logo',
+        newValue: null,
+        url: window.location.href
+      }));
+      
+      return true;
+    } catch (error) {
+      console.error("Error removing logo:", error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     applyThemeColors(buttonColor, menuColor);
   }, []);
@@ -156,32 +193,26 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     localStorage.setItem('language', lng);
   };
 
-  // Xử lý áp dụng màu sắc
   const handleApplyColors = () => {
     applyThemeColors(buttonColor, menuColor);
     saveColors(buttonColor, menuColor);
     setIsApplied(true);
-    
     setTimeout(() => setIsApplied(false), 2500);
   };
 
-  // Reset về màu mặc định
   const handleResetColors = () => {
     const defaultButtonColor = '#222831';
     const defaultMenuColor = '#e8f4fa';
-    
     setButtonColor(defaultButtonColor);
     setMenuColor(defaultMenuColor);
     applyThemeColors(defaultButtonColor, defaultMenuColor);
     saveColors(defaultButtonColor, defaultMenuColor);
   };
 
-  // Xử lý upload logo
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Kiểm tra loại file
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
     if (!validTypes.includes(file.type)) {
       setLogoError(
@@ -192,8 +223,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
       return;
     }
 
-    // Kiểm tra kích thước file (max 2MB)
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
       setLogoError(
         i18n.language === 'vi' 
@@ -207,13 +237,23 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     setIsUploading(true);
     setLogoFile(file);
 
-    // Đọc file và chuyển thành base64
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const result = reader.result as string;
       setLogo(result);
-      saveLogo(result); // Đã có trigger event ở đây
       setIsUploading(false);
+      
+      setIsSavingLogo(true);
+      const success = await saveLogoToSupabase(result);
+      setIsSavingLogo(false);
+      
+      if (!success) {
+        setLogoError(
+          i18n.language === 'vi' 
+            ? 'Không thể lưu logo vào hệ thống. Vui lòng thử lại.' 
+            : 'Failed to save logo. Please try again.'
+        );
+      }
     };
     reader.onerror = () => {
       setLogoError(
@@ -226,23 +266,31 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     reader.readAsDataURL(file);
   };
 
-  // Xóa logo
-  const handleRemoveLogo = () => {
-    setLogo(null);
-    setLogoFile(null);
-    setLogoError('');
-    removeLogo(); // Đã có trigger event ở đây
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleRemoveLogo = async () => {
+    setIsSavingLogo(true);
+    const success = await removeLogoFromSupabase();
+    setIsSavingLogo(false);
+    
+    if (success) {
+      setLogo(null);
+      setLogoFile(null);
+      setLogoError('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } else {
+      setLogoError(
+        i18n.language === 'vi' 
+          ? 'Không thể xóa logo. Vui lòng thử lại.' 
+          : 'Failed to remove logo. Please try again.'
+      );
     }
   };
 
-  // Trigger file input click
   const handleLogoButtonClick = () => {
     fileInputRef.current?.click();
   };
 
-  // Preset màu sắc chuyên nghiệp
   const colorPresets = [
     { name: 'Default', button: '#222831', menu: '#e8f4fa' },
     { name: 'Blue', button: '#2563eb', menu: '#dbeafe' },
@@ -347,7 +395,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
         </CardContent>
       </Card>
 
-      {/* Logo công ty - HOÀN THIỆN */}
+      {/* Logo công ty */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -357,7 +405,9 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                 <CardTitle>{t('settings.logo.title')}</CardTitle>
               </div>
               <CardDescription className="mt-1">
-                {t('settings.logo.description')}
+                {i18n.language === 'vi' 
+                  ? 'Logo sẽ đồng bộ trên mọi thiết bị' 
+                  : 'Logo will sync across all devices'}
               </CardDescription>
             </div>
             {logo && (
@@ -365,6 +415,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                 variant="outline" 
                 size="sm"
                 onClick={handleRemoveLogo}
+                disabled={isSavingLogo}
                 className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
               >
                 <X className="w-4 h-4" />
@@ -380,13 +431,12 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
             accept="image/png,image/jpeg,image/jpg,image/svg+xml"
             onChange={handleLogoUpload}
             className="hidden"
+            disabled={isUploading || isSavingLogo}
           />
           
           {logo ? (
-            // Hiển thị logo đã upload
             <div className="space-y-4">
               <div className="flex flex-col md:flex-row items-center gap-6 p-6 rounded-lg border-2 bg-gradient-to-br from-muted/30 to-background">
-                {/* Logo preview lớn */}
                 <div className="flex-shrink-0 w-48 h-48 rounded-lg border-2 border-dashed border-primary/30 bg-white p-4 flex items-center justify-center shadow-md">
                   <img 
                     src={logo} 
@@ -395,14 +445,13 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                   />
                 </div>
                 
-                {/* Thông tin logo */}
                 <div className="flex-1 space-y-3">
                   <div>
                     <h4 className="font-semibold text-lg mb-1">
                       {i18n.language === 'vi' ? 'Logo hiện tại' : 'Current Logo'}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {logoFile?.name || (i18n.language === 'vi' ? 'Logo đã lưu' : 'Saved logo')}
+                      {logoFile?.name || (i18n.language === 'vi' ? 'Logo đã lưu trong hệ thống' : 'Logo saved in system')}
                     </p>
                   </div>
                   
@@ -423,6 +472,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                     <Button 
                       variant="outline" 
                       onClick={handleLogoButtonClick}
+                      disabled={isUploading || isSavingLogo}
                       className="flex items-center gap-2"
                     >
                       <Upload className="w-4 h-4" />
@@ -431,6 +481,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                     <Button 
                       variant="outline" 
                       onClick={handleRemoveLogo}
+                      disabled={isSavingLogo}
                       className="flex items-center gap-2 hover:bg-destructive/10 hover:text-destructive"
                     >
                       <X className="w-4 h-4" />
@@ -440,7 +491,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                 </div>
               </div>
 
-              {/* Logo preview sizes */}
               <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
                 <p className="text-sm font-medium">
                   {i18n.language === 'vi' ? 'Xem trước các kích thước:' : 'Preview sizes:'}
@@ -468,7 +518,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
               </div>
             </div>
           ) : (
-            // Upload area khi chưa có logo
             <div 
               onClick={handleLogoButtonClick}
               className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
@@ -498,7 +547,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
             </div>
           )}
 
-          {/* Error message */}
           {logoError && (
             <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
               <X className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
@@ -506,19 +554,20 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
             </div>
           )}
 
-          {/* Upload progress */}
-          {isUploading && (
+          {(isUploading || isSavingLogo) && (
             <div className="mt-3 p-3 bg-primary/10 border border-primary/30 rounded-lg">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm text-primary font-medium">
-                  {i18n.language === 'vi' ? 'Đang tải lên...' : 'Uploading...'}
+                  {isUploading 
+                    ? (i18n.language === 'vi' ? 'Đang tải lên...' : 'Uploading...')
+                    : (i18n.language === 'vi' ? 'Đang lưu vào hệ thống...' : 'Saving to system...')
+                  }
                 </p>
               </div>
             </div>
           )}
 
-          {/* Instructions */}
           <div className="mt-4 text-xs space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="font-semibold text-blue-900 flex items-center gap-2">
               <span>💡</span>
@@ -528,7 +577,11 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
               <li>{i18n.language === 'vi' ? 'Logo nên có nền trong suốt (PNG)' : 'Logo should have transparent background (PNG)'}</li>
               <li>{i18n.language === 'vi' ? 'Tỉ lệ khuyến nghị: vuông (1:1)' : 'Recommended ratio: square (1:1)'}</li>
               <li>{i18n.language === 'vi' ? 'Kích thước đề xuất: 512x512px' : 'Recommended size: 512x512px'}</li>
-              <li>{i18n.language === 'vi' ? 'Logo sẽ được lưu trong trình duyệt và hiển thị trên Sidebar' : 'Logo will be saved in browser and displayed on Sidebar'}</li>
+              <li className="font-semibold text-green-700">
+                {i18n.language === 'vi' 
+                  ? '✅ Logo sẽ đồng bộ trên mọi thiết bị của bạn' 
+                  : '✅ Logo will sync across all your devices'}
+              </li>
             </ul>
           </div>
         </CardContent>
@@ -749,7 +802,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
             
             <Card className="bg-gradient-to-br from-muted/30 via-muted/50 to-muted/30 border-2 border-dashed">
               <CardContent className="p-6 space-y-5">
-                {/* Button previews */}
                 <div className="space-y-3">
                   <p className="text-xs font-medium text-muted-foreground">
                     {i18n.language === 'vi' ? 'Các kiểu nút:' : 'Button variants:'}
@@ -770,7 +822,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                   </div>
                 </div>
                 
-                {/* Demo cards */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div 
                     className="p-4 rounded-lg border-2 transition-all shadow-sm"
@@ -802,7 +853,6 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
                   </div>
                 </div>
 
-                {/* Color info */}
                 <div className="grid md:grid-cols-2 gap-3 pt-2 border-t border-dashed">
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-4 h-4 rounded border" style={{ backgroundColor: buttonColor }}></div>

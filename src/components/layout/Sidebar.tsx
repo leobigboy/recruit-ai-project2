@@ -40,17 +40,50 @@ const NavItem = ({ to, icon: Icon, label, isActive }: NavItemProps) => (
   </Link>
 );
 
-// Component hiển thị Logo công ty
+// Component hiển thị Logo công ty - Load từ Supabase
 function CompanyLogo({ companyName }: { companyName: string }) {
   const [logo, setLogo] = useState<string | null>(null);
+  const [isLoadingLogo, setIsLoadingLogo] = useState(true);
 
   useEffect(() => {
-    const loadLogo = () => {
-      const savedLogo = localStorage.getItem('company-logo');
-      setLogo(savedLogo);
+    // Load logo từ Supabase
+    const loadLogoFromSupabase = async () => {
+      try {
+        setIsLoadingLogo(true);
+        
+        const { data, error } = await supabase
+          .from('cv_company_profile')
+          .select('company_logo_url')
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading logo:", error);
+        }
+        
+        if (data?.company_logo_url) {
+          setLogo(data.company_logo_url);
+          // Đồng bộ vào localStorage để cache
+          localStorage.setItem('company-logo', data.company_logo_url);
+        } else {
+          // Nếu không có trong DB, thử load từ localStorage (fallback)
+          const cachedLogo = localStorage.getItem('company-logo');
+          if (cachedLogo) {
+            setLogo(cachedLogo);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading logo:", error);
+        // Fallback to localStorage nếu có lỗi
+        const cachedLogo = localStorage.getItem('company-logo');
+        if (cachedLogo) {
+          setLogo(cachedLogo);
+        }
+      } finally {
+        setIsLoadingLogo(false);
+      }
     };
 
-    loadLogo();
+    loadLogoFromSupabase();
 
     // Listen for storage changes (cross-tab updates)
     const handleStorageChange = (e: StorageEvent) => {
@@ -59,10 +92,34 @@ function CompanyLogo({ companyName }: { companyName: string }) {
       }
     };
 
-    // Listen for custom event (same-tab updates)
+    // Listen for custom event (same-tab updates from Settings)
     const handleLogoUpdate = () => {
-      loadLogo();
+      loadLogoFromSupabase();
     };
+
+    // Subscribe to realtime changes in Supabase
+    const channel = supabase
+      .channel('logo_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'cv_company_profile'
+        },
+        (payload) => {
+          if (payload.new && (payload.new as any).company_logo_url !== undefined) {
+            const newLogo = (payload.new as any).company_logo_url;
+            setLogo(newLogo);
+            if (newLogo) {
+              localStorage.setItem('company-logo', newLogo);
+            } else {
+              localStorage.removeItem('company-logo');
+            }
+          }
+        }
+      )
+      .subscribe();
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('logo-updated', handleLogoUpdate);
@@ -70,8 +127,22 @@ function CompanyLogo({ companyName }: { companyName: string }) {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('logo-updated', handleLogoUpdate);
+      supabase.removeChannel(channel);
     };
   }, []);
+
+  // Nếu đang loading logo, hiển thị skeleton
+  if (isLoadingLogo) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-white/15 animate-pulse shadow-lg" />
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="h-6 bg-white/20 rounded animate-pulse w-36 mb-2" />
+          <div className="h-3 bg-white/15 rounded animate-pulse w-28" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3">
@@ -88,7 +159,7 @@ function CompanyLogo({ companyName }: { companyName: string }) {
         )}
       </div>
 
-      {/* Company Name */}
+      {/* Company Name - CẢI TIẾN ĐỂ NỔI BẬT HỠN */}
       <div className="flex flex-col flex-1 min-w-0">
         <h1 
           className="text-2xl font-extrabold text-white tracking-tight truncate" 

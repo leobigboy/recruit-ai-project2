@@ -108,23 +108,23 @@ export default function Authorization({ children }: AuthorizationProps) {
     setError(null)
 
     try {
-      // 1) attempt to read modules table
+      // 1) Thử đọc bảng modules, nếu lỗi thì dùng mặc định
       let loadedModules = defaultModules
       const { data: modulesData, error: modulesErr } = await supabase.from("modules").select("id,name,icon")
       if (modulesErr) {
-        console.warn("modules read error, using defaults:", modulesErr.message)
+        console.warn("Lỗi đọc modules, sử dụng mặc định:", modulesErr.message)
       } else if (modulesData && modulesData.length) {
         loadedModules = modulesData.map((m: any) => ({ id: m.id, name: m.name, icon: m.icon })) as Module[]
       }
       setModules(loadedModules)
 
-      // 2) read roles
+      // 2) Đọc roles
       const { data: rolesData, error: rolesErr } = await supabase.from("roles").select("id,name,description,color,icon")
       let fetchedRoles: Role[] = []
       
       if (rolesErr) {
-        console.warn("roles read error, falling back to defaults:", rolesErr.message)
-        fetchedRoles = getDefaultRoles()
+        console.warn("Lỗi đọc roles, sử dụng mặc định:", rolesErr.message)
+        fetchedRoles = getDefaultRoles(loadedModules)
       } else if (rolesData && rolesData.length > 0) {
         fetchedRoles = rolesData.map((r: any) => ({
           id: r.id,
@@ -136,34 +136,34 @@ export default function Authorization({ children }: AuthorizationProps) {
           permissions: {},
         }))
       } else {
-        fetchedRoles = getDefaultRoles()
+        fetchedRoles = getDefaultRoles(loadedModules)
       }
 
-      // Initialize permissions for all roles and modules
+      // Khởi tạo permissions cho tất cả roles và modules nếu chưa có
       fetchedRoles = fetchedRoles.map((r) => ({
         ...r,
         permissions: loadedModules.reduce((acc, m) => ({ 
           ...acc, 
-          [m.id]: { view: false, create: false, edit: false, delete: false } 
+          [m.id]: r.permissions[m.id] || { view: false, create: false, edit: false, delete: false } 
         }), {} as RolePermissions),
       }))
 
-      // 3) read role_permissions table
+      // 3) Đọc role_permissions
       const { data: permsData, error: permsErr } = await supabase
         .from("role_permissions")
-        .select("id,role_id,module_id,view,create,edit,delete")
+        .select("id,role_id,module_id,can_view,can_create,can_edit,can_delete")
 
       if (permsErr) {
-        console.warn("role_permissions read error:", permsErr.message)
+        console.warn("Lỗi đọc role_permissions:", permsErr.message)
       } else if (permsData) {
         const permMap: Record<string, RolePermissions> = {}
         permsData.forEach((p: any) => {
           if (!permMap[p.role_id]) permMap[p.role_id] = {}
           permMap[p.role_id][p.module_id] = {
-            view: !!p.view,
-            create: !!p.create,
-            edit: !!p.edit,
-            delete: !!p.delete,
+            view: !!p.can_view,
+            create: !!p.can_create,
+            edit: !!p.can_edit,
+            delete: !!p.can_delete,
           }
         })
 
@@ -176,9 +176,11 @@ export default function Authorization({ children }: AuthorizationProps) {
         }))
       }
 
-      // 4) compute user counts per role
+      // 4) Tính userCount từ bảng users, nhưng nếu lỗi 404 thì bỏ qua và giữ 0
       const { data: usersData, error: usersErr } = await supabase.from("users").select("id,role_id")
-      if (!usersErr && usersData) {
+      if (usersErr) {
+        console.warn("Lỗi đọc users (có thể bảng không tồn tại), bỏ qua userCount:", usersErr.message)
+      } else if (usersData) {
         const counts: Record<string, number> = {}
         usersData.forEach((u: any) => {
           if (!u.role_id) return
@@ -196,7 +198,32 @@ export default function Authorization({ children }: AuthorizationProps) {
     }
   }
 
-  function getDefaultRoles(): Role[] {
+  // Hàm lấy roles mặc định với permissions được phân quyền cụ thể
+  function getDefaultRoles(modules: Module[]): Role[] {
+    const allModules = modules.reduce((acc, m) => ({
+      ...acc,
+      [m.id]: { view: true, create: true, edit: true, delete: true }
+    }), {} as RolePermissions)
+
+    const hrPermissions = modules.reduce((acc, m) => ({
+      ...acc,
+      [m.id]: m.id === "settings" 
+        ? { view: false, create: false, edit: false, delete: false } // HR không chỉnh settings (admin only)
+        : { view: true, create: true, edit: true, delete: false } // HR có quyền cơ bản trừ xóa
+    }), {} as RolePermissions)
+
+    const interviewerPermissions = modules.reduce((acc, m) => ({
+      ...acc,
+      [m.id]: ["interview", "evaluation"].includes(m.id)
+        ? { view: true, create: true, edit: true, delete: false } // Interviewer chỉ chỉnh interview và evaluation
+        : { view: true, create: false, edit: false, delete: false } // Chỉ xem các module khác
+    }), {} as RolePermissions)
+
+    const userPermissions = modules.reduce((acc, m) => ({
+      ...acc,
+      [m.id]: { view: true, create: false, edit: false, delete: false } // User chỉ xem
+    }), {} as RolePermissions)
+
     return [
       {
         id: "admin",
@@ -205,7 +232,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#7c3aed",
         icon: "shield",
         userCount: 0,
-        permissions: {},
+        permissions: allModules, // Admin có tất cả quyền
       },
       {
         id: "hr",
@@ -214,7 +241,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#2563eb",
         icon: "users",
         userCount: 0,
-        permissions: {},
+        permissions: hrPermissions, // HR không chỉnh admin-only như settings
       },
       {
         id: "interviewer",
@@ -223,7 +250,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#059669",
         icon: "usercheck",
         userCount: 0,
-        permissions: {},
+        permissions: interviewerPermissions, // Chỉ chỉnh interview và evaluation
       },
       {
         id: "user",
@@ -232,7 +259,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#6b7280",
         icon: "users",
         userCount: 0,
-        permissions: {},
+        permissions: userPermissions, // Chỉ xem
       },
     ]
   }
@@ -273,25 +300,25 @@ export default function Authorization({ children }: AuthorizationProps) {
       if (upsertErr) throw upsertErr
 
       const { error: delErr } = await supabase.from("role_permissions").delete().eq("role_id", editingRole.id)
-      if (delErr) console.warn("failed to delete old perms:", delErr.message)
+      if (delErr) console.warn("Lỗi xóa permissions cũ:", delErr.message)
 
       const inserts: any[] = []
       Object.entries(editingRole.permissions).forEach(([moduleId, perms]) => {
         inserts.push({ 
           role_id: editingRole.id, 
           module_id: moduleId, 
-          view: perms.view, 
-          create: perms.create, 
-          edit: perms.edit, 
-          delete: perms.delete 
+          can_view: perms.view, 
+          can_create: perms.create, 
+          can_edit: perms.edit, 
+          can_delete: perms.delete 
         })
       })
       if (inserts.length) {
         const { error: insertErr } = await supabase.from("role_permissions").insert(inserts)
-        if (insertErr) console.warn("failed to insert perms:", insertErr.message)
+        if (insertErr) console.warn("Lỗi insert permissions:", insertErr.message)
       }
     } catch (e) {
-      console.error("save role error", e)
+      console.error("Lỗi lưu role", e)
       setError("Không thể lưu thay đổi. Kiểm tra console để biết chi tiết.")
       loadFromSupabase()
     } finally {
@@ -551,25 +578,25 @@ export default function Authorization({ children }: AuthorizationProps) {
                       inserts.push({ 
                         role_id: r.id, 
                         module_id: moduleId, 
-                        view: perms.view, 
-                        create: perms.create, 
-                        edit: perms.edit, 
-                        delete: perms.delete 
+                        can_view: perms.view, 
+                        can_create: perms.create, 
+                        can_edit: perms.edit, 
+                        can_delete: perms.delete 
                       })
                     })
                   })
                   
-                  // Delete all existing permissions
+                  // Xóa tất cả permissions hiện có
                   const { error: deleteError } = await supabase
                     .from("role_permissions")
                     .delete()
                     .gte('id', 0)
                   
                   if (deleteError) {
-                    console.warn("Delete error:", deleteError)
+                    console.warn("Lỗi xóa:", deleteError)
                   }
                   
-                  // Insert new permissions
+                  // Insert permissions mới
                   if (inserts.length) {
                     const { error: insertError } = await supabase
                       .from("role_permissions")
@@ -580,7 +607,7 @@ export default function Authorization({ children }: AuthorizationProps) {
                     }
                   }
                   
-                  // Show success message
+                  // Hiển thị thông báo thành công
                   alert("Lưu thay đổi thành công!")
                   
                 } catch (e: any) {
