@@ -12,6 +12,7 @@ import {
   Building2,
   Bot,
   FileText,
+  Filter,
 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { supabase } from "@/lib/supabaseClient";
@@ -117,7 +118,7 @@ export function Sidebar() {
     { to: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
     { to: "/mo-ta-cong-viec", label: t('nav.jobs'), icon: Briefcase },
     { to: "/ung-vien", label: t('nav.candidates'), icon: Users },
-    { to: "/lich-phong-van", label: t('nav.interviews'), icon: Calendar },
+    { to: "/phong-van", label: t('nav.interviews'), icon: Calendar },
     { to: "/danh-gia", label: t('nav.reviews'), icon: Star },
     { to: "/quan-ly-email", label: t('nav.email'), icon: Mail },
     { to: "/cai-dat", label: t('nav.settings'), icon: Settings },
@@ -164,14 +165,10 @@ export function Sidebar() {
       .subscribe();
 
     return () => {
-      // removeChannel API depending on supabase client version:
-      // if removeChannel doesn't exist, you can call channel.unsubscribe()
-      // em giữ cả 2 để an toàn:
       try {
         // @ts-ignore
         if (supabase.removeChannel) supabase.removeChannel(channel);
       } catch (e) {
-        // fallback
         // @ts-ignore
         if (channel && channel.unsubscribe) channel.unsubscribe();
       }
@@ -217,31 +214,29 @@ export function Sidebar() {
           );
         })}
 
+        {/* CV Filter Link */}
+        <NavItem
+          to="/loc-cv"
+          icon={Filter}
+          label="Lọc CV"
+          isActive={location.pathname === '/loc-cv'}
+        />
+
         {/* Single AI parent link (opens AIToolsPage) */}
-        <NavLink
-          to="/app/ai"
-          className={({ isActive }: { isActive: boolean }) =>
-            `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-              isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-            }`
-          }
-        >
-          <Bot className="w-5 h-5 mr-3" />
-          <span className="truncate">AI thông minh</span>
-        </NavLink>
+        <NavItem
+          to="/ai"
+          icon={Bot}
+          label="AI thông minh"
+          isActive={location.pathname === '/ai'}
+        />
 
         {/* Extra tools */}
-        <NavLink
-          to="/app/offers"
-          className={({ isActive }: { isActive: boolean }) =>
-            `flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-              isActive ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-blue-50"
-            }`
-          }
-        >
-          <FileText className="w-5 h-5 mr-3" />
-          <span className="truncate">Offer Management</span>
-        </NavLink>
+        <NavItem
+          to="/offers"
+          icon={FileText}
+          label="Offer Management"
+          isActive={location.pathname === '/offers'}
+        />
       </nav>
 
       {/* User Profile Section */}

@@ -29,7 +29,7 @@ export const UserMenu = () => {
   };
 
   const handleProfileSettings = () => {
-    navigate('/profile-settings');
+    navigate('/cai-dat/thong-tin-ca-nhan');
     setIsOpen(false);
   };
 

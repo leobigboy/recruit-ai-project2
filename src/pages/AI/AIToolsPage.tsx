@@ -360,7 +360,7 @@ function CandidateMatchUI({ apiKeys }: TabUIProps) {
       const { data, error } = await supabase
         .from('cv_jobs')
         .select('*')
-        .eq('status', 'active')
+        .eq('status', 'Đã đăng')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -378,13 +378,19 @@ function CandidateMatchUI({ apiKeys }: TabUIProps) {
 
     setLoading(true);
     try {
-      // Fetch all CVs
+      // Fetch CVs từ bảng cv_candidates
       const { data: cvData, error } = await supabase
-        .from('cv_applications')
+        .from('cv_candidates')
         .select('*')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
+
+      if (!cvData || cvData.length === 0) {
+        alert('Hiện chưa có CV nào trong hệ thống');
+        setLoading(false);
+        return;
+      }
 
       // Get job details
       let jobInfo = jobDescription;
@@ -400,9 +406,9 @@ function CandidateMatchUI({ apiKeys }: TabUIProps) {
 Job Description:
 ${jobInfo}
 
-Danh sách ứng viên (${cvData?.length || 0} CVs):
-${cvData?.map((cv: any, idx: number) => 
-  `${idx + 1}. ${cv.candidate_name} - ${cv.position} - ${cv.email}`
+Danh sách ứng viên (${cvData.length} CVs):
+${cvData.map((cv: any, idx: number) => 
+  `${idx + 1}. ${cv.full_name} - ${cv.university || 'N/A'} - ${cv.email}`
 ).join('\n')}
 
 Nhiệm vụ: Phân tích và trả về top 5 ứng viên phù hợp nhất với job này.
@@ -526,7 +532,7 @@ function SummarizeCVUI({ apiKeys }: TabUIProps) {
   const fetchCVs = async () => {
     try {
       const { data, error } = await supabase
-        .from('cv_applications')
+        .from('cv_candidates')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -552,12 +558,12 @@ function SummarizeCVUI({ apiKeys }: TabUIProps) {
       const prompt = `Bạn là AI chuyên phân tích CV.
 
 Thông tin CV:
-- Tên: ${cv.candidate_name}
-- Vị trí: ${cv.position}
+- Tên: ${cv.full_name}
 - Email: ${cv.email}
-- Phone: ${cv.phone}
+- Phone: ${cv.phone_number}
+- Trường: ${cv.university || 'N/A'}
+- Học vấn: ${cv.education || 'N/A'}
 - Kinh nghiệm: ${cv.experience || 'N/A'}
-- Kỹ năng: ${cv.skills || 'N/A'}
 
 Nhiệm vụ: Tóm tắt CV này thành 3-5 bullet points ngắn gọn, súc tích.
 
@@ -606,7 +612,7 @@ Trả về JSON format:
           <option value="">Chọn CV...</option>
           {cvs.map(cv => (
             <option key={cv.id} value={cv.id}>
-              {cv.candidate_name} - {cv.position} - {new Date(cv.created_at).toLocaleDateString('vi-VN')}
+              {cv.full_name} - {cv.university || 'N/A'} - {new Date(cv.created_at).toLocaleDateString('vi-VN')}
             </option>
           ))}
         </select>
@@ -702,7 +708,7 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
   const fetchCVData = async () => {
     try {
       const { data, error } = await supabase
-        .from('cv_applications')
+        .from('cv_candidates')
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -719,7 +725,7 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
       const { data, error } = await supabase
         .from('cv_jobs')
         .select('*')
-        .eq('status', 'active')
+        .eq('status', 'Đã đăng')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -759,10 +765,10 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
         
         const topCVs = cvData.slice(0, 5);
         const cvSummary = topCVs.map((cv: any, idx: number) => 
-          `${idx + 1}. **${cv.candidate_name || 'N/A'}**
-   - Vị trí: ${cv.position || 'N/A'}
+          `${idx + 1}. **${cv.full_name || 'N/A'}**
+   - Trường: ${cv.university || 'N/A'}
    - Email: ${cv.email || 'N/A'}
-   - Phone: ${cv.phone || 'N/A'}
+   - Phone: ${cv.phone_number || 'N/A'}
    - Trạng thái: ${cv.status || 'pending'}
    - Ngày nộp: ${new Date(cv.created_at).toLocaleDateString('vi-VN')}`
         ).join('\n\n');
@@ -777,7 +783,7 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
         }
         
         const potentialCVs = cvData.filter((cv: any) => 
-          cv.status === 'under_review' || cv.status === 'interview_scheduled' || cv.status === 'approved'
+          cv.status === 'Đang xem xét' || cv.status === 'Đã phỏng vấn' || cv.status === 'Chấp nhận'
         );
         
         if (potentialCVs.length === 0) {
@@ -785,8 +791,8 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
         }
         
         const cvList = potentialCVs.slice(0, 10).map((cv: any, idx: number) => 
-          `${idx + 1}. **${cv.candidate_name || 'N/A'}** - ${cv.position || 'N/A'}
-   📧 ${cv.email || 'N/A'} | 📱 ${cv.phone || 'N/A'}
+          `${idx + 1}. **${cv.full_name || 'N/A'}** - ${cv.university || 'N/A'}
+   📧 ${cv.email || 'N/A'} | 📱 ${cv.phone_number || 'N/A'}
    Status: ${cv.status} | Ngày: ${new Date(cv.created_at).toLocaleDateString('vi-VN')}`
         ).join('\n\n');
         
@@ -888,9 +894,9 @@ Bạn muốn gửi template nào? Tôi có thể giúp tùy chỉnh!`;
 ${stats}
 
 **Tỷ lệ chuyển đổi:**
-• CV mới: ${Math.round((statusCounts.pending || 0) / totalCVs * 100)}%
-• Đang xem xét: ${Math.round((statusCounts.under_review || 0) / totalCVs * 100)}%
-• Đã phỏng vấn: ${Math.round((statusCounts.interview_scheduled || 0) / totalCVs * 100)}%`;
+• CV mới: ${Math.round((statusCounts['Đã nộp'] || 0) / totalCVs * 100)}%
+• Đang xem xét: ${Math.round((statusCounts['Đang xem xét'] || 0) / totalCVs * 100)}%
+• Đã phỏng vấn: ${Math.round((statusCounts['Đã phỏng vấn'] || 0) / totalCVs * 100)}%`;
       }
 
       default:
@@ -1072,7 +1078,7 @@ function RecruitPredictUI({ apiKeys }: TabUIProps) {
   const fetchCVs = async () => {
     try {
       const { data, error } = await supabase
-        .from('cv_applications')
+        .from('cv_candidates')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -1098,10 +1104,11 @@ function RecruitPredictUI({ apiKeys }: TabUIProps) {
       const prompt = `Bạn là AI chuyên dự đoán tuyển dụng.
 
 Thông tin ứng viên:
-- Tên: ${cv.candidate_name}
-- Vị trí: ${cv.position}
+- Tên: ${cv.full_name}
+- Email: ${cv.email}
+- Trường: ${cv.university || 'N/A'}
+- Học vấn: ${cv.education || 'N/A'}
 - Kinh nghiệm: ${cv.experience || 'N/A'}
-- Kỹ năng: ${cv.skills || 'N/A'}
 - Trạng thái: ${cv.status}
 
 Nhiệm vụ: Dự đoán xác suất tuyển dụng thành công (0-100%) dựa trên profile.
@@ -1154,7 +1161,7 @@ Trả về JSON format:
             <option value="">Chọn ứng viên...</option>
             {cvs.map(cv => (
               <option key={cv.id} value={cv.id}>
-                {cv.candidate_name} - {cv.position}
+                {cv.full_name} - {cv.university || 'N/A'}
               </option>
             ))}
           </select>
