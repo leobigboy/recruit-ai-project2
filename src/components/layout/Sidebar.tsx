@@ -18,6 +18,9 @@ import { UserMenu } from "./UserMenu";
 import { supabase } from "@/lib/supabaseClient";
 import { useTranslation } from 'react-i18next';
 
+// Fixed UUID cho company profile (chung cho toàn hệ thống)
+const COMPANY_PROFILE_ID = '00000000-0000-0000-0000-000000000001';
+
 interface NavItemProps {
   to: string;
   icon: React.ElementType;
@@ -51,25 +54,30 @@ function CompanyLogo({ companyName }: { companyName: string }) {
       try {
         setIsLoadingLogo(true);
         
+        // Thử load từ localStorage trước (cache)
+        const cachedLogo = localStorage.getItem('company-logo');
+        if (cachedLogo) {
+          setLogo(cachedLogo);
+        }
+        
+        // Load từ Supabase để đảm bảo sync
         const { data, error } = await supabase
           .from('cv_company_profile')
-          .select('company_logo_url')
+          .select('logo_url')
+          .eq('id', COMPANY_PROFILE_ID)
           .single();
         
         if (error && error.code !== 'PGRST116') {
           console.error("Error loading logo:", error);
         }
         
-        if (data?.company_logo_url) {
-          setLogo(data.company_logo_url);
-          // Đồng bộ vào localStorage để cache
-          localStorage.setItem('company-logo', data.company_logo_url);
-        } else {
-          // Nếu không có trong DB, thử load từ localStorage (fallback)
-          const cachedLogo = localStorage.getItem('company-logo');
-          if (cachedLogo) {
-            setLogo(cachedLogo);
-          }
+        if (data?.logo_url) {
+          setLogo(data.logo_url);
+          localStorage.setItem('company-logo', data.logo_url);
+        } else if (!data?.logo_url) {
+          // Nếu logo = null trong DB, xóa cache
+          setLogo(null);
+          localStorage.removeItem('company-logo');
         }
       } catch (error) {
         console.error("Error loading logo:", error);
@@ -94,22 +102,25 @@ function CompanyLogo({ companyName }: { companyName: string }) {
 
     // Listen for custom event (same-tab updates from Settings)
     const handleLogoUpdate = () => {
+      console.log('🔄 Logo update event received, reloading...');
       loadLogoFromSupabase();
     };
 
     // Subscribe to realtime changes in Supabase
     const channel = supabase
-      .channel('logo_changes')
+      .channel('company_logo_changes')
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'cv_company_profile'
+          table: 'cv_company_profile',
+          filter: `id=eq.${COMPANY_PROFILE_ID}`
         },
         (payload) => {
-          if (payload.new && (payload.new as any).company_logo_url !== undefined) {
-            const newLogo = (payload.new as any).company_logo_url;
+          console.log('📡 Realtime update received:', payload);
+          if (payload.new && (payload.new as any).logo_url !== undefined) {
+            const newLogo = (payload.new as any).logo_url;
             setLogo(newLogo);
             if (newLogo) {
               localStorage.setItem('company-logo', newLogo);
@@ -119,7 +130,9 @@ function CompanyLogo({ companyName }: { companyName: string }) {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
 
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('logo-updated', handleLogoUpdate);
@@ -153,6 +166,10 @@ function CompanyLogo({ companyName }: { companyName: string }) {
             src={logo} 
             alt="Company Logo" 
             className="w-full h-full object-contain"
+            onError={(e) => {
+              console.error('Logo image failed to load');
+              e.currentTarget.style.display = 'none';
+            }}
           />
         ) : (
           <Building2 className="w-full h-full text-white" />
@@ -202,6 +219,7 @@ export function Sidebar() {
       const { data, error } = await supabase
         .from('cv_company_profile')
         .select('company_name')
+        .eq('id', COMPANY_PROFILE_ID)
         .single();
       
       if (data && (data as any).company_name) {
@@ -225,7 +243,8 @@ export function Sidebar() {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'cv_company_profile'
+          table: 'cv_company_profile',
+          filter: `id=eq.${COMPANY_PROFILE_ID}`
         },
         (payload) => {
           if (payload.new && (payload.new as any).company_name) {
