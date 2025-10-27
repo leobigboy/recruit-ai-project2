@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Send, Mail, Clock, FileText, Settings, ChevronDown, Search } from "lucide-react"
+import { Send, Mail, Clock, FileText, Search } from "lucide-react"
 
 // --- Bắt đầu: Code từ file stat-card.tsx ---
 interface StatCardProps {

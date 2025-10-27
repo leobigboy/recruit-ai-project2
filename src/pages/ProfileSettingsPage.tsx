@@ -11,7 +11,6 @@ import { User, Mail, Phone, Lock, Upload, Loader2, ArrowLeft } from "lucide-reac
 import { useAuth } from "@/contexts/AuthContext"
 import { supabase } from "@/lib/supabaseClient"
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from "react-router-dom"
 
 export function ProfileSettingsPage() {
   const { t } = useTranslation()

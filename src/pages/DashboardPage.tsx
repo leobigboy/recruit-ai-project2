@@ -280,7 +280,7 @@ export function DashboardPage() {
                     }}
                     labelLine={true}
                   >
-                    {sourceData.map((entry, index) => (
+                    {sourceData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
