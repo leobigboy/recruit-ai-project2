@@ -1,41 +1,38 @@
-import os
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from openai import OpenAI
-import logging
-import json
-import PyPDF2
-import io
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+"""
+Backend API for CV Management System
+Uses OpenRouter AI for both CV parsing and job matching
+"""
 
-# =========================================
-# Load environment
-# =========================================
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+import os
+from dotenv import load_dotenv
+import io
+import json
+import requests
+import PyPDF2
+from docx import Document
+
+# Load environment variables
 load_dotenv()
+
+# Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 if not OPENROUTER_API_KEY:
-    raise ValueError("❌ Thiếu OpenRouter API key trong file .env")
+    raise ValueError("OPENROUTER_API_KEY not found in environment variables")
 
-# ✅ Không log key thật ra console
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-logger.info("🔒 OpenRouter API key loaded (ẩn trong log).")
-
-# Khởi tạo client OpenRouter an toàn
-client = OpenAI(
-    api_key=OPENROUTER_API_KEY,
-    base_url="https://openrouter.ai/api/v1",
-    default_headers={
-        "HTTP-Referer": "http://localhost:5173",
-        "X-Title": "Recruit AI CV Parser"
-    }
+# Initialize FastAPI
+app = FastAPI(
+    title="CV Management API",
+    description="API for parsing CVs and matching with jobs using OpenRouter AI",
+    version="1.0.0"
 )
 
-app = FastAPI(title="CV Parser API")
-
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,12 +41,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# =========================================
-# Pydantic Models
-# =========================================
+# ==================== PYDANTIC MODELS ====================
+
 class CVData(BaseModel):
     full_name: str
-    email: Optional[str] = None
+    email: str
     phone_number: Optional[str] = None
     address: Optional[str] = None
     university: Optional[str] = None
@@ -74,350 +70,291 @@ class MatchCVJobsRequest(BaseModel):
     jobs: List[JobData]
     primary_job_id: Optional[str] = None
 
-# =========================================
-# Helper: Đọc PDF
-# =========================================
-def extract_text_from_pdf(content: bytes) -> str:
-    """Trích xuất text từ PDF bytes"""
+# ==================== HELPER FUNCTIONS ====================
+
+def call_openrouter_api(messages: List[dict], model: str = "openai/gpt-4o-mini", temperature: float = 0.7, max_tokens: int = 4000) -> dict:
+    """Call OpenRouter API with error handling"""
     try:
-        pdf_file = io.BytesIO(content)
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-
-        if text.strip():
-            return text
-
-        return content.decode("utf-8", errors="ignore")
-    except Exception as e:
-        logger.warning(f"Lỗi đọc PDF: {e}, fallback sang UTF-8")
-        return content.decode("utf-8", errors="ignore")
-
-# =========================================
-# Route kiểm tra server
-# =========================================
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "model_loaded": True}
-
-# =========================================
-# Route parse 1 CV
-# =========================================
-@app.post("/api/parse-cv")
-async def parse_cv(file: UploadFile = File(...)):
-    try:
-        content = await file.read()
-
-        # ✅ Xử lý PDF đúng cách
-        if file.filename.lower().endswith('.pdf'):
-            text = extract_text_from_pdf(content)
-        else:
-            text = content.decode("utf-8", errors="ignore")
-
-        logger.info(f"📄 Đọc được {len(text)} ký tự từ {file.filename}")
-
-        if not text or len(text.strip()) < 50:
-            raise HTTPException(status_code=400, detail="File trống hoặc không đọc được nội dung")
-
-        prompt = f"""
-Bạn là chuyên gia phân tích CV. Hãy đọc kỹ CV sau và trích xuất thông tin CHÍNH XÁC.
-
-QUAN TRỌNG: 
-- Nếu không tìm thấy thông tin, để trống "" thay vì "N/A"
-- Skills phải là array các string
-- Trả về ĐÚNG định dạng JSON, không thêm markdown ```json
-- ĐẶC BIỆT CHÚ Ý: Trường "name" là HỌ TÊN ỨNG VIÊN, thường ở đầu CV, là TÊN NGƯỜI, không phải tên công ty hay tên dự án
-
-Trả về JSON với cấu trúc:
-{{
-  "name": "tên đầy đủ của ứng viên",
-  "email": "email",
-  "phone": "số điện thoại",
-  "address": "địa chỉ",
-  "skills": ["skill1", "skill2", "skill3"],
-  "experience": "kinh nghiệm làm việc",
-  "education": "học vấn",
-  "university": "tên trường"
-}}
-
-CV Content:
-{text[:4000]}
-"""
-
-        response = client.chat.completions.create(
-            model="openai/gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1500,
-            temperature=0.1,
+        response = requests.post(
+            f"{OPENROUTER_BASE_URL}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:8000",
+                "X-Title": "CV Management System"
+            },
+            json={
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            },
+            timeout=60
         )
+        
+        if response.status_code != 200:
+            error_data = response.json()
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"OpenRouter API error: {error_data.get('error', {}).get('message', 'Unknown error')}"
+            )
+        
+        return response.json()
+    
+    except requests.exceptions.Timeout:
+        raise HTTPException(status_code=504, detail="OpenRouter API timeout")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Request error: {str(e)}")
 
-        result_text = response.choices[0].message.content.strip()
-        logger.info("🤖 GPT response nhận thành công.")
-
-        # Parse JSON
+def extract_json_from_response(content: str) -> dict:
+    """Extract JSON from AI response, handling markdown code blocks"""
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        if '```json' in content:
+            content = content.split('```json')[1].split('```')[0].strip()
+        elif '```' in content:
+            content = content.split('```')[1].split('```')[0].strip()
+        
         try:
-            if result_text.startswith("```json"):
-                result_text = result_text.replace("```json", "").replace("```", "").strip()
-            elif result_text.startswith("```"):
-                result_text = result_text.replace("```", "").strip()
-
-            parsed_json = json.loads(result_text)
+            return json.loads(content)
         except json.JSONDecodeError as e:
-            logger.error(f"❌ Cannot parse JSON: {e}")
-            logger.error(f"Raw response: {result_text[:500]}")
-            parsed_json = {}
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to parse AI response as JSON: {str(e)}"
+            )
 
-        # Chuẩn hóa dữ liệu
-        def safe_get(field, default=""):
-            return parsed_json.get(field, default) if parsed_json else default
+# ==================== API ENDPOINTS ====================
 
-        name = safe_get("name")
-        email = safe_get("email")
-        phone = safe_get("phone")
-        address = safe_get("address")
-        skills = safe_get("skills", [])
-        experience = safe_get("experience")
-        education = safe_get("education")
-        university = safe_get("university")
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "message": "CV Management API",
+        "version": "1.0.0",
+        "status": "running"
+    }
 
-        if isinstance(skills, str):
-            skills = [s.strip() for s in skills.split(",") if s.strip()]
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "openrouter_configured": bool(OPENROUTER_API_KEY)
+    }
 
-        # ✅ FIX: Truy cập usage object đúng cách
-        tokens_count = None
-        if hasattr(response, 'usage') and response.usage:
-            tokens_count = response.usage.total_tokens
+@app.post("/api/parse-cv")
+async def parse_cv(
+    file: UploadFile = File(None, description="CV file (primary parameter)"),
+    cv_file: UploadFile = File(None, description="CV file (legacy parameter)")
+):
+    """
+    Parse CV file (PDF or DOCX) - Supports both 'file' and 'cv_file' parameters
+    """
+    try:
+        upload_file = file if file else cv_file
+        
+        if not upload_file:
+            raise HTTPException(
+                status_code=422,
+                detail="No file provided. Upload a CV file using 'file' or 'cv_file' parameter."
+            )
+        
+        print(f"\n📄 ===== CV PARSING START =====")
+        print(f"📎 File: {upload_file.filename}")
+        
+        if not upload_file.filename.endswith(('.pdf', '.doc', '.docx')):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file format. Only PDF and DOCX are supported."
+            )
+        
+        file_content = await upload_file.read()
+        
+        if not file_content:
+            raise HTTPException(status_code=400, detail="File is empty")
+        
+        print(f"💾 File size: {len(file_content)/1024:.2f} KB")
+        
+        cv_text = ""
+        
+        if upload_file.filename.endswith('.pdf'):
+            print("🔍 Parsing PDF...")
+            pdf_file = io.BytesIO(file_content)
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            
+            for page_num, page in enumerate(pdf_reader.pages):
+                text = page.extract_text()
+                if text:
+                    cv_text += text + "\n"
+                    print(f"  ✓ Page {page_num + 1}: {len(text)} chars")
+        
+        elif upload_file.filename.endswith(('.doc', '.docx')):
+            print("🔍 Parsing DOCX...")
+            doc_file = io.BytesIO(file_content)
+            doc = Document(doc_file)
+            cv_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+        
+        if not cv_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Could not extract text from CV."
+            )
+        
+        print(f"✅ Extracted {len(cv_text)} characters")
+        
+        ai_input_text = cv_text[:4000] if len(cv_text) > 4000 else cv_text
+        
+        print(f"🤖 Calling OpenRouter AI...")
+        
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a professional CV parser. Extract structured information. Return ONLY valid JSON."
+            },
+            {
+                "role": "user",
+                "content": f"""Parse this CV and return JSON:
 
+{ai_input_text}
+
+Return this structure:
+{{
+  "full_name": "string or null",
+  "email": "string or null",
+  "phone_number": "string or null",
+  "address": "string or null",
+  "university": "string or null",
+  "education": "string or null",
+  "experience": "string or null",
+  "skills": ["skill1", "skill2"] or [],
+  "summary": "string or null"
+}}"""
+            }
+        ]
+        
+        result = call_openrouter_api(
+            messages=messages,
+            model="openai/gpt-4o-mini",
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        print(f"✅ OpenRouter responded")
+        
+        content = result['choices'][0]['message']['content']
+        parsed_data = extract_json_from_response(content)
+        parsed_data['fullText'] = cv_text
+        
+        print(f"✅ Parsed: {parsed_data.get('full_name', 'N/A')}")
+        print(f"===== CV PARSING END =====\n")
+        
         return {
             "success": True,
-            "data": {
-                "name": name,
-                "email": email,
-                "phone": phone,
-                "address": address,
-                "skills": skills,
-                "experience": experience,
-                "education": education,
-                "university": university,
-                "fullText": text[:1000],
-                "parseQuality": "good",
-            },
+            "data": parsed_data,
+            "message": "CV parsed successfully",
             "metadata": {
-                "tokens_count": tokens_count,
-                "confidence": 0.85,
-                "model": "openai/gpt-4o"
+                "model": "gpt-4o-mini",
+                "filename": upload_file.filename
             }
         }
-
-    except HTTPException as e:
-        raise e
+    
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Lỗi khi xử lý CV: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Lỗi xử lý CV: {str(e)}")
+        print(f"❌ Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error parsing CV: {str(e)}")
 
-# =========================================
-# Route match CV với Jobs
-# =========================================
 @app.post("/api/match-cv-jobs")
 async def match_cv_jobs(request: MatchCVJobsRequest):
-    """
-    Phân tích độ phù hợp của CV với các Jobs bằng GPT-4o
-    """
+    """Match CV with jobs using OpenRouter AI"""
     try:
-        cv_text = request.cv_text
-        cv_data = request.cv_data
-        jobs = request.jobs
-        primary_job_id = request.primary_job_id
-
-        if not cv_text or not cv_data or not jobs:
-            raise HTTPException(status_code=400, detail="Thiếu thông tin CV hoặc Jobs")
-
-        logger.info(f"🎯 Analyzing CV matching với {len(jobs)} jobs...")
-
-        # Build jobs context
-        jobs_context = ""
-        primary_job = None
+        print(f"\n🎯 ===== CV-JOB MATCHING START =====")
+        print(f"👤 Candidate: {request.cv_data.full_name}")
+        print(f"📋 Jobs to analyze: {len(request.jobs)}")
         
-        for job in jobs:
-            is_primary = job.id == primary_job_id
-            if is_primary:
-                primary_job = job
-            
-            jobs_context += f"""{'⭐ PRIMARY JOB - ' if is_primary else ''}Job {job.id}:
-- Tiêu đề: {job.title}
-- Phòng ban: {job.department or 'N/A'}
-- Cấp độ: {job.level or 'N/A'}
-- Loại hình: {job.job_type or 'N/A'}
-- Địa điểm làm việc: {job.work_location or job.location or 'N/A'}
-- Mô tả công việc: {job.description or 'N/A'}
-- Yêu cầu công việc: {job.requirements or 'N/A'}
-- Quyền lợi: {job.benefits or 'N/A'}
-{'(Đây là vị trí ứng viên đã apply - ưu tiên đánh giá)' if is_primary else ''}
-
-"""
-
-        # Build CV context
-        cv_context = f"""
-CV của ứng viên:
-- Họ và tên: {cv_data.full_name}
-- Email: {cv_data.email or 'N/A'}
-- Số điện thoại: {cv_data.phone_number or 'N/A'}
-- Địa chỉ: {cv_data.address or 'N/A'}
-- Trường đại học: {cv_data.university or 'N/A'}
-- Học vấn: {cv_data.education or 'N/A'}
-- Kinh nghiệm làm việc: {cv_data.experience or 'N/A'}
-- Nội dung chi tiết CV: {cv_text[:3000]}
-"""
-
-        primary_job_title = primary_job.title if primary_job else ""
-
-        prompt = f"""Bạn là chuyên gia tuyển dụng HR chuyên nghiệp trong lĩnh vực IT với hơn 15 năm kinh nghiệm. Hãy phân tích CV sau so với các Job vị trí ứng tuyển tương ứng và đánh giá độ phù hợp với các công việc một cách CHI TIẾT và CHÍNH XÁC.
+        jobs_context = []
+        for job in request.jobs:
+            is_primary = job.id == request.primary_job_id
+            job_info = f"""{'⭐ PRIMARY - ' if is_primary else ''}Job {job.id}:
+- Title: {job.title}
+- Level: {job.level or 'N/A'}
+- Requirements: {job.requirements or 'N/A'}"""
+            jobs_context.append(job_info)
+        
+        jobs_text = "\n\n".join(jobs_context)
+        
+        cv_context = f"""CV: {request.cv_data.full_name}
+Email: {request.cv_data.email}
+Experience: {request.cv_data.experience or 'N/A'}
+Education: {request.cv_data.education or 'N/A'}
+Full Text: {request.cv_text[:2000]}"""
+        
+        messages = [
+            {
+                "role": "system",
+                "content": "You are an HR expert. Analyze CVs and match with jobs. Return ONLY valid JSON."
+            },
+            {
+                "role": "user",
+                "content": f"""Analyze this CV and match with jobs:
 
 {cv_context}
 
-CÁC CÔNG VIỆC CẦN ĐÁNH GIÁ:
-{jobs_context}
+JOBS:
+{jobs_text}
 
-HƯỚNG DẪN ĐÁNH GIÁ:
-1. Đánh giá theo các tiêu chí sau (thang điểm 100):
-   - Kinh nghiệm liên quan (30 điểm): So sánh kinh nghiệm với yêu cầu công việc
-   - Kỹ năng kỹ thuật (25 điểm): Đánh giá kỹ năng chuyên môn phù hợp
-   - Học vấn (15 điểm): Bằng cấp, trường học phù hợp với yêu cầu
-   - Cấp độ phù hợp (15 điểm): Level (Junior/Mid/Senior) khớp với yêu cầu
-   - Địa điểm (10 điểm): Phù hợp với work_location
-   - Soft skills (5 điểm): Kỹ năng mềm từ CV
-
-2. {f'ƯU TIÊN đánh giá cho Job "{primary_job_title}" (có dấu ⭐) vì đây là vị trí ứng viên đã apply.' if primary_job else 'Đánh giá công bằng cho tất cả các jobs.'}
-
-3. Phân tích CỤ THỂ:
-   - Điểm mạnh: Liệt kê các điểm phù hợp CỤ THỂ với từng job (tối thiểu 3 điểm)
-   - Điểm yếu: Chỉ ra thiếu sót hoặc không phù hợp (1-2 điểm)
-   - Khuyến nghị: Đưa ra lời khuyên CHI TIẾT (50-100 từ)
-
-4. Chấm điểm THỰC TẾ và CHÍNH XÁC:
-   - Tránh chấm điểm quá cao nếu không đủ điều kiện
-   - Tránh chấm điểm quá thấp nếu ứng viên có tiềm năng
-   - Giải thích rõ ràng tại sao cho điểm đó
-
-HÃY TRẢ VỀ JSON với format SAU (CHÍNH XÁC, không thêm text nào khác):
+Return JSON:
 {{
   "overall_score": 85,
   "best_match": {{
-    "job_id": "job-uuid-here",
-    "job_title": "Job Title",
+    "job_id": "uuid",
+    "job_title": "title",
     "match_score": 92,
-    "strengths": ["Có X năm kinh nghiệm với công nghệ Y phù hợp với yêu cầu", "Học vấn đạt chuẩn với bằng Z từ trường A", "Kỹ năng B,C,D match với requirements"],
-    "weaknesses": ["Thiếu kinh nghiệm về aspect X được nêu trong JD", "Chưa làm việc với tool Y"],
-    "recommendation": "Ứng viên có nền tảng vững chắc và kinh nghiệm phù hợp. Điểm mạnh nổi bật là... Tuy nhiên cần bổ sung thêm về... Nên mời phỏng vấn để đánh giá sâu hơn về..."
+    "strengths": ["strength1", "strength2", "strength3"],
+    "weaknesses": ["weakness1"],
+    "recommendation": "detailed text"
   }},
-  "all_matches": [
-    {{
-      "job_id": "job-uuid-1",
-      "job_title": "Job 1",
-      "match_score": 92,
-      "strengths": ["Strength 1 cụ thể", "Strength 2 cụ thể", "Strength 3 cụ thể"],
-      "weaknesses": ["Weakness 1 cụ thể", "Weakness 2 cụ thể"],
-      "recommendation": "Khuyến nghị chi tiết và cụ thể"
-    }}
-  ]
-}}
-
-LƯU Ý QUAN TRỌNG:
-- overall_score: Điểm TỔNG THỂ dựa trên best_match (0-100)
-- match_score: Điểm phù hợp cho TỪNG job (0-100)
-- best_match: Công việc phù hợp NHẤT {f'(ưu tiên "{primary_job_title}")' if primary_job else ''}
-- Sắp xếp all_matches theo match_score GIẢM DẦN
-- PHẢI có ít nhất 3 strengths và 1-2 weaknesses cho mỗi job
-- recommendation PHẢI chi tiết, cụ thể, từ 50-100 từ
-"""
-
-        # Call OpenRouter API
-        response = client.chat.completions.create(
-            model="openai/gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Bạn là chuyên gia tuyển dụng HR chuyên nghiệp trong lĩnh vực IT với hơn 15 năm kinh nghiệm. Hãy phân tích CV so với các Job và đánh giá độ phù hợp một cách CHI TIẾT và CHÍNH XÁC. Trả về JSON đúng format được yêu cầu."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=2500,
-            temperature=0.2,
+  "all_matches": [...]
+}}"""
+            }
+        ]
+        
+        print(f"🤖 Calling OpenRouter AI...")
+        
+        result = call_openrouter_api(
+            messages=messages,
+            model="openai/gpt-4o-mini",
+            temperature=0.7,
+            max_tokens=4000
         )
-
-        result_text = response.choices[0].message.content.strip()
-        logger.info("🤖 GPT matching analysis thành công.")
-
-        # Parse JSON
-        try:
-            if result_text.startswith("```json"):
-                result_text = result_text.replace("```json", "").replace("```", "").strip()
-            elif result_text.startswith("```"):
-                result_text = result_text.replace("```", "").strip()
-
-            analysis_result = json.loads(result_text)
-        except json.JSONDecodeError as e:
-            logger.error(f"❌ Cannot parse JSON: {e}")
-            logger.error(f"Raw response: {result_text[:500]}")
-            raise HTTPException(status_code=500, detail="AI trả về dữ liệu không hợp lệ")
-
-        # Get tokens count
-        tokens_count = None
-        if hasattr(response, 'usage') and response.usage:
-            tokens_count = response.usage.total_tokens
-
+        
+        print(f"✅ OpenRouter responded")
+        
+        content = result['choices'][0]['message']['content']
+        analysis_data = extract_json_from_response(content)
+        
+        print(f"✅ Overall score: {analysis_data.get('overall_score', 'N/A')}")
+        print(f"===== CV-JOB MATCHING END =====\n")
+        
         return {
             "success": True,
-            "data": analysis_result,
+            "data": analysis_data,
+            "message": "CV-Job matching completed",
             "metadata": {
-                "tokens_count": tokens_count,
-                "jobs_analyzed": len(jobs),
-                "model": "openai/gpt-4o"
+                "model": "gpt-4o-mini",
+                "jobs_analyzed": len(request.jobs)
             }
         }
-
-    except HTTPException as e:
-        raise e
+    
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Lỗi khi match CV với jobs: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Lỗi phân tích: {str(e)}")
+        print(f"❌ Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error matching: {str(e)}")
 
-# =========================================
-# Route parse nhiều CV
-# =========================================
-@app.post("/api/batch-parse-cv")
-async def batch_parse_cv(files: list[UploadFile]):
-    results = []
-    for file in files:
-        try:
-            parsed = await parse_cv(file)
-            results.append({
-                "filename": file.filename,
-                "success": True,
-                "data": parsed["data"]
-            })
-        except Exception as e:
-            results.append({
-                "filename": file.filename,
-                "success": False,
-                "error": str(e)
-            })
-    return {"results": results}
+# ==================== MAIN ====================
 
-# =========================================
-# Chạy server
-# =========================================
 if __name__ == "__main__":
     import uvicorn
-    logger.info("✅ OpenRouter client khởi tạo an toàn.")
-    logger.info("🚀 Backend API đang chạy trên http://0.0.0.0:8000")
-    logger.info("📝 Endpoints:")
-    logger.info("   - GET  /health")
-    logger.info("   - POST /api/parse-cv")
-    logger.info("   - POST /api/match-cv-jobs")
-    logger.info("   - POST /api/batch-parse-cv")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
