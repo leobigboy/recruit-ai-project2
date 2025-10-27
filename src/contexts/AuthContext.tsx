@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.tsx
 "use client";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,16 +9,17 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   setProfile: (p: any) => void;
+  signUp: (email: string, password: string) => Promise<any>;
+  updateProfile: (data: any) => Promise<any>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<any | null>(null);
-  const [profile, setProfile] = useState<any | null | undefined>(undefined); // undefined = not loaded, null = loaded but missing
+  const [profile, setProfile] = useState<any | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  // init: get session + profile
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -30,11 +30,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // fetch profile
           const { data: prof, error } = await supabase
-            .from('cv_profiles')
-            .select('*')
-            .eq('id', session.user.id)
+            .from("cv_profiles")
+            .select("*")
+            .eq("id", session.user.id)
             .single();
           if (!mounted) return;
           setProfile(error ? null : prof ?? null);
@@ -42,7 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(null);
         }
       } catch (err) {
-        console.error('Auth init error', err);
+        console.error("Auth init error", err);
         setUser(null);
         setProfile(null);
       } finally {
@@ -51,16 +50,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // session may be null on sign out
       setUser(session?.user ?? null);
-      // reset profile state to "not loaded" when user changes
       setProfile(undefined);
       if (session?.user) {
-        // fetch profile for new user
         const { data: prof, error } = await supabase
-          .from('cv_profiles')
-          .select('*')
-          .eq('id', session.user.id)
+          .from("cv_profiles")
+          .select("*")
+          .eq("id", session.user.id)
           .single();
         setProfile(error ? null : prof ?? null);
       } else {
@@ -75,7 +71,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // return supabase response directly so caller can inspect { data, error }
     return await supabase.auth.signInWithPassword({ email, password });
   };
 
@@ -85,8 +80,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile(null);
   };
 
-  return (
-    <AuthContext.Provider value={{ user, profile: profile ?? null, loading, signIn, signOut, setProfile }}>
+  const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    setUser(data?.user ?? null);
+    return data;
+  };
+
+  const updateProfile = async (data: any) => {
+    if (!user) throw new Error("No authenticated user");
+    const { error, data: updated } = await supabase
+      .from("cv_profiles")
+      .update(data)
+      .eq("id", user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    setProfile(updated);
+    return updated;
+  };
+return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile: profile ?? null,
+        loading,
+        signIn,
+        signOut,
+        setProfile,
+        signUp,
+        updateProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -94,6 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
