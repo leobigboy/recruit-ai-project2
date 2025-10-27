@@ -95,6 +95,9 @@ const loadColors = () => {
   };
 };
 
+// Fixed UUID cho company profile (chung cho toàn hệ thống)
+const COMPANY_PROFILE_ID = '00000000-0000-0000-0000-000000000001';
+
 export function CompanySettings({ profile, handleInputChange }: CompanySettingsProps) {
   const { t, i18n } = useTranslation();
   const savedColors = loadColors();
@@ -119,7 +122,8 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     try {
       const { data, error } = await supabase
         .from('cv_company_profile')
-        .select('company_logo_url')
+        .select('logo_url')
+        .eq('id', COMPANY_PROFILE_ID)
         .single();
       
       if (error && error.code !== 'PGRST116') {
@@ -127,9 +131,9 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
         return;
       }
       
-      if (data?.company_logo_url) {
-        setLogo(data.company_logo_url);
-        localStorage.setItem('company-logo', data.company_logo_url);
+      if (data?.logo_url) {
+        setLogo(data.logo_url);
+        localStorage.setItem('company-logo', data.logo_url);
       }
     } catch (error) {
       console.error("Error loading logo:", error);
@@ -138,10 +142,12 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
 
   const saveLogoToSupabase = async (logoDataUrl: string) => {
     try {
+      // CHỈ UPDATE - Không INSERT
+      // Row đã được tạo sẵn trong SQL setup
       const { error } = await supabase
         .from('cv_company_profile')
-        .update({ company_logo_url: logoDataUrl })
-        .eq('id', profile.id);
+        .update({ logo_url: logoDataUrl })
+        .eq('id', COMPANY_PROFILE_ID);
       
       if (error) throw error;
       
@@ -164,8 +170,8 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     try {
       const { error } = await supabase
         .from('cv_company_profile')
-        .update({ company_logo_url: null })
-        .eq('id', profile.id);
+        .update({ logo_url: null })
+        .eq('id', COMPANY_PROFILE_ID);
       
       if (error) throw error;
       
@@ -395,8 +401,8 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
         </CardContent>
       </Card>
 
-      {/* Logo công ty */}
-      <Card>
+      {/* Logo công ty - CHUNG CHO TOÀN HỆ THỐNG */}
+      <Card className="border-2 border-blue-200 bg-blue-50/30">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -406,8 +412,8 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
               </div>
               <CardDescription className="mt-1">
                 {i18n.language === 'vi' 
-                  ? 'Logo sẽ đồng bộ trên mọi thiết bị' 
-                  : 'Logo will sync across all devices'}
+                  ? '🌐 Logo chung cho toàn hệ thống - Tất cả người dùng sẽ thấy logo này' 
+                  : '🌐 System-wide logo - All users will see this logo'}
               </CardDescription>
             </div>
             {logo && (
@@ -579,8 +585,13 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
               <li>{i18n.language === 'vi' ? 'Kích thước đề xuất: 512x512px' : 'Recommended size: 512x512px'}</li>
               <li className="font-semibold text-green-700">
                 {i18n.language === 'vi' 
-                  ? '✅ Logo sẽ đồng bộ trên mọi thiết bị của bạn' 
-                  : '✅ Logo will sync across all your devices'}
+                  ? '✅ Logo sẽ đồng bộ cho TẤT CẢ người dùng trong hệ thống' 
+                  : '✅ Logo will sync for ALL users in the system'}
+              </li>
+              <li className="font-semibold text-orange-700">
+                {i18n.language === 'vi' 
+                  ? '⚠️ Mọi thay đổi sẽ ảnh hưởng đến toàn bộ hệ thống' 
+                  : '⚠️ Any changes will affect the entire system'}
               </li>
             </ul>
           </div>
