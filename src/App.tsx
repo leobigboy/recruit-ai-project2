@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { useEffect, useState, Suspense } from "react";
+import React, { Suspense } from "react";
 import {
   createBrowserRouter,
   RouterProvider,
@@ -39,7 +39,6 @@ function resolveModuleComponent<M extends Record<string, any>>(mod: M, names: st
   for (const n of names) {
     if (mod[n]) return mod[n] as React.ComponentType<any>;
   }
-  // fallback: pick first exported value that looks like a component
   const keys = Object.keys(mod);
   for (const k of keys) {
     const candidate = mod[k];
@@ -48,7 +47,6 @@ function resolveModuleComponent<M extends Record<string, any>>(mod: M, names: st
   return null;
 }
 
-// Resolve components (provide possible named export names commonly used)
 const DashboardPage = resolveModuleComponent(DashboardPageModule, ["DashboardPage"]) ?? (() => <div>Missing Dashboard</div>);
 const JobsPage = resolveModuleComponent(JobsPageModule, ["JobsPage"]) ?? (() => <div>Missing Jobs</div>);
 const CandidatesPage = resolveModuleComponent(CandidatesPageModule, ["CandidatesPage"]) ?? (() => <div>Missing Candidates</div>);
@@ -65,21 +63,19 @@ const CategorySettingsPage = resolveModuleComponent(CategorySettingsModule, ["Ca
 const RegisterPage = resolveModuleComponent(RegisterPageModule, ["RegisterPage"]) ?? (() => <div>Missing Register</div>);
 const UsersPage = resolveModuleComponent(UsersPageModule, ["UsersPage","User"]) ?? (() => <div>Missing Users</div>);
 
-// ----------------------------------------------------------------------
-// RequireAuth Component - Protect routes with authentication
-// ----------------------------------------------------------------------
+// RequireAuth component (unchanged)
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
+  const [checking, setChecking] = React.useState(true);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let mounted = true;
 
     const checkSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         if (!mounted) return;
-        setIsAuthenticated(!!data?.session);
+        setIsAuthenticated(!!(data as any)?.session);
       } catch (err) {
         console.warn("Lỗi kiểm tra session:", err);
         if (mounted) setIsAuthenticated(false);
@@ -90,7 +86,6 @@ const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
 
     checkSession();
 
-    // subscribe to auth changes and update boolean
     const { data } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return;
@@ -98,7 +93,6 @@ const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
       }
     );
 
-    // data may contain `subscription` (supabase v2)
     const subscription = (data as any)?.subscription;
 
     return () => {
@@ -111,7 +105,6 @@ const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
     };
   }, []);
 
-  // show loading while checking initial session
   if (checking || isAuthenticated === null) {
     return (
       <div className="flex items-center justify-center h-screen text-gray-500">
@@ -127,15 +120,9 @@ const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => 
   return <>{children ?? <Outlet />}</>;
 };
 
-// ----------------------------------------------------------------------
-// Router Configuration
-// ----------------------------------------------------------------------
 const router = createBrowserRouter([
-  // Public routes
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
-
-  // Protected routes wrapped by MainLayout
   {
     path: "/",
     element: (
@@ -144,37 +131,25 @@ const router = createBrowserRouter([
       </RequireAuth>
     ),
     children: [
-      // index redirects to dashboard
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
-
-      // Main features
       { path: "mo-ta-cong-viec", element: <JobsPage /> },
       { path: "ung-vien", element: <CandidatesPage /> },
       { path: "phong-van", element: <InterviewsPage /> },
       { path: "loc-cv", element: <CVFilterPage /> },
       { path: "danh-gia", element: <ReviewsPage /> },
       { path: "quan-ly-email", element: <EmailManagementPage /> },
-
-      // Settings
       { path: "cai-dat", element: <SettingsPage /> },
       { path: "cai-dat/danh-muc", element: <CategorySettingsPage /> },
       { path: "cai-dat/thong-tin-ca-nhan", element: <ProfileSettingsPage /> },
-
-      // Additional
       { path: "nguoi-dung", element: <UsersPage /> },
       { path: "ai", element: <AIToolsPage /> },
       { path: "offers", element: <OffersPage /> },
     ],
   },
-
-  // Catch-all - redirect to login
   { path: "*", element: <Navigate to="/login" replace /> },
 ]);
 
-// ----------------------------------------------------------------------
-// App Component
-// ----------------------------------------------------------------------
 export default function App() {
   return (
     <AuthProvider>

@@ -1,5 +1,5 @@
 // src/pages/LoginPage.tsx
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -20,19 +20,22 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!email || !password) {
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
       setError("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
     setLoading(true);
     try {
-      const res = await signIn(email, password);
+      const res = await signIn(trimmedEmail, password);
       console.log("signIn result:", res);
 
-      // supabase v2 returns { data, error }
-      if (res?.error) {
-        const msg = res.error?.message ?? "Đăng nhập thất bại";
+      // supabase v2 client commonly returns { data, error } or { error }
+      if ((res as any)?.error) {
+        const msg = (res as any).error?.message ?? "Đăng nhập thất bại";
         setError(msg === "Invalid login credentials" ? "Email hoặc mật khẩu không chính xác" : msg);
         return;
       }
@@ -40,7 +43,7 @@ export const LoginPage: React.FC = () => {
       // confirm session existence
       const { data: sessionData } = await supabase.auth.getSession();
       console.log("sessionData", sessionData);
-      const session = sessionData?.session ?? null;
+      const session = (sessionData as any)?.session ?? null;
       if (!session) {
         setError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
         return;
@@ -56,16 +59,14 @@ export const LoginPage: React.FC = () => {
 
       console.log("profileData", profileData, profileErr);
       if (profileErr) {
-        // nếu không có profile, bạn có thể tạo 1 bản tạm hoặc cho phép redirect
-        // fallback: setProfile(null) để guard xử lý
+        // Nếu không có profile, set null để app biết không có profile
         setProfile(null);
-        // optionally create minimal profile server-side / RPC; for now continue
       } else {
         setProfile(profileData);
       }
 
-      // finally navigate
-      navigate("/app"); // or '/app/dashboard' depending router
+      // Redirect đến route hiện có trong router (thay vì "/app")
+      navigate("/dashboard", { replace: true });
     } catch (ex: any) {
       console.error("Login exception:", ex);
       setError(ex?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");
