@@ -1,8 +1,8 @@
-// src/pages/JobsPage.tsx
 "use client"
 
 import { useState, useEffect } from "react"
 import { Search, Plus, MoreHorizontal, FileText, CheckCircle, Users, Eye, Edit, Trash2, Share2, Copy, Sparkles, PenTool, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,6 +35,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabaseClient"
 import { generateJobDescription } from "@/lib/aiService"
@@ -62,10 +72,14 @@ interface Job {
   job_type?: string;
   location?: string;
   work_location?: string;
+  description?: string;
+  requirements?: string;
+  benefits?: string;
   cv_candidates: { count: number }[];
 }
 
 export function JobsPage() {
+  const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [totalCandidatesCount, setTotalCandidatesCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -87,6 +101,20 @@ export function JobsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiLanguage, setAiLanguage] = useState('vietnamese');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+
+  // States cho các chức năng mới
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isAIQuestionsDialogOpen, setIsAIQuestionsDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [editFormData, setEditFormData] = useState<any>(null);
+  const [aiQuestions, setAiQuestions] = useState('');
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -124,8 +152,11 @@ export function JobsPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleEditInputChange = (field: string, value: string) => {
+    setEditFormData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
   const handleAIGenerate = async () => {
-    // Validation
     if (!formData.title || !formData.department) {
       alert('Vui lòng điền đầy đủ: Tiêu đề vị trí và Phòng ban');
       return;
@@ -141,10 +172,9 @@ export function JobsPage() {
         work_location: formData.work_location || 'Remote',
         job_type: formData.job_type || 'Full-time',
         language: aiLanguage,
-        keywords: formData.requirements // Sử dụng field requirements làm keywords
+        keywords: formData.requirements
       });
 
-      // Cập nhật form data với nội dung được generate
       setFormData(prev => ({
         ...prev,
         description: generatedContent.description,
@@ -152,7 +182,6 @@ export function JobsPage() {
         benefits: generatedContent.benefits
       }));
 
-      // Chuyển sang tab Manual để user review
       setActiveTab('manual');
       
       alert('✅ Đã tạo gợi ý JD với AI thành công! Vui lòng kiểm tra và chỉnh sửa nếu cần.');
@@ -165,13 +194,11 @@ export function JobsPage() {
   };
 
   const handleSubmit = async () => {
-    // Validation cho cả 2 tab
     if (!formData.title || !formData.department) {
       alert('Vui lòng điền đầy đủ thông tin bắt buộc: Tiêu đề vị trí và Phòng ban');
       return;
     }
 
-    // Validation riêng cho Manual tab
     if (activeTab === 'manual') {
       if (!formData.description || !formData.requirements || !formData.benefits) {
         alert('Vui lòng điền đầy đủ: Mô tả công việc, Yêu cầu công việc và Quyền lợi');
@@ -181,7 +208,6 @@ export function JobsPage() {
 
     setIsSubmitting(true);
 
-    // Chuẩn bị data để insert
     const dataToInsert = {
       title: formData.title,
       department: formData.department,
@@ -207,7 +233,6 @@ export function JobsPage() {
     } else {
       alert('Tạo JD thành công!');
       setIsDialogOpen(false);
-      // Reset form
       setFormData({
         title: '',
         department: '',
@@ -221,7 +246,7 @@ export function JobsPage() {
         benefits: '',
         posted_date: new Date().toISOString().split('T')[0]
       });
-      fetchJobs(); // Refresh danh sách
+      fetchJobs();
     }
 
     setIsSubmitting(false);
@@ -243,8 +268,195 @@ export function JobsPage() {
     });
   };
 
+  // Xem chi tiết
+  const handleViewDetails = (job: Job) => {
+    setSelectedJob(job);
+    setIsViewDialogOpen(true);
+  };
+
+  // Chỉnh sửa
+  const handleEdit = (job: Job) => {
+    setSelectedJob(job);
+    setEditFormData({
+      id: job.id,
+      title: job.title,
+      department: job.department,
+      location: job.location || '',
+      work_location: job.work_location || '',
+      level: job.level,
+      job_type: job.job_type || 'Full-time',
+      status: job.status,
+      description: job.description || '',
+      requirements: job.requirements || '',
+      benefits: job.benefits || ''
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateJob = async () => {
+    if (!editFormData.title || !editFormData.department) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const { error } = await supabase
+      .from('cv_jobs')
+      .update({
+        title: editFormData.title,
+        department: editFormData.department,
+        location: editFormData.location || null,
+        work_location: editFormData.work_location || null,
+        level: editFormData.level,
+        job_type: editFormData.job_type,
+        status: editFormData.status,
+        description: editFormData.description || null,
+        requirements: editFormData.requirements || null,
+        benefits: editFormData.benefits || null
+      })
+      .eq('id', editFormData.id);
+
+    if (error) {
+      console.error('Error updating job:', error);
+      alert(`❌ Lỗi: ${error.message}`);
+    } else {
+      alert('✅ Đã cập nhật Job Description thành công!');
+      setIsEditDialogOpen(false);
+      setEditFormData(null);
+      fetchJobs();
+    }
+
+    setIsSubmitting(false);
+  };
+
+  // Sao chép
+  const handleCopy = async (job: Job) => {
+    const dataToInsert = {
+      title: `${job.title} (Copy)`,
+      department: job.department,
+      location: job.location || null,
+      work_location: job.work_location || null,
+      level: job.level,
+      job_type: job.job_type || 'Full-time',
+      status: 'Bản nháp',
+      description: job.description || null,
+      requirements: job.requirements || null,
+      benefits: job.benefits || null,
+      posted_date: new Date().toISOString().split('T')[0]
+    };
+
+    const { error } = await supabase
+      .from('cv_jobs')
+      .insert([dataToInsert]);
+
+    if (error) {
+      console.error('Error copying job:', error);
+      alert(`❌ Lỗi khi sao chép: ${error.message}`);
+    } else {
+      alert('✅ Đã sao chép Job Description thành công!');
+      fetchJobs();
+    }
+  };
+
+  // Chia sẻ
+  const handleShare = (job: Job) => {
+    const jobUrl = `${window.location.origin}/jobs/${job.id}`;
+    navigator.clipboard.writeText(jobUrl);
+    alert('✅ Đã sao chép link chia sẻ vào clipboard!');
+  };
+
+  // Tạo câu hỏi AI
+  const handleGenerateAIQuestions = async (job: Job) => {
+    setSelectedJob(job);
+    setIsAIQuestionsDialogOpen(true);
+    setGeneratingQuestions(true);
+    setAiQuestions('');
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const mockQuestions = `# Câu hỏi phỏng vấn cho vị trí: ${job.title}
+
+## Phần 1: Kiến thức chuyên môn
+1. Hãy mô tả kinh nghiệm của bạn với các công nghệ liên quan đến vị trí ${job.title}?
+2. Bạn đã từng giải quyết vấn đề kỹ thuật phức tạp nào? Cách tiếp cận của bạn là gì?
+3. Trong dự án gần đây nhất, bạn đã đóng góp như thế nào?
+
+## Phần 2: Kỹ năng mềm
+4. Bạn xử lý xung đột trong team như thế nào?
+5. Hãy chia sẻ về một lần bạn phải làm việc dưới áp lực deadline gấp rút?
+6. Bạn cập nhật kiến thức mới trong lĩnh vực ${job.department} như thế nào?
+
+## Phần 3: Tình huống thực tế
+7. Nếu có một yêu cầu thay đổi đột xuất từ khách hàng, bạn sẽ xử lý ra sao?
+8. Làm thế nào bạn đảm bảo chất lượng công việc của mình?
+9. Bạn có kinh nghiệm làm việc với team remote không? Chia sẻ về điều đó?
+
+## Phần 4: Định hướng phát triển
+10. Mục tiêu nghề nghiệp của bạn trong 2-3 năm tới là gì?`;
+
+      setAiQuestions(mockQuestions);
+    } catch (error) {
+      console.error('Error generating AI questions:', error);
+      alert('❌ Lỗi khi tạo câu hỏi AI');
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
+  const handleCopyAIQuestions = () => {
+    navigator.clipboard.writeText(aiQuestions);
+    alert('✅ Đã sao chép câu hỏi vào clipboard!');
+  };
+
+  // Xóa
+  const handleDelete = (job: Job) => {
+    setSelectedJob(job);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedJob) return;
+
+    setIsDeleting(true);
+
+    const { error } = await supabase
+      .from('cv_jobs')
+      .delete()
+      .eq('id', selectedJob.id);
+
+    if (error) {
+      console.error('Error deleting job:', error);
+      alert(`❌ Lỗi khi xóa: ${error.message}`);
+    } else {
+      alert('✅ Đã xóa Job Description thành công!');
+      setIsDeleteDialogOpen(false);
+      setSelectedJob(null);
+      fetchJobs();
+    }
+
+    setIsDeleting(false);
+  };
+
+  const filteredJobs = jobs.filter((job) => {
+    const lowerQuery = searchQuery.toLowerCase();
+    const matchesSearch =
+      job.title.toLowerCase().includes(lowerQuery) ||
+      job.department.toLowerCase().includes(lowerQuery) ||
+      (job.level || '').toLowerCase().includes(lowerQuery) ||
+      (job.job_type || '').toLowerCase().includes(lowerQuery) ||
+      (job.work_location || '').toLowerCase().includes(lowerQuery) ||
+      (job.location || '').toLowerCase().includes(lowerQuery);
+
+    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+    const matchesDepartment = departmentFilter === 'all' || job.department === departmentFilter;
+
+    return matchesSearch && matchesStatus && matchesDepartment;
+  });
+
   const totalJobs = jobs.length;
-  const openJobs = jobs.filter(job => job.status === 'Đã đăng').length;
+  const openJobs = jobs.filter(job => job.status === 'Đã đăng' || job.status === 'Published').length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -255,7 +467,7 @@ export function JobsPage() {
         </div>
         <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm" onClick={() => setIsDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Tạo JD mới
+          {t('jobs.createNew')}
         </Button>
       </div>
 
@@ -320,7 +532,7 @@ export function JobsPage() {
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-gray-900">Danh sách JD ({jobs.length})</CardTitle>
+          <CardTitle className="text-gray-900">Danh sách JD ({filteredJobs.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 mb-4">
@@ -328,10 +540,12 @@ export function JobsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input 
                 placeholder="Tìm kiếm theo tiêu đề, phòng ban, vị trí..." 
-                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500" 
+                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px] border-gray-300">
                 <SelectValue placeholder="Tất cả trạng thái" />
               </SelectTrigger>
@@ -342,14 +556,17 @@ export function JobsPage() {
                 <SelectItem value="Đã đóng">Đã đóng</SelectItem>
               </SelectContent>
             </Select>
-            <Select>
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-[180px] border-gray-300">
                 <SelectValue placeholder="Tất cả phòng ban" />
               </SelectTrigger>
               <SelectContent className="min-w-[180px] bg-white z-50 shadow-lg border border-gray-200" align="start" sideOffset={4}>
                 <SelectItem value="all">Tất cả phòng ban</SelectItem>
-                <SelectItem value="engineering">Engineering</SelectItem>
-                <SelectItem value="design">Design</SelectItem>
+                <SelectItem value="Engineering">Engineering</SelectItem>
+                <SelectItem value="Design">Design</SelectItem>
+                <SelectItem value="Product">Product</SelectItem>
+                <SelectItem value="Marketing">Marketing</SelectItem>
+                <SelectItem value="Sales">Sales</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -374,19 +591,22 @@ export function JobsPage() {
                       Đang tải dữ liệu...
                     </TableCell>
                   </TableRow>
-                ) : jobs.length === 0 ? (
+                ) : filteredJobs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center h-24 text-gray-500">
                       Chưa có JD nào. Hãy tạo JD đầu tiên!
                     </TableCell>
                   </TableRow>
                 ) : (
-                  jobs.map((job) => (
+                  filteredJobs.map((job) => (
                     <TableRow key={job.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="font-medium text-gray-900">{job.title}</div>
                         <div className="text-sm text-gray-500">{job.level} • {job.job_type || 'Full-time'}</div>
                       </TableCell>
+                      <TableCell className="text-gray-700">{job.department}</TableCell>
+                      <TableCell className="text-gray-700">{job.work_location || job.location || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(job.status)}</TableCell>
                       <TableCell className="text-gray-700">{job.cv_candidates[0]?.count || 0}</TableCell>
                       <TableCell className="text-gray-700">0</TableCell>
                       <TableCell className="text-gray-700">
@@ -400,28 +620,28 @@ export function JobsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" side="top" className="w-48 bg-white z-50 shadow-lg border border-gray-200">
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewDetails(job)}>
                               <Eye className="mr-2 h-4 w-4 text-gray-600" />
                               <span>Xem chi tiết</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(job)}>
                               <Edit className="mr-2 h-4 w-4 text-gray-600" />
                               <span>Chỉnh sửa</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleCopy(job)}>
                               <Copy className="mr-2 h-4 w-4 text-gray-600" />
                               <span>Sao chép</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleShare(job)}>
                               <Share2 className="mr-2 h-4 w-4 text-gray-600" />
                               <span>Chia sẻ</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer">
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => handleGenerateAIQuestions(job)}>
                               <Sparkles className="mr-2 h-4 w-4 text-purple-600" />
                               <span>Tạo câu hỏi AI</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer">
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer" onClick={() => handleDelete(job)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               <span>Xóa</span>
                             </DropdownMenuItem>
@@ -437,6 +657,7 @@ export function JobsPage() {
         </CardContent>
       </Card>
 
+      {/* Dialog Tạo JD mới */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -473,9 +694,21 @@ export function JobsPage() {
             </button>
           </div>
 
-          <div className="mt-6 space-y-4">
+          <div className="space-y-4 mt-4">
             {activeTab === 'ai' ? (
               <>
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">Tạo JD tự động với AI</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        AI sẽ giúp bạn tạo mô tả công việc chuyên nghiệp dựa trên các thông tin cơ bản
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -491,22 +724,6 @@ export function JobsPage() {
                         <SelectItem value="Backend Developer">Backend Developer</SelectItem>
                         <SelectItem value="UI/UX Designer">UI/UX Designer</SelectItem>
                         <SelectItem value="Product Manager">Product Manager</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Cấp độ</label>
-                    <Select value={formData.level} onValueChange={(value) => handleInputChange('level', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn cấp độ" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
-                        <SelectItem value="Intern">Intern</SelectItem>
-                        <SelectItem value="Junior">Junior</SelectItem>
-                        <SelectItem value="Mid-level">Mid-level</SelectItem>
-                        <SelectItem value="Senior">Senior</SelectItem>
-                        <SelectItem value="Lead">Lead</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -530,40 +747,26 @@ export function JobsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Địa điểm</label>
-                    <Select value={formData.work_location} onValueChange={(value) => handleInputChange('work_location', value)}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Cấp độ</label>
+                    <Select value={formData.level} onValueChange={(value) => handleInputChange('level', value)}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn địa điểm" />
+                        <SelectValue placeholder="Mid-level" />
                       </SelectTrigger>
                       <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
-                        <SelectItem value="Remote">Remote</SelectItem>
-                        <SelectItem value="Ho Chi Minh City">Ho Chi Minh City</SelectItem>
-                        <SelectItem value="Ha Noi">Hà Nội</SelectItem>
-                        <SelectItem value="Da Nang">Đà Nẵng</SelectItem>
+                        <SelectItem value="Intern">Intern</SelectItem>
+                        <SelectItem value="Junior">Junior</SelectItem>
+                        <SelectItem value="Mid-level">Mid-level</SelectItem>
+                        <SelectItem value="Senior">Senior</SelectItem>
+                        <SelectItem value="Lead">Lead</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Loại công ty</label>
-                    <Select value={formData.job_type} onValueChange={(value) => handleInputChange('job_type', value)}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Chọn loại công ty" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
-                        <SelectItem value="Startup">Startup</SelectItem>
-                        <SelectItem value="Product Company">Product Company</SelectItem>
-                        <SelectItem value="Outsourcing">Outsourcing</SelectItem>
-                        <SelectItem value="Enterprise">Enterprise</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngôn ngữ</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Ngôn ngữ JD</label>
                     <Select value={aiLanguage} onValueChange={setAiLanguage}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Tiếng Việt" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
                         <SelectItem value="vietnamese">Tiếng Việt</SelectItem>
@@ -574,10 +777,12 @@ export function JobsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Từ khóa kỹ năng</label>
-                  <Input
-                    placeholder="VD: React, Node.js, PostgreSQL (phân cách bằng dấu phẩy)"
-                    className="w-full"
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Kỹ năng cần thiết (tùy chọn)
+                  </label>
+                  <Textarea
+                    placeholder="Ví dụ: React, Node.js, TypeScript, Git..."
+                    className="min-h-[80px] resize-none"
                     value={formData.requirements}
                     onChange={(e) => handleInputChange('requirements', e.target.value)}
                   />
@@ -772,6 +977,299 @@ export function JobsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog Xem chi tiết */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">{selectedJob?.title}</DialogTitle>
+            <div className="flex gap-2 mt-2">
+              {selectedJob && getStatusBadge(selectedJob.status)}
+              <Badge variant="outline">{selectedJob?.department}</Badge>
+              <Badge variant="outline">{selectedJob?.level}</Badge>
+            </div>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm text-gray-600">Loại hình</p>
+                <p className="font-medium">{selectedJob?.job_type || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Địa điểm</p>
+                <p className="font-medium">{selectedJob?.work_location || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Ngày tạo</p>
+                <p className="font-medium">
+                  {selectedJob && new Date(selectedJob.created_at).toLocaleDateString('vi-VN')}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Ứng viên</p>
+                <p className="font-medium">
+                  {selectedJob?.cv_candidates && selectedJob.cv_candidates[0] 
+                    ? selectedJob.cv_candidates[0].count 
+                    : 0}
+                </p>
+              </div>
+            </div>
+
+            {selectedJob?.description && (
+              <div>
+                <h3 className="font-semibold text-base mb-2">Mô tả công việc</h3>
+                <div className="p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap">
+                  {selectedJob.description}
+                </div>
+              </div>
+            )}
+
+            {selectedJob?.requirements && (
+              <div>
+                <h3 className="font-semibold text-base mb-2">Yêu cầu công việc</h3>
+                <div className="p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap">
+                  {selectedJob.requirements}
+                </div>
+              </div>
+            )}
+
+            {selectedJob?.benefits && (
+              <div>
+                <h3 className="font-semibold text-base mb-2">Quyền lợi</h3>
+                <div className="p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap">
+                  {selectedJob.benefits}
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Chỉnh sửa */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Chỉnh sửa Job Description</DialogTitle>
+          </DialogHeader>
+          
+          {editFormData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Tiêu đề vị trí <span className="text-red-500">*</span>
+                  </label>
+                  <Select value={editFormData.title} onValueChange={(value) => handleEditInputChange('title', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Software Engineer">Software Engineer</SelectItem>
+                      <SelectItem value="Frontend Developer">Frontend Developer</SelectItem>
+                      <SelectItem value="Backend Developer">Backend Developer</SelectItem>
+                      <SelectItem value="UI/UX Designer">UI/UX Designer</SelectItem>
+                      <SelectItem value="Product Manager">Product Manager</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Phòng ban <span className="text-red-500">*</span>
+                  </label>
+                  <Select value={editFormData.department} onValueChange={(value) => handleEditInputChange('department', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Engineering">Engineering</SelectItem>
+                      <SelectItem value="Design">Design</SelectItem>
+                      <SelectItem value="Product">Product</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Sales">Sales</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Địa điểm</label>
+                  <Select value={editFormData.work_location} onValueChange={(value) => handleEditInputChange('work_location', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Remote">Remote</SelectItem>
+                      <SelectItem value="Ho Chi Minh City">Ho Chi Minh City</SelectItem>
+                      <SelectItem value="Ha Noi">Hà Nội</SelectItem>
+                      <SelectItem value="Da Nang">Đà Nẵng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Loại hình</label>
+                  <Select value={editFormData.job_type} onValueChange={(value) => handleEditInputChange('job_type', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Full-time">Full-time</SelectItem>
+                      <SelectItem value="Part-time">Part-time</SelectItem>
+                      <SelectItem value="Contract">Contract</SelectItem>
+                      <SelectItem value="Internship">Internship</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Cấp độ</label>
+                  <Select value={editFormData.level} onValueChange={(value) => handleEditInputChange('level', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Intern">Intern</SelectItem>
+                      <SelectItem value="Junior">Junior</SelectItem>
+                      <SelectItem value="Mid-level">Mid-level</SelectItem>
+                      <SelectItem value="Senior">Senior</SelectItem>
+                      <SelectItem value="Lead">Lead</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Trạng thái</label>
+                  <Select value={editFormData.status} onValueChange={(value) => handleEditInputChange('status', value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white z-50 shadow-lg border border-gray-200">
+                      <SelectItem value="Bản nháp">Bản nháp</SelectItem>
+                      <SelectItem value="Đã đăng">Đã đăng</SelectItem>
+                      <SelectItem value="Đã đóng">Đã đóng</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Mô tả công việc</label>
+                <Textarea
+                  placeholder="Mô tả chi tiết về công việc, trách nhiệm..."
+                  className="min-h-[100px] resize-none"
+                  value={editFormData.description}
+                  onChange={(e) => handleEditInputChange('description', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Yêu cầu công việc</label>
+                <Textarea
+                  placeholder="Yêu cầu về kỹ năng, kinh nghiệm..."
+                  className="min-h-[100px] resize-none"
+                  value={editFormData.requirements}
+                  onChange={(e) => handleEditInputChange('requirements', e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Quyền lợi</label>
+                <Textarea
+                  placeholder="Mô tả về lương thưởng, quyền lợi..."
+                  className="min-h-[100px] resize-none"
+                  value={editFormData.benefits}
+                  onChange={(e) => handleEditInputChange('benefits', e.target.value)}
+                />
+              </div>
+
+              <div className="flex gap-3 mt-6 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  className="px-6"
+                  onClick={() => setIsEditDialogOpen(false)}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={handleUpdateJob}
+                  disabled={isSubmitting}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  {isSubmitting ? 'Đang cập nhật...' : 'Cập nhật'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Câu hỏi AI */}
+      <Dialog open={isAIQuestionsDialogOpen} onOpenChange={setIsAIQuestionsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              Câu hỏi phỏng vấn AI cho: {selectedJob?.title}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {generatingQuestions ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-gray-600">Đang tạo câu hỏi với AI...</p>
+              </div>
+            ) : (
+              <>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <pre className="whitespace-pre-wrap text-sm">{aiQuestions}</pre>
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleCopyAIQuestions}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Sao chép câu hỏi
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsAIQuestionsDialogOpen(false)}
+                  >
+                    Đóng
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Xác nhận xóa */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận xóa Job Description</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bạn có chắc chắn muốn xóa JD <strong>{selectedJob?.title}</strong> không? 
+              Hành động này không thể hoàn tác.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Đang xóa...' : 'Xóa'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

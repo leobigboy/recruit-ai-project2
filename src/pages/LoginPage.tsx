@@ -1,52 +1,88 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Lock, AlertCircle } from 'lucide-react';
+// src/pages/LoginPage.tsx
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Mail, Lock, AlertCircle } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
-export const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+export const LoginPage: React.FC = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, setProfile } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    if (!email || !password) {
-      setError('Vui lòng điền đầy đủ thông tin');
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
+      setError("Vui lòng điền đầy đủ thông tin");
       return;
     }
 
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
+    try {
+      const res = await signIn(trimmedEmail, password);
+      console.log("signIn result:", res);
 
-    if (error) {
-      setError(error.message === 'Invalid login credentials' 
-        ? 'Email hoặc mật khẩu không chính xác' 
-        : error.message);
-    } else {
-      navigate('/app');  // Fix: Redirect đến /app (dashboard) thay vì '/'
+      // supabase v2 client commonly returns { data, error } or { error }
+      if ((res as any)?.error) {
+        const msg = (res as any).error?.message ?? "Đăng nhập thất bại";
+        setError(msg === "Invalid login credentials" ? "Email hoặc mật khẩu không chính xác" : msg);
+        return;
+      }
+
+      // confirm session existence
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log("sessionData", sessionData);
+      const session = (sessionData as any)?.session ?? null;
+      if (!session) {
+        setError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
+        return;
+      }
+
+      // fetch profile (cv_profiles)
+      const userId = session.user.id;
+      const { data: profileData, error: profileErr } = await supabase
+        .from("cv_profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      console.log("profileData", profileData, profileErr);
+      if (profileErr) {
+        // Nếu không có profile, set null để app biết không có profile
+        setProfile(null);
+      } else {
+        setProfile(profileData);
+      }
+
+      // Redirect đến route hiện có trong router (thay vì "/app")
+      navigate("/dashboard", { replace: true });
+    } catch (ex: any) {
+      console.error("Login exception:", ex);
+      setError(ex?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-md">
-        {/* Logo & Title */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-blue-600 mb-2">Recruit AI</h1>
           <p className="text-gray-600">Hệ thống quản lý tuyển dụng</p>
         </div>
 
-        {/* Login Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Đăng nhập</h2>
 
@@ -70,7 +106,7 @@ export const LoginPage = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   disabled={loading}
-                  autoComplete="email"  // Fix: Thêm để browser autofill và tắt cảnh báo
+                  autoComplete="email"
                 />
               </div>
             </div>
@@ -87,7 +123,7 @@ export const LoginPage = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   disabled={loading}
-                  autoComplete="current-password"  // Fix: Thêm để browser autofill mật khẩu và tắt cảnh báo
+                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -109,7 +145,7 @@ export const LoginPage = () => {
                   Đang đăng nhập...
                 </>
               ) : (
-                'Đăng nhập'
+                "Đăng nhập"
               )}
             </Button>
           </form>
@@ -122,11 +158,10 @@ export const LoginPage = () => {
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-sm text-gray-500 mt-6">
-          © 2025 Recruit AI. All rights reserved.
-        </p>
+        <p className="text-center text-sm text-gray-500 mt-6">© 2025 Recruit AI. All rights reserved.</p>
       </div>
     </div>
   );
 };
+
+export default LoginPage;

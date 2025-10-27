@@ -75,3 +75,21 @@ Sau khi cài đặt thành công, chạy lệnh sau để khởi động server 
 Bash
 
 npm run dev
+
+
+
+
+account Admin: 
+account HR : Baohr@example.com', '110804'
+account Interviewer: 
+account User: 
+
+
+-- tạo HR
+SELECT public.create_user_with_name('baohr@example.com','110804','HR Account');
+
+-- tạo Interviewer
+SELECT public.create_user_with_name('baointerviewer@example.com','110804','Interviewer Account');
+
+-- tạo User
+SELECT public.create_user_with_name('baouser@example.com','110804','Basic User');

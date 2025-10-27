@@ -1,3 +1,4 @@
+// src/components/settings/AiSettings.tsx
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { CheckCircle2, Sparkles, Link as LinkIcon, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { testGeminiConnection } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface AIConfig {
   id?: string;
@@ -18,8 +20,10 @@ interface AIConfig {
 }
 
 const AiSettings = () => {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingOpenAI, setTestingOpenAI] = useState(false);
   const [testingGemini, setTestingGemini] = useState(false);
   const [openAIStatus, setOpenAIStatus] = useState<'unconfigured' | 'configured' | 'error'>('unconfigured');
   const [geminiStatus, setGeminiStatus] = useState<'unconfigured' | 'configured' | 'error'>('unconfigured');
@@ -45,7 +49,6 @@ const AiSettings = () => {
     
     if (data) {
       setConfig(data);
-      // Check status based on existing keys
       if (data.openai_api_key && data.openai_api_key.length > 0) {
         setOpenAIStatus('configured');
       }
@@ -62,7 +65,6 @@ const AiSettings = () => {
   const handleInputChange = (field: keyof AIConfig, value: string | boolean) => {
     setConfig(prev => ({ ...prev, [field]: value }));
     
-    // Reset status when key is changed
     if (field === 'openai_api_key') {
       setOpenAIStatus('unconfigured');
     }
@@ -73,31 +75,57 @@ const AiSettings = () => {
 
   const testOpenAI = async () => {
     if (!config.openai_api_key || !config.openai_endpoint) {
-      alert('Vui lòng nhập OpenAI API Key và Endpoint');
+      alert(t('ai.messages.enterOpenAIKey'));
       return;
     }
 
-    // Tạm thời không test OpenAI vì CORS, chỉ validate format
     if (!config.openai_api_key.startsWith('sk-')) {
-      alert('❌ OpenAI API Key không hợp lệ. Key phải bắt đầu bằng "sk-"');
+      alert(t('ai.messages.invalidOpenAIKey'));
       setOpenAIStatus('error');
       return;
     }
 
     if (!config.openai_endpoint.startsWith('https://')) {
-      alert('❌ OpenAI Endpoint không hợp lệ. Endpoint phải bắt đầu bằng "https://"');
+      alert(t('ai.messages.invalidEndpoint'));
       setOpenAIStatus('error');
       return;
     }
 
-    // Tự động đánh dấu đã cấu hình
-    setOpenAIStatus('configured');
-    alert('✅ OpenAI Key đã được lưu!\n\nLưu ý: Test kết nối sẽ được thực hiện khi deploy production với backend API.');
+    setTestingOpenAI(true);
+    
+    try {
+      const response = await fetch('/api/test-openai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: config.openai_api_key,
+          endpoint: config.openai_endpoint
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOpenAIStatus('configured');
+        alert(t('ai.messages.openAISuccess'));
+      } else {
+        setOpenAIStatus('error');
+        alert(t('ai.messages.openAIFailed') + ' ' + data.error);
+      }
+    } catch (error: any) {
+      setOpenAIStatus('error');
+      alert(t('ai.messages.openAIError') + ' ' + (error.message || 'Unknown error'));
+      console.error('OpenAI test error:', error);
+    } finally {
+      setTestingOpenAI(false);
+    }
   };
 
   const testGemini = async () => {
     if (!config.gemini_api_key) {
-      alert('Vui lòng nhập Gemini API Key');
+      alert(t('ai.messages.enterGeminiKey'));
       return;
     }
 
@@ -107,14 +135,14 @@ const AiSettings = () => {
       
       if (result.success) {
         setGeminiStatus('configured');
-        alert('✅ Kết nối Gemini AI thành công!');
+        alert(t('ai.messages.geminiSuccess'));
       } else {
         setGeminiStatus('error');
-        alert(`❌ Kết nối Gemini AI thất bại: ${result.error}`);
+        alert(t('ai.messages.geminiFailed') + ' ' + result.error);
       }
     } catch (error: any) {
       setGeminiStatus('error');
-      alert('❌ Lỗi khi kết nối Gemini AI: ' + (error.message || 'Unknown error'));
+      alert(t('ai.messages.geminiError') + ' ' + (error.message || 'Unknown error'));
       console.error('Gemini test error:', error);
     } finally {
       setTestingGemini(false);
@@ -133,10 +161,10 @@ const AiSettings = () => {
     
     setSaving(false);
     if (error) {
-      alert("❌ Lỗi! Không thể lưu cài đặt AI.");
+      alert(t('ai.messages.saveError'));
       console.error(error);
     } else {
-      alert("✅ Đã lưu cài đặt AI thành công!");
+      alert(t('ai.messages.saveSuccess'));
       loadConfig();
     }
   };
@@ -146,7 +174,7 @@ const AiSettings = () => {
       <div className="flex items-center justify-center py-12">
         <div className="text-center space-y-3">
           <Loader2 className="animate-spin h-8 w-8 text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Đang tải cấu hình...</p>
+          <p className="text-sm text-muted-foreground">{t('ai.loading')}</p>
         </div>
       </div>
     );
@@ -164,7 +192,7 @@ const AiSettings = () => {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold">Cài đặt AI</h3>
+                <h3 className="text-lg font-semibold">{t('ai.openai.title')}</h3>
                 {openAIStatus === 'configured' && (
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 )}
@@ -173,7 +201,7 @@ const AiSettings = () => {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Cấu hình OpenAI để sử dụng các tính năng AI trong hệ thống
+                {t('ai.openai.description')}
               </p>
             </div>
           </div>
@@ -181,7 +209,7 @@ const AiSettings = () => {
           <div className="space-y-4 pl-0">
             <div className="space-y-2">
               <Label htmlFor="openai_api_key" className="text-sm font-semibold">
-                OpenAI API Key
+                {t('ai.openai.apiKey')}
               </Label>
               <div className="relative">
                 <Input
@@ -190,7 +218,7 @@ const AiSettings = () => {
                   value={config.openai_api_key || ''}
                   onChange={(e) => handleInputChange('openai_api_key', e.target.value)}
                   className="bg-gray-50 border-gray-200 pr-10"
-                  placeholder="sk-..."
+                  placeholder={t('ai.openai.apiKeyPlaceholder')}
                 />
                 <button 
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -202,17 +230,17 @@ const AiSettings = () => {
               {openAIStatus === 'configured' && (
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <p className="text-xs text-green-600 font-medium">Đã lưu cấu hình</p>
+                  <p className="text-xs text-green-600 font-medium">{t('ai.openai.configured')}</p>
                 </div>
               )}
               {openAIStatus === 'error' && (
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600" />
-                  <p className="text-xs text-red-600 font-medium">Key không hợp lệ</p>
+                  <p className="text-xs text-red-600 font-medium">{t('ai.openai.invalid')}</p>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Lấy API key từ{' '}
+                {t('ai.openai.getKeyFrom')}{' '}
                 <a 
                   href="https://platform.openai.com" 
                   target="_blank"
@@ -222,17 +250,11 @@ const AiSettings = () => {
                   OpenAI Platform
                 </a>
               </p>
-              <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded p-2 mt-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700">
-                  <strong>Lưu ý:</strong> Test kết nối OpenAI sẽ được thực hiện khi deploy production.
-                </p>
-              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="openai_endpoint" className="text-sm font-semibold">
-                OpenAI Endpoint
+                {t('ai.openai.endpoint')}
               </Label>
               <Input
                 id="openai_endpoint"
@@ -240,10 +262,10 @@ const AiSettings = () => {
                 value={config.openai_endpoint || ''}
                 onChange={(e) => handleInputChange('openai_endpoint', e.target.value)}
                 className="bg-gray-50 border-gray-200"
-                placeholder="https://api.openai.com/v1"
+                placeholder={t('ai.openai.endpointPlaceholder')}
               />
               <p className="text-xs text-muted-foreground">
-                Endpoint mặc định của OpenAI API
+                {t('ai.openai.endpointDescription')}
               </p>
             </div>
           </div>
@@ -257,7 +279,7 @@ const AiSettings = () => {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="text-lg font-semibold">Google Gemini AI</h3>
+                <h3 className="text-lg font-semibold">{t('ai.gemini.title')}</h3>
                 {geminiStatus === 'configured' && (
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 )}
@@ -266,7 +288,7 @@ const AiSettings = () => {
                 )}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                Cấu hình Google Gemini AI cho tính năng AI Job Matching và phân tích CV
+                {t('ai.gemini.description')}
               </p>
             </div>
           </div>
@@ -274,7 +296,7 @@ const AiSettings = () => {
           <div className="space-y-4 pl-0">
             <div className="space-y-2">
               <Label htmlFor="gemini_api_key" className="text-sm font-semibold">
-                Gemini API Key
+                {t('ai.gemini.apiKey')}
               </Label>
               <div className="relative">
                 <Input
@@ -283,7 +305,7 @@ const AiSettings = () => {
                   value={config.gemini_api_key || ''}
                   onChange={(e) => handleInputChange('gemini_api_key', e.target.value)}
                   className="bg-gray-50 border-gray-200 pr-10"
-                  placeholder="AIza..."
+                  placeholder={t('ai.gemini.apiKeyPlaceholder')}
                 />
                 {geminiStatus === 'configured' && (
                   <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-600" />
@@ -295,17 +317,17 @@ const AiSettings = () => {
               {geminiStatus === 'configured' && (
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <p className="text-xs text-green-600 font-medium">Đã cấu hình và kết nối thành công</p>
+                  <p className="text-xs text-green-600 font-medium">{t('ai.gemini.configured')}</p>
                 </div>
               )}
               {geminiStatus === 'error' && (
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4 text-red-600" />
-                  <p className="text-xs text-red-600 font-medium">Kết nối thất bại</p>
+                  <p className="text-xs text-red-600 font-medium">{t('ai.gemini.connectionFailed')}</p>
                 </div>
               )}
               <p className="text-xs text-muted-foreground">
-                Lấy API key từ{' '}
+                {t('ai.gemini.getKeyFrom')}{' '}
                 <a 
                   href="https://aistudio.google.com" 
                   target="_blank"
@@ -321,9 +343,9 @@ const AiSettings = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h4 className="font-semibold text-sm text-blue-900">Cài đặt nhanh</h4>
+                  <h4 className="font-semibold text-sm text-blue-900">{t('ai.gemini.quickSetup')}</h4>
                   <p className="text-xs text-blue-700 mt-1">
-                    Sử dụng API key mặc định để test tính năng
+                    {t('ai.gemini.quickSetupDescription')}
                   </p>
                 </div>
                 <Button 
@@ -337,7 +359,7 @@ const AiSettings = () => {
                     }));
                   }}
                 >
-                  Dùng key mặc định
+                  {t('ai.gemini.useDefaultKey')}
                 </Button>
               </div>
             </div>
@@ -350,10 +372,10 @@ const AiSettings = () => {
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <Label htmlFor="is_gemini_enabled" className="text-base font-semibold">
-                Kích hoạt Gemini AI
+                {t('ai.gemini.enable')}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Bật/tắt tính năng AI Job Matching với Gemini
+                {t('ai.gemini.enableDescription')}
               </p>
             </div>
             <Switch
@@ -368,10 +390,10 @@ const AiSettings = () => {
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <Label htmlFor="is_openai_enabled" className="text-base font-semibold">
-                Kích hoạt OpenAI
+                {t('ai.openai.enable')}
               </Label>
               <p className="text-sm text-muted-foreground">
-                Bật/tắt các tính năng OpenAI trong hệ thống
+                {t('ai.openai.enableDescription')}
               </p>
             </div>
             <Switch
@@ -393,12 +415,12 @@ const AiSettings = () => {
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Đang lưu...
+                {t('ai.buttons.saving')}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />
-                Lưu cài đặt AI
+                {t('ai.buttons.save')}
               </>
             )}
           </Button>
@@ -409,10 +431,10 @@ const AiSettings = () => {
       <div className="border rounded-lg bg-white p-6 space-y-6">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <h3 className="text-lg font-semibold">Trạng thái AI Services</h3>
+          <h3 className="text-lg font-semibold">{t('ai.status.title')}</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tổng quan tình trạng cấu hình các dịch vụ AI
+          {t('ai.status.description')}
         </p>
 
         {/* Service Cards */}
@@ -425,9 +447,9 @@ const AiSettings = () => {
                   <Sparkles className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold">OpenAI</h4>
+                  <h4 className="font-semibold">{t('ai.services.openai.name')}</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    AI Evaluation, Phân tích CV, Tạo câu hỏi phỏng vấn
+                    {t('ai.services.openai.description')}
                   </p>
                 </div>
               </div>
@@ -438,7 +460,7 @@ const AiSettings = () => {
                   ? 'text-red-600 bg-red-50'
                   : 'text-muted-foreground bg-gray-100'
               }`}>
-                {openAIStatus === 'configured' ? 'Đã cấu hình' : openAIStatus === 'error' ? 'Lỗi' : 'Chưa cấu hình'}
+                {openAIStatus === 'configured' ? t('ai.status.configured') : openAIStatus === 'error' ? t('ai.status.error') : t('ai.status.notConfigured')}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-3">
@@ -446,7 +468,7 @@ const AiSettings = () => {
                 config.is_openai_enabled ? 'bg-green-500' : 'bg-gray-400'
               }`}></div>
               <span className="text-xs text-muted-foreground">
-                {config.is_openai_enabled ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
+                {config.is_openai_enabled ? t('ai.status.enabled') : t('ai.status.disabled')}
               </span>
             </div>
           </div>
@@ -459,9 +481,9 @@ const AiSettings = () => {
                   <span className="text-white font-semibold text-sm">G</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold">Gemini AI</h4>
+                  <h4 className="font-semibold">{t('ai.services.gemini.name')}</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    AI Job Matching, Phân tích độ phù hợp CV-JD
+                    {t('ai.services.gemini.description')}
                   </p>
                 </div>
               </div>
@@ -472,7 +494,7 @@ const AiSettings = () => {
                   ? 'text-red-600 bg-red-50'
                   : 'text-muted-foreground bg-gray-100'
               }`}>
-                {geminiStatus === 'configured' ? 'Đã cấu hình' : geminiStatus === 'error' ? 'Lỗi' : 'Chưa cấu hình'}
+                {geminiStatus === 'configured' ? t('ai.status.configured') : geminiStatus === 'error' ? t('ai.status.error') : t('ai.status.notConfigured')}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-3">
@@ -480,7 +502,7 @@ const AiSettings = () => {
                 config.is_gemini_enabled ? 'bg-blue-500' : 'bg-gray-400'
               }`}></div>
               <span className="text-xs text-muted-foreground">
-                {config.is_gemini_enabled ? 'Đã kích hoạt' : 'Chưa kích hoạt'}
+                {config.is_gemini_enabled ? t('ai.status.enabled') : t('ai.status.disabled')}
               </span>
             </div>
           </div>
@@ -488,16 +510,25 @@ const AiSettings = () => {
 
         {/* Test Features */}
         <div className="space-y-3">
-          <h4 className="font-semibold">Test tính năng</h4>
+          <h4 className="font-semibold">{t('ai.testFeatures.title')}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Button 
               variant="outline" 
               className="justify-center"
-              disabled={!config.openai_api_key}
+              disabled={!config.openai_api_key || testingOpenAI}
               onClick={testOpenAI}
             >
-              <Sparkles className="h-4 w-4 mr-2 text-gray-400" />
-              Xác thực OpenAI Key
+              {testingOpenAI ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t('ai.buttons.testing')}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2 text-gray-400" />
+                  {t('ai.buttons.testOpenAI')}
+                </>
+              )}
             </Button>
             <Button 
               variant="outline" 
@@ -508,39 +539,36 @@ const AiSettings = () => {
               {testingGemini ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Đang test...
+                  {t('ai.buttons.testing')}
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4 mr-2 text-blue-600" />
-                  Test Gemini AI
+                  {t('ai.buttons.testGemini')}
                 </>
               )}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            💡 Test OpenAI chỉ validate format key. Test kết nối thực tế sẽ được thực hiện khi deploy production.
-          </p>
         </div>
 
         {/* Configuration Details */}
         <div className="space-y-3">
-          <h4 className="font-semibold">Chi tiết cấu hình</h4>
+          <h4 className="font-semibold">{t('ai.configDetails.title')}</h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">OpenAI API Key:</span>
+              <span className="text-muted-foreground">{t('ai.configDetails.openaiKey')}</span>
               <span className={openAIStatus === 'configured' ? 'text-green-600' : 'text-muted-foreground'}>
                 {config.openai_api_key && config.openai_api_key.length > 7 
                   ? config.openai_api_key.substring(0, 7) + '...' 
-                  : 'Chưa cấu hình'}
+                  : t('ai.status.notConfigured')}
               </span>
             </div>
             <div className="flex items-center justify-between py-2 border-b">
-              <span className="text-muted-foreground">Gemini API Key:</span>
+              <span className="text-muted-foreground">{t('ai.configDetails.geminiKey')}</span>
               <span className={geminiStatus === 'configured' ? 'text-blue-600' : 'text-muted-foreground'}>
                 {config.gemini_api_key && config.gemini_api_key.length > 8
                   ? config.gemini_api_key.substring(0, 4) + '••••••••••••••••••••••••••••' + config.gemini_api_key.substring(config.gemini_api_key.length - 4) 
-                  : 'Chưa cấu hình'}
+                  : t('ai.status.notConfigured')}
               </span>
             </div>
           </div>
@@ -551,38 +579,38 @@ const AiSettings = () => {
       <div className="border rounded-lg bg-white p-6 space-y-6">
         <div className="flex items-center gap-2">
           <CheckCircle2 className="h-5 w-5 text-green-600" />
-          <h3 className="text-lg font-semibold">Tính năng AI có sẵn</h3>
+          <h3 className="text-lg font-semibold">{t('ai.availableFeatures.title')}</h3>
         </div>
 
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between py-3 border-b">
-            <span className="font-medium">Đánh giá ứng viên với AI</span>
+            <span className="font-medium">{t('ai.availableFeatures.aiEvaluation')}</span>
             <span className={`text-xs px-3 py-1 rounded ${
               openAIStatus === 'configured' && config.is_openai_enabled
                 ? 'text-green-600 bg-green-50 font-medium'
                 : 'text-muted-foreground bg-gray-100'
             }`}>
-              {openAIStatus === 'configured' && config.is_openai_enabled ? 'Đã kích hoạt' : 'Chưa cấu hình'}
+              {openAIStatus === 'configured' && config.is_openai_enabled ? t('ai.status.enabled') : t('ai.status.notConfigured')}
             </span>
           </div>
           <div className="flex items-center justify-between py-3 border-b">
-            <span className="font-medium">Phân tích CV tự động</span>
+            <span className="font-medium">{t('ai.availableFeatures.cvAnalysis')}</span>
             <span className={`text-xs px-3 py-1 rounded ${
               openAIStatus === 'configured' && config.is_openai_enabled
                 ? 'text-green-600 bg-green-50 font-medium'
                 : 'text-muted-foreground bg-gray-100'
             }`}>
-              {openAIStatus === 'configured' && config.is_openai_enabled ? 'Đã kích hoạt' : 'Chưa cấu hình'}
+              {openAIStatus === 'configured' && config.is_openai_enabled ? t('ai.status.enabled') : t('ai.status.notConfigured')}
             </span>
           </div>
           <div className="flex items-center justify-between py-3">
-            <span className="font-medium">Gợi ý JD thông minh</span>
+            <span className="font-medium">{t('ai.availableFeatures.smartJD')}</span>
             <span className={`text-xs px-3 py-1 rounded ${
               geminiStatus === 'configured' && config.is_gemini_enabled
                 ? 'text-blue-600 bg-blue-50 font-medium'
                 : 'text-muted-foreground bg-gray-100'
             }`}>
-              {geminiStatus === 'configured' && config.is_gemini_enabled ? 'Đã kích hoạt' : 'Chưa cấu hình'}
+              {geminiStatus === 'configured' && config.is_gemini_enabled ? t('ai.status.enabled') : t('ai.status.notConfigured')}
             </span>
           </div>
         </div>
