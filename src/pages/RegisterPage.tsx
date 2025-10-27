@@ -40,7 +40,7 @@ export const RegisterPage = () => {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, password);
     setLoading(false);
 
     if (error) {
