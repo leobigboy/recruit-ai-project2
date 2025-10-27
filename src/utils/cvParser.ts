@@ -114,9 +114,9 @@ async function extractInfoWithAI(file: File): Promise<ParsedCV> {
       // Map response từ backend về ParsedCV format
       return {
         fullText: result.data.fullText || '',
-        fullName: result.data.name || undefined,
+        fullName: result.data.full_name || undefined,
         email: result.data.email || undefined,
-        phone: result.data.phone || undefined,
+        phone: result.data.phone_number || undefined,
         address: result.data.address || undefined,
         skills: result.data.skills || [],
         experience: result.data.experience || undefined,
