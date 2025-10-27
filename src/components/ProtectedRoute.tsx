@@ -1,23 +1,28 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+// src/components/ProtectedRoute.tsx
+import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
-export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+type Props = {
+  children: React.ReactNode;
+  requiredRole?: string; // optional
+};
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Đang tải...</p>
-        </div>
-      </div>
-    );
-  }
+export const ProtectedRoute: React.FC<Props> = ({ children, requiredRole }) => {
+  const { user, profile, loading } = useAuth();
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  // initial loading (auth init)
+  if (loading) return <div className="p-6">Loading...</div>;
+
+  // if not logged in
+  if (!user) return <Navigate to="/login" replace />;
+
+  // if profile still loading (profile === undefined) show spinner
+  if (profile === undefined) return <div className="p-6">Loading profile...</div>;
+
+  // if required role specified, check it
+  if (requiredRole && profile?.role !== requiredRole) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <>{children}</>;
