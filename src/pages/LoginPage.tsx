@@ -20,36 +20,47 @@ export const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    const trimmedEmail = email.trim();
-
-    if (!trimmedEmail || !password) {
-      setError("Vui lòng điền đầy đủ thông tin");
-      return;
-    }
-
     setLoading(true);
+
     try {
+      const trimmedEmail = email.trim();
+
+      // Validation
+      if (!trimmedEmail || !password) {
+        setError("Vui lòng điền đầy đủ thông tin");
+        return;
+      }
+
+      // Attempt sign in
       const res = await signIn(trimmedEmail, password);
       console.log("signIn result:", res);
 
-      // supabase v2 client commonly returns { data, error } or { error }
-      if ((res as any)?.error) {
-        const msg = (res as any).error?.message ?? "Đăng nhập thất bại";
+      // Check for authentication errors
+      if (res?.error) {
+        const msg = res.error?.message ?? "Đăng nhập thất bại";
         setError(msg === "Invalid login credentials" ? "Email hoặc mật khẩu không chính xác" : msg);
         return;
       }
 
-      // confirm session existence
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log("sessionData", sessionData);
-      const session = (sessionData as any)?.session ?? null;
+      // Verify session was created
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError);
+        setError("Lỗi kiểm tra phiên đăng nhập. Vui lòng thử lại.");
+        return;
+      }
+
+      const session = sessionData?.session;
+      
       if (!session) {
         setError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
         return;
       }
 
-      // fetch profile (cv_profiles)
+      console.log("Session created:", session);
+
+      // Fetch user profile
       const userId = session.user.id;
       const { data: profileData, error: profileErr } = await supabase
         .from("cv_profiles")
@@ -57,20 +68,24 @@ export const LoginPage: React.FC = () => {
         .eq("id", userId)
         .single();
 
-      console.log("profileData", profileData, profileErr);
-      if (profileErr) {
-        // Nếu không có profile, set null để app biết không có profile
-        setProfile(null);
-      } else {
-        setProfile(profileData);
-      }
+      console.log("Profile data:", profileData, "Error:", profileErr);
 
-      // Redirect đến route hiện có trong router (thay vì "/app")
+      // Set profile (null if not found, which is okay)
+      if (profileErr && profileErr.code !== 'PGRST116') {
+        // PGRST116 is "not found" - that's acceptable
+        console.warn("Profile fetch error:", profileErr);
+      }
+      
+      setProfile(profileData || null);
+
+      // Navigate to dashboard
       navigate("/dashboard", { replace: true });
+
     } catch (ex: any) {
       console.error("Login exception:", ex);
       setError(ex?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
+      // Always reset loading state
       setLoading(false);
     }
   };

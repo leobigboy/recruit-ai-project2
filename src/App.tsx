@@ -63,56 +63,88 @@ const CategorySettingsPage = resolveModuleComponent(CategorySettingsModule, ["Ca
 const RegisterPage = resolveModuleComponent(RegisterPageModule, ["RegisterPage"]) ?? (() => <div>Missing Register</div>);
 const UsersPage = resolveModuleComponent(UsersPageModule, ["UsersPage","User"]) ?? (() => <div>Missing Users</div>);
 
-// RequireAuth component (unchanged)
+// FIXED: RequireAuth component with better error handling and timeout
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
   const [checking, setChecking] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const checkSession = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        // Set timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (mounted && checking) {
+            console.warn('Session check timeout - redirecting to login');
+            setIsAuthenticated(false);
+            setChecking(false);
+            setError('Session check timeout');
+          }
+        }, 5000); // 5 second timeout
+
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        clearTimeout(timeoutId);
+        
         if (!mounted) return;
-        setIsAuthenticated(!!(data as any)?.session);
+
+        if (sessionError) {
+          console.error('Session check error:', sessionError);
+          setError(sessionError.message);
+          setIsAuthenticated(false);
+          setChecking(false);
+          return;
+        }
+
+        const hasSession = !!(data?.session);
+        console.log('Session check result:', hasSession);
+        setIsAuthenticated(hasSession);
+        setChecking(false);
       } catch (err) {
-        console.warn("Lỗi kiểm tra session:", err);
-        if (mounted) setIsAuthenticated(false);
-      } finally {
-        if (mounted) setChecking(false);
+        clearTimeout(timeoutId);
+        console.error('Session check exception:', err);
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Unknown error');
+          setIsAuthenticated(false);
+          setChecking(false);
+        }
       }
     };
 
     checkSession();
 
-    const { data } = supabase.auth.onAuthStateChange(
+    // Subscribe to auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return;
+        console.log('Auth state changed:', _event, !!session);
         setIsAuthenticated(!!session);
+        setChecking(false);
       }
     );
 
-    const subscription = (data as any)?.subscription;
-
     return () => {
       mounted = false;
-      try {
-        subscription?.unsubscribe?.();
-      } catch (e) {
-        // ignore
-      }
+      clearTimeout(timeoutId);
+      authListener?.subscription?.unsubscribe();
     };
   }, []);
 
-  if (checking || isAuthenticated === null) {
+  // Show loading state
+  if (checking) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        Đang kiểm tra đăng nhập...
+      <div className="flex flex-col items-center justify-center h-screen text-gray-500 space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p>Đang kiểm tra đăng nhập...</p>
+        {error && <p className="text-red-500 text-sm">{error}</p>}
       </div>
     );
   }
 
+  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -153,7 +185,11 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <Suspense fallback={<div>Đang tải...</div>}>
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }>
         <RouterProvider router={router} />
       </Suspense>
     </AuthProvider>
