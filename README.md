@@ -1,95 +1,213 @@
-Recruit AI - Hệ thống Quản lý CV
-Đây là dự án frontend cho hệ thống quản lý tuyển dụng và CV, được xây dựng với React, TypeScript và kết nối với backend Supabase.
+# Recruit AI Project 2 — CV Management Platform
 
-Công nghệ sử dụng
-Framework: Vite + React + TypeScript
+## Overview
 
-Thư viện UI: Tailwind CSS + shadcn/ui
+**Recruit AI Project 2** is a full-stack web application that automatically parses resumes (CVs) and matches them with job postings using V0 AI and OpenRouter API with supabase database. The platform consists of a **FastAPI backend** and a **React (Vite) frontend**.
 
-Biểu đồ: Recharts
+---
 
-Backend & Database: Supabase
+## Features
 
-Icons: Lucide React
+* Upload and parse CVs in **PDF** or **DOCX** format.
+* Use **OpenRouter AI (GPT-4o-mini)** to extract structured information from CVs.
+* Match parsed CVs with job descriptions using AI.
+* View candidate strengths, weaknesses, and overall match scores.
+* Cross-origin ready with full CORS configuration.
+* Clean API design with FastAPI and JSON-based responses.
 
-Cài đặt và Chạy dự án
-Để chạy dự án này, bạn cần làm theo các bước sau.
+---
 
-1. Lấy mã nguồn
-Clone repository này về máy của bạn:
+## Tech Stack
 
-Bash
+| Layer             | Technology                           |
+| ----------------- | ------------------------------------ |
+| **Frontend**      | React + Vite + TailwindCSS           |
+| **Backend**       | FastAPI (Python)                     |
+| **AI Engine**     | OpenRouter API (GPT models) + Gemini |
+| **File Parsing**  | PyPDF2, python-docx                  |
+| **Communication** | Axios + REST API                     |
 
-git clone [URL_REPOSITORY_CUA_BAN]
-2. Môi trường phát triển (Khuyến khích dùng Codespaces)
-Cách dễ dàng và nhanh nhất để bắt đầu là sử dụng GitHub Codespaces để tránh các vấn đề cài đặt trên máy cá nhân.
+---
 
-Truy cập repository trên GitHub.
+## Installation Guide
 
-Nhấn vào nút màu xanh lá < > Code.
+### 1. Clone Repository
 
-Chuyển sang tab "Codespaces".
 
-Nhấn "Create codespace on main" để khởi tạo môi trường.
+git clone https://github.com/leobigboy/recruit-ai-project2.git
+cd recruit-ai-project2
 
-3. Cấu hình kết nối Supabase (Quan trọng)
-Dự án cần kết nối đến Supabase để lấy dữ liệu. Các khóa API này là bí mật và sẽ không được lưu trên Git.
 
-Trong thư mục gốc của dự án, hãy tạo một file mới tên là .env.local.
+---
 
-Copy và dán nội dung sau vào file .env.local vừa tạo:
+### 2. Backend Setup (FastAPI)
 
-Đoạn mã
+#### Navigate to backend folder
 
-VITE_SUPABASE_URL="DÁN_URL_DỰ_ÁN_SUPABASE_CỦA_BẠN_VÀO_ĐÂY"
-VITE_SUPABASE_ANON_KEY="DÁN_ANON_KEY_DỰ_ÁN_SUPABASE_CỦA_BẠN_VÀO_ĐÂY"
-Lấy Keys: Bạn có thể tìm thấy URL và ANON_KEY trong dashboard Supabase tại Project Settings -> API.
 
-Quan trọng: File .env.local đã được thêm vào .gitignore để đảm bảo các khóa bí mật của bạn không bị đưa lên GitHub.
+cd backend
 
-4. Cập nhật file supabaseClient.ts
-Để sử dụng các biến môi trường vừa tạo, hãy đảm bảo file src/lib/supabaseClient.ts có nội dung sau:
 
-TypeScript
+#### Install Dependencies
 
-// src/lib/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+pip install fastapi uvicorn python-multipart python-dotenv requests PyPDF2 python-docx pydantic aiofiles
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Supabase URL and Anon Key are required.");
-}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-5. Cài đặt các gói phụ thuộc
-Mở terminal trong Codespaces (hoặc trên máy local) và chạy lệnh sau:
+#### (Optional) Create `requirements.txt`
 
-Bash
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+requests
+PyPDF2
+python-docx
+pydantic
+aiofiles
 
-npm install
-6. Chạy dự án
-Sau khi cài đặt thành công, chạy lệnh sau để khởi động server phát triển:
 
-Bash
+Then install with:
+
+
+pip install -r requirements.txt
+
+
+####  Run Backend Server
+
+
+python main.py
+
+
+Server will start at: **[http://localhost:8000](http://localhost:8000)**
+
+---
+
+### 3. Frontend Setup (React + Vite)
+
+####  Navigate to frontend folder
+
+
+cd frontend
+
+
+####  Install Dependencies
+
+
+npm install react react-dom vite axios react-router-dom lucide-react tailwindcss autoprefixer postcss @headlessui/react @heroicons/react
+
+
+#### (Optional Dev Dependencies)
+
+
+npm install -D eslint prettier typescript @types/react @types/react-dom
+
+
+#### Run Frontend
+
 
 npm run dev
 
 
+The web app runs at **[http://localhost:5173](http://localhost:5173)** by default.
+
+---
+
+## Environment Variables
+
+Create a `.env` file in your backend root with:
 
 
-account Admin: 
-account HR : Baohr@example.com', '110804'
-account Interviewer: 
-account User: 
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 
--- tạo HR
-SELECT public.create_user_with_name('baohr@example.com','110804','HR Account');
+---
 
--- tạo Interviewer
-SELECT public.create_user_with_name('baointerviewer@example.com','110804','Interviewer Account');
+## API Endpoints
 
--- tạo User
-SELECT public.create_user_with_name('baouser@example.com','110804','Basic User');
+### 🔹 Root
+
+`GET /` → Returns API status and version.
+
+### 🔹 Health Check
+
+`GET /health` → Confirms API and OpenRouter configuration.
+
+### 🔹 Parse CV
+
+`POST /api/parse-cv`
+
+* Upload a CV file (`.pdf` or `.docx`)
+* Extracts text + structured info via AI.
+
+### 🔹 Match CV with Jobs
+
+`POST /api/match-cv-jobs`
+
+* Sends parsed CV + job list
+* Returns best match, strengths, weaknesses, and score.
+
+---
+
+## Folder Structure
+
+
+recruit-ai-project2/
+│
+├── backend/
+│   ├── main.py               # FastAPI
+│   ├── .env                  # API key
+│   ├── requirements.txt
+│   └── ...
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
+│
+└── README.md
+
+
+---
+
+## Example Commands Summary
+
+| Purpose                | Command                           |
+| ---------------------- | --------------------------------- |
+| Start backend          | `uvicorn main:app --reload`       |
+| Start frontend         | `npm run dev`                     |
+| Install backend deps   | `pip install -r requirements.txt` |
+| Install frontend deps  | `npm install`                     |
+| Create Tailwind config | `npx tailwindcss init -p`         |
+
+---
+
+## Example `.env`
+
+
+OPENROUTER_API_KEY=sk-your-key
+
+
+---
+
+## Notes
+
+* The project integrates with **OpenRouter AI**, so make sure the API key is valid.
+* Only **PDF** and **DOCX** are supported for CV parsing.
+* The backend returns JSON responses — frontend uses **Axios** to consume them.
+
+---
+
+## Author
+
+**Võ Huỳnh Thái Bảo**
+**Nguyễn Trung Hậu**
+**Huỳnh Nhật QUang**
+GitHub: [leobigboy](https://github.com/leobigboy)
+
+---
