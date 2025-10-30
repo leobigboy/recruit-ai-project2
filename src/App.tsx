@@ -6,11 +6,7 @@ import {
   Navigate,
   Outlet,
 } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
-import { AuthProvider } from "@/contexts/AuthContext";
-
-// Import types
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 // Layouts / Pages
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -63,60 +59,50 @@ const CategorySettingsPage = resolveModuleComponent(CategorySettingsModule, ["Ca
 const RegisterPage = resolveModuleComponent(RegisterPageModule, ["RegisterPage"]) ?? (() => <div>Missing Register</div>);
 const UsersPage = resolveModuleComponent(UsersPageModule, ["UsersPage","User"]) ?? (() => <div>Missing Users</div>);
 
-// RequireAuth component (unchanged)
+// SIMPLIFIED: RequireAuth component - uses AuthContext instead of duplicate logic
 const RequireAuth: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
-  const [checking, setChecking] = React.useState(true);
+  const { user, loading } = useAuth();
+  const [showReset, setShowReset] = React.useState(false);
 
+  // Show reset button after 5 seconds of loading
   React.useEffect(() => {
-    let mounted = true;
+    if (loading) {
+      const timer = setTimeout(() => setShowReset(true), 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowReset(false);
+    }
+  }, [loading]);
 
-    const checkSession = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (!mounted) return;
-        setIsAuthenticated(!!(data as any)?.session);
-      } catch (err) {
-        console.warn("Lỗi kiểm tra session:", err);
-        if (mounted) setIsAuthenticated(false);
-      } finally {
-        if (mounted) setChecking(false);
-      }
-    };
-
-    checkSession();
-
-    const { data } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        if (!mounted) return;
-        setIsAuthenticated(!!session);
-      }
-    );
-
-    const subscription = (data as any)?.subscription;
-
-    return () => {
-      mounted = false;
-      try {
-        subscription?.unsubscribe?.();
-      } catch (e) {
-        // ignore
-      }
-    };
-  }, []);
-
-  if (checking || isAuthenticated === null) {
+  // Show loading state while AuthContext is initializing
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        Đang kiểm tra đăng nhập...
+      <div className="flex flex-col items-center justify-center h-screen text-gray-500 space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p>Đang kiểm tra đăng nhập...</p>
+        {showReset && (
+          <button
+            onClick={() => {
+              console.log("🔄 Force reset - clearing session and reloading");
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.href = "/login";
+            }}
+            className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition"
+          >
+            Tải lại trang đăng nhập
+          </button>
+        )}
       </div>
     );
   }
 
-  if (!isAuthenticated) {
+  // Redirect to login if not authenticated
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // User is authenticated, render protected content
   return <>{children ?? <Outlet />}</>;
 };
 
@@ -153,7 +139,11 @@ const router = createBrowserRouter([
 export default function App() {
   return (
     <AuthProvider>
-      <Suspense fallback={<div>Đang tải...</div>}>
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }>
         <RouterProvider router={router} />
       </Suspense>
     </AuthProvider>

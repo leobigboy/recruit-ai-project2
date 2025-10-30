@@ -1,5 +1,5 @@
 // src/pages/LoginPage.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,66 +7,70 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Mail, Lock, AlertCircle } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, setProfile } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      console.log("User already logged in, redirecting...");
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    const trimmedEmail = email.trim();
-
-    if (!trimmedEmail || !password) {
-      setError("Vui lòng điền đầy đủ thông tin");
-      return;
-    }
-
     setLoading(true);
-    try {
-      const res = await signIn(trimmedEmail, password);
-      console.log("signIn result:", res);
 
-      // supabase v2 client commonly returns { data, error } or { error }
-      if ((res as any)?.error) {
-        const msg = (res as any).error?.message ?? "Đăng nhập thất bại";
-        setError(msg === "Invalid login credentials" ? "Email hoặc mật khẩu không chính xác" : msg);
+    try {
+      const trimmedEmail = email.trim();
+
+      // Validation
+      if (!trimmedEmail || !password) {
+        setError("Vui lòng điền đầy đủ thông tin");
         return;
       }
 
-      // confirm session existence
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log("sessionData", sessionData);
-      const session = (sessionData as any)?.session ?? null;
-      if (!session) {
+      console.log("Attempting sign in with:", trimmedEmail);
+
+      // Attempt sign in
+      const result = await signIn(trimmedEmail, password);
+      console.log("Sign in result:", result);
+
+      // Check for authentication errors
+      if (result?.error) {
+        console.error("Sign in error:", result.error);
+        const msg = result.error.message;
+        
+        if (msg === "Invalid login credentials") {
+          setError("Email hoặc mật khẩu không chính xác");
+        } else if (msg.includes("Email not confirmed")) {
+          setError("Vui lòng xác nhận email trước khi đăng nhập");
+        } else {
+          setError(msg || "Đăng nhập thất bại");
+        }
+        return;
+      }
+
+      // Check if we have a valid session
+      if (!result?.data?.session || !result?.data?.user) {
         setError("Không tạo được phiên đăng nhập. Vui lòng thử lại.");
         return;
       }
 
-      // fetch profile (cv_profiles)
-      const userId = session.user.id;
-      const { data: profileData, error: profileErr } = await supabase
-        .from("cv_profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      console.log("✅ Login successful:", result.data.user.email);
 
-      console.log("profileData", profileData, profileErr);
-      if (profileErr) {
-        // Nếu không có profile, set null để app biết không có profile
-        setProfile(null);
-      } else {
-        setProfile(profileData);
-      }
-
-      // Redirect đến route hiện có trong router (thay vì "/app")
+      // Navigate to dashboard
+      // AuthContext will handle the rest (profile fetching, state management)
       navigate("/dashboard", { replace: true });
+
     } catch (ex: any) {
       console.error("Login exception:", ex);
       setError(ex?.message ?? "Có lỗi xảy ra. Vui lòng thử lại.");

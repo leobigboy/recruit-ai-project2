@@ -1,6 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X, Star, Award } from 'lucide-react'
+import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { saveCandidateSkills, getCandidateSkills, type Skill } from "@/utils/skillsHelper"
@@ -41,10 +41,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Slider } from "@/components/ui/slider"
 import { supabase } from "@/lib/supabaseClient"
 import { parseCV, validateCVFile, type ParsedCV } from "@/utils/cvParser"
-import { calculateCVScore, getScoreBadgeClass, getScoreIcon, type ScoreResult } from "@/utils/cvScoringHelper"
 
 const getStatusBadge = (status: string) => {
   if (status === "Mới") return <Badge variant="outline" className="text-blue-600 border-blue-600 bg-blue-50">Mới</Badge>
@@ -54,22 +52,6 @@ const getStatusBadge = (status: string) => {
   if (status === "Từ chối") return <Badge variant="outline" className="text-red-600 border-red-600 bg-red-50">Từ chối</Badge>
   return <Badge variant="secondary">{status}</Badge>
 }
-
-// Component hiển thị badge điểm
-const ScoreBadge = ({ score, size = 'md' }: { score: number; size?: 'sm' | 'md' | 'lg' }) => {
-  const sizeClasses = {
-    sm: 'text-xs px-2 py-1',
-    md: 'text-sm px-3 py-1.5',
-    lg: 'text-base px-4 py-2'
-  };
-  
-  return (
-    <div className={`inline-flex items-center gap-1.5 rounded-full border-2 font-bold ${getScoreBadgeClass(score)} ${sizeClasses[size]}`}>
-      <span className="text-base">{getScoreIcon(score)}</span>
-      <span>{score}/100</span>
-    </div>
-  );
-};
 
 interface Candidate {
   id: string;
@@ -133,22 +115,16 @@ export function CandidatesPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPosition, setFilterPosition] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
-  const [filterMinScore, setFilterMinScore] = useState<number>(0);
-  const [filterMaxScore, setFilterMaxScore] = useState<number>(100);
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [tempFilterStatus, setTempFilterStatus] = useState<string>('all');
   const [tempFilterPosition, setTempFilterPosition] = useState<string>('all');
   const [tempFilterLevel, setTempFilterLevel] = useState<string>('all');
-  const [tempScoreRange, setTempScoreRange] = useState<number[]>([0, 100]);
   
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
   const [isLoadingCV, setIsLoadingCV] = useState(false);
   const [isLoadingAnalyze, setIsLoadingAnalyze] = useState(false);
-  
-  // State mới cho điểm số
-  const [candidateScores, setCandidateScores] = useState<Map<string, ScoreResult>>(new Map());
   
   const [formData, setFormData] = useState({
     full_name: '',
@@ -203,25 +179,6 @@ export function CandidatesPage() {
     if (data) {
       const candidatesData = data as Candidate[];
       setCandidates(candidatesData);
-      
-      // Tính điểm cho tất cả ứng viên
-      const scores = new Map<string, ScoreResult>();
-      candidatesData.forEach(candidate => {
-        const jobReq = candidate.cv_jobs ? {
-          title: candidate.cv_jobs.title,
-          level: candidate.cv_jobs.level
-        } : undefined;
-        
-        const scoreData = calculateCVScore({
-          skills: candidate.cv_candidate_skills,
-          experience: candidate.experience,
-          university: candidate.university,
-          cv_jobs: candidate.cv_jobs
-        }, jobReq);
-        
-        scores.set(candidate.id, scoreData);
-      });
-      setCandidateScores(scores);
     }
     if (error) {
       console.error('Error fetching candidates:', error);
@@ -451,22 +408,6 @@ export function CandidatesPage() {
       if (fullData) {
         setCandidates(prev => [fullData as Candidate, ...prev]);
         
-        // Tính điểm cho ứng viên mới
-        const newCandidate = fullData as Candidate;
-        const jobReq = newCandidate.cv_jobs ? {
-          title: newCandidate.cv_jobs.title,
-          level: newCandidate.cv_jobs.level
-        } : undefined;
-        
-        const scoreData = calculateCVScore({
-          skills: newCandidate.cv_candidate_skills,
-          experience: newCandidate.experience,
-          university: newCandidate.university,
-          cv_jobs: newCandidate.cv_jobs
-        }, jobReq);
-        
-        setCandidateScores(prev => new Map(prev).set(newCandidate.id, scoreData));
-        
         setIsDialogOpen(false);
         resetForm();
         alert('✓ Thêm ứng viên thành công!');
@@ -522,21 +463,6 @@ export function CandidatesPage() {
         setCandidates(prev =>
           prev.map(c => (c.id === editCandidate.id ? updatedCandidate : c))
         );
-        
-        // Tính lại điểm sau khi update
-        const jobReq = updatedCandidate.cv_jobs ? {
-          title: updatedCandidate.cv_jobs.title,
-          level: updatedCandidate.cv_jobs.level
-        } : undefined;
-        
-        const scoreData = calculateCVScore({
-          skills: updatedCandidate.cv_candidate_skills,
-          experience: updatedCandidate.experience,
-          university: updatedCandidate.university,
-          cv_jobs: updatedCandidate.cv_jobs
-        }, jobReq);
-        
-        setCandidateScores(prev => new Map(prev).set(updatedCandidate.id, scoreData));
         
         setEditCandidate(null);
         resetForm();
@@ -654,11 +580,6 @@ export function CandidatesPage() {
       if (error) throw error;
 
       setCandidates(prev => prev.filter(c => c.id !== deleteCandidate.id));
-      setCandidateScores(prev => {
-        const newScores = new Map(prev);
-        newScores.delete(deleteCandidate.id);
-        return newScores;
-      });
       setDeleteCandidate(null);
       alert('✓ Đã xóa ứng viên thành công!');
     } catch (err: any) {
@@ -670,8 +591,6 @@ export function CandidatesPage() {
     setFilterStatus(tempFilterStatus);
     setFilterPosition(tempFilterPosition);
     setFilterLevel(tempFilterLevel);
-    setFilterMinScore(tempScoreRange[0]);
-    setFilterMaxScore(tempScoreRange[1]);
     setIsFilterOpen(false);
   };
 
@@ -679,15 +598,13 @@ export function CandidatesPage() {
     setTempFilterStatus('all');
     setTempFilterPosition('all');
     setTempFilterLevel('all');
-    setTempScoreRange([0, 100]);
   };
 
   const exportCSV = () => {
-    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Status', 'Source', 'Position', 'Level', 'Score'];
+    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Status', 'Source', 'Position', 'Level'];
     const csvContent = [
       headers.join(','),
       ...filteredCandidates.map(c => {
-        const score = candidateScores.get(c.id)?.total || 'N/A';
         return [
           c.id,
           `"${c.full_name.replace(/"/g, '""')}"`,
@@ -696,8 +613,7 @@ export function CandidatesPage() {
           c.status,
           c.source,
           c.cv_jobs?.title || '',
-          c.cv_jobs?.level || '',
-          score
+          c.cv_jobs?.level || ''
         ].join(',');
       })
     ].join('\n');
@@ -724,19 +640,9 @@ export function CandidatesPage() {
     const matchesStatus = filterStatus === 'all' || candidate.status === filterStatus;
     const matchesPosition = filterPosition === 'all' || candidate.cv_jobs?.title === filterPosition;
     const matchesLevel = filterLevel === 'all' || candidate.cv_jobs?.level === filterLevel;
-    const score = candidateScores.get(candidate.id)?.total || 0;
-    const matchesScore = score >= filterMinScore && score <= filterMaxScore;
 
-    return matchesSearch && matchesStatus && matchesPosition && matchesLevel && matchesScore;
+    return matchesSearch && matchesStatus && matchesPosition && matchesLevel;
   });
-
-  // Tính điểm trung bình
-  const averageScore = candidateScores.size > 0 
-    ? Math.round(Array.from(candidateScores.values()).reduce((sum, s) => sum + s.total, 0) / candidateScores.size)
-    : 0;
-  
-  // Số lượng ứng viên xuất sắc
-  const excellentCount = Array.from(candidateScores.values()).filter(s => s.total >= 85).length;
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -1056,54 +962,9 @@ export function CandidatesPage() {
                   <p className="text-sm text-gray-500">{viewCandidate.cv_jobs?.title || 'N/A'}</p>
                   <div className="flex items-center gap-2 mt-1">
                     {getStatusBadge(viewCandidate.status)}
-                    {candidateScores.get(viewCandidate.id) && (
-                      <ScoreBadge score={candidateScores.get(viewCandidate.id)!.total} size="sm" />
-                    )}
                   </div>
                 </div>
               </div>
-
-              {/* Hiển thị Score Breakdown */}
-              {candidateScores.get(viewCandidate.id) && (
-                <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-200">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Award className="w-5 h-5 text-blue-600" />
-                    Phân tích điểm số
-                  </h4>
-                  <div className="space-y-2">
-                    {Object.entries(candidateScores.get(viewCandidate.id)!.breakdown).map(([key, value]) => {
-                      const labels: Record<string, string> = {
-                        skills: '🛠️ Kỹ năng',
-                        experience: '💼 Kinh nghiệm',
-                        education: '🎓 Học vấn',
-                        level: '📊 Cấp độ',
-                        position: '🎯 Vị trí'
-                      };
-                      const maxScores: Record<string, number> = {
-                        skills: 40,
-                        experience: 25,
-                        education: 15,
-                        level: 10,
-                        position: 10
-                      };
-                      return (
-                        <div key={key}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-gray-700">{labels[key]}</span>
-                            <span className="text-sm font-bold text-gray-900">{value}/{maxScores[key]}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
-                              style={{ width: `${(value / maxScores[key]) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="text-sm font-medium text-gray-500">Email</label><p className="text-gray-900">{viewCandidate.email}</p></div>
@@ -1375,20 +1236,6 @@ export function CandidatesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Khoảng điểm CV</label>
-              <Slider 
-                value={tempScoreRange} 
-                onValueChange={setTempScoreRange}
-                min={0}
-                max={100}
-                step={1}
-              />
-              <div className="flex justify-between text-sm text-gray-600 mt-2">
-                <span>{tempScoreRange[0]}</span>
-                <span>{tempScoreRange[1]}</span>
-              </div>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={resetFilters}>Reset</Button>
@@ -1432,35 +1279,6 @@ export function CandidatesPage() {
             <p className="text-xs text-muted-foreground">
               <UserCheck className="inline h-4 w-4 mr-1 text-purple-500" />
               Từ 120 ứng viên
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-2 border-gray-100">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Điểm CV trung bình</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              <ScoreBadge score={averageScore} size="md" />
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              <TrendingUp className="inline h-4 w-4 mr-1 text-green-500" />
-              Cập nhật từ {candidates.length} ứng viên
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-2 border-gray-100">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Ứng viên xuất sắc</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{excellentCount}</div>
-            <p className="text-xs text-muted-foreground">
-              <Star className="inline h-4 w-4 mr-1 text-yellow-500" />
-              Điểm từ 85/100 trở lên
             </p>
           </CardContent>
         </Card>
@@ -1511,7 +1329,6 @@ export function CandidatesPage() {
                 <TableHead className="w-[250px]">Ứng viên</TableHead>
                 <TableHead>Vị trí</TableHead>
                 <TableHead>Trạng thái</TableHead>
-                <TableHead>Điểm CV</TableHead>
                 <TableHead>Kỹ năng</TableHead>
                 <TableHead className="text-right">Hành động</TableHead>
               </TableRow>
@@ -1541,13 +1358,6 @@ export function CandidatesPage() {
                     ) : 'N/A'}
                   </TableCell>
                   <TableCell>{getStatusBadge(candidate.status)}</TableCell>
-                  <TableCell>
-                    {candidateScores.get(candidate.id) ? (
-                      <ScoreBadge score={candidateScores.get(candidate.id)!.total} size="sm" />
-                    ) : (
-                      <Badge variant="outline" className="text-gray-600 border-gray-600 bg-gray-50">N/A</Badge>
-                    )}
-                  </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1 max-w-[300px]">
                       {candidate.cv_candidate_skills?.slice(0, 4).map((item, idx) => (
