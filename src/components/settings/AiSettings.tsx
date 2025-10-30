@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { CheckCircle2, Sparkles, Link as LinkIcon, Loader2, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { testGeminiConnection } from '@/lib/utils';
@@ -18,6 +17,85 @@ interface AIConfig {
   is_gemini_enabled?: boolean;
   profile_id?: string;
 }
+
+// Custom Toggle Switch Component
+const ToggleSwitch = ({ 
+  checked, 
+  onChange, 
+  id 
+}: { 
+  checked: boolean; 
+  onChange: (checked: boolean) => void; 
+  id: string;
+}) => {
+  return (
+    <label className="switch" htmlFor={id}>
+      <input 
+        type="checkbox" 
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="slider round"></span>
+      <style>{`
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 60px;
+          height: 34px;
+        }
+
+        .switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #ccc;
+          transition: .4s;
+        }
+
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 26px;
+          width: 26px;
+          left: 4px;
+          bottom: 4px;
+          background-color: white;
+          transition: .4s;
+        }
+
+        input:checked + .slider {
+          background-color: #2196F3;
+        }
+
+        input:focus + .slider {
+          box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .slider:before {
+          transform: translateX(26px);
+        }
+
+        .slider.round {
+          border-radius: 34px;
+        }
+
+        .slider.round:before {
+          border-radius: 50%;
+        }
+      `}</style>
+    </label>
+  );
+};
 
 const AiSettings = () => {
   const { t } = useTranslation();
@@ -366,42 +444,44 @@ const AiSettings = () => {
           </div>
         </div>
 
-        {/* Enable/Disable Switches */}
-        <div className="space-y-6">
+        {/* Enable/Disable Toggle Switches */}
+        <div className="space-y-4">
           {/* Enable Gemini AI */}
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="is_gemini_enabled" className="text-base font-semibold">
-                {t('ai.gemini.enable')}
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                {t('ai.gemini.enableDescription')}
-              </p>
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="is_gemini_enabled" className="text-base font-semibold">
+                  {t('ai.gemini.enable')}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t('ai.gemini.enableDescription')}
+                </p>
+              </div>
+              <ToggleSwitch
+                id="is_gemini_enabled"
+                checked={config.is_gemini_enabled || false}
+                onChange={(checked) => handleInputChange('is_gemini_enabled', checked)}
+              />
             </div>
-            <Switch
-              id="is_gemini_enabled"
-              checked={config.is_gemini_enabled || false}
-              onCheckedChange={(checked) => handleInputChange('is_gemini_enabled', checked)}
-              className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300"
-            />
           </div>
 
           {/* Enable OpenAI */}
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="is_openai_enabled" className="text-base font-semibold">
-                {t('ai.openai.enable')}
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                {t('ai.openai.enableDescription')}
-              </p>
+          <div className="border rounded-lg p-4 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="is_openai_enabled" className="text-base font-semibold">
+                  {t('ai.openai.enable')}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t('ai.openai.enableDescription')}
+                </p>
+              </div>
+              <ToggleSwitch
+                id="is_openai_enabled"
+                checked={config.is_openai_enabled || false}
+                onChange={(checked) => handleInputChange('is_openai_enabled', checked)}
+              />
             </div>
-            <Switch
-              id="is_openai_enabled"
-              checked={config.is_openai_enabled || false}
-              onCheckedChange={(checked) => handleInputChange('is_openai_enabled', checked)}
-              className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-gray-300"
-            />
           </div>
         </div>
 
@@ -613,7 +693,7 @@ const AiSettings = () => {
               {geminiStatus === 'configured' && config.is_gemini_enabled ? t('ai.status.enabled') : t('ai.status.notConfigured')}
             </span>
           </div>
-        </div>
+        </div >
       </div>
     </div>
   );

@@ -3,33 +3,74 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Check } from 'lucide-react';
 
-// Custom Toggle Button Component
-interface ToggleButtonProps {
+// Custom Toggle Switch Component
+interface ToggleSwitchProps {
   checked: boolean;
   onChange: (value: boolean) => void;
   id: string;
 }
 
-const ToggleButton: React.FC<ToggleButtonProps> = ({ checked, onChange, id }) => {
+const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ checked, onChange, id }) => {
   return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`
-        relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-        ${checked ? 'bg-blue-600' : 'bg-gray-300'}
-      `}
-    >
-      <span
-        className={`
-          inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out
-          ${checked ? 'translate-x-7' : 'translate-x-1'}
-        `}
+    <label className="toggle-switch" htmlFor={id}>
+      <input 
+        type="checkbox" 
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
       />
-    </button>
+      <span className="toggle-slider"></span>
+      <style>{`
+        .toggle-switch {
+          position: relative;
+          display: inline-block;
+          width: 60px;
+          height: 34px;
+        }
+
+        .toggle-switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .toggle-slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #ccc;
+          transition: .4s;
+          border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+          position: absolute;
+          content: "";
+          height: 26px;
+          width: 26px;
+          left: 4px;
+          bottom: 4px;
+          background-color: white;
+          transition: .4s;
+          border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+          background-color: #2196F3;
+        }
+
+        input:focus + .toggle-slider {
+          box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .toggle-slider:before {
+          transform: translateX(26px);
+        }
+      `}</style>
+    </label>
   );
 };
 
@@ -94,7 +135,7 @@ export function NotificationSettings() {
               </Label>
               <p className="text-sm text-muted-foreground">Nhận thông báo chung qua email.</p>
             </div>
-            <ToggleButton
+            <ToggleSwitch
               id="email-notifications"
               checked={emailNotifications}
               onChange={setEmailNotifications}
@@ -110,7 +151,7 @@ export function NotificationSettings() {
               </Label>
               <p className="text-sm text-muted-foreground">Gửi email nhắc nhở trước buổi phỏng vấn.</p>
             </div>
-            <ToggleButton
+            <ToggleSwitch
               id="interview-reminders"
               checked={interviewReminders}
               onChange={setInterviewReminders}
@@ -126,7 +167,7 @@ export function NotificationSettings() {
               </Label>
               <p className="text-sm text-muted-foreground">Thông báo khi có ứng viên mới nộp hồ sơ.</p>
             </div>
-            <ToggleButton
+            <ToggleSwitch
               id="candidate-updates"
               checked={candidateUpdates}
               onChange={setCandidateUpdates}
@@ -137,3 +178,5 @@ export function NotificationSettings() {
     </Card>
   );
 }
+
+export default NotificationSettings;

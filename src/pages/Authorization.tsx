@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import {
   Building2,
   Briefcase,
@@ -56,6 +55,80 @@ type Module = {
 
 interface AuthorizationProps {
   children?: React.ReactNode
+}
+
+// Custom Toggle Switch Component
+const ToggleSwitch = ({ 
+  checked, 
+  onChange, 
+  size = "normal"
+}: { 
+  checked: boolean; 
+  onChange: (checked: boolean) => void;
+  size?: "small" | "normal";
+}) => {
+  const isSmall = size === "small"
+  
+  return (
+    <label className="toggle-switch">
+      <input 
+        type="checkbox" 
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className={`toggle-slider ${isSmall ? 'small' : ''}`}></span>
+      <style>{`
+        .toggle-switch {
+          position: relative;
+          display: inline-block;
+          width: ${isSmall ? '36px' : '60px'};
+          height: ${isSmall ? '20px' : '34px'};
+        }
+
+        .toggle-switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+
+        .toggle-slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #ccc;
+          transition: .4s;
+          border-radius: ${isSmall ? '20px' : '34px'};
+        }
+
+        .toggle-slider:before {
+          position: absolute;
+          content: "";
+          height: ${isSmall ? '14px' : '26px'};
+          width: ${isSmall ? '14px' : '26px'};
+          left: ${isSmall ? '3px' : '4px'};
+          bottom: ${isSmall ? '3px' : '4px'};
+          background-color: white;
+          transition: .4s;
+          border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+          background-color: #2196F3;
+        }
+
+        input:focus + .toggle-slider {
+          box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked + .toggle-slider:before {
+          transform: translateX(${isSmall ? '16px' : '26px'});
+        }
+      `}</style>
+    </label>
+  )
 }
 
 const iconMap: Record<string, any> = {
@@ -655,18 +728,11 @@ export default function Authorization({ children }: AuthorizationProps) {
                                 const isChecked = !!role.permissions?.[module.id]?.[permission]
                                 return (
                                   <div key={permission} className="flex flex-col items-center gap-1">
-                                    <button
-                                      onClick={() => handlePermissionToggle(role.id, module.id, permission)}
-                                      className={`relative w-9 h-5 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
-                                        isChecked ? 'bg-blue-600' : 'bg-gray-300'
-                                      }`}
-                                    >
-                                      <span
-                                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ease-in-out ${
-                                          isChecked ? 'translate-x-4' : 'translate-x-0'
-                                        }`}
-                                      />
-                                    </button>
+                                    <ToggleSwitch
+                                      checked={isChecked}
+                                      onChange={() => handlePermissionToggle(role.id, module.id, permission)}
+                                      size="small"
+                                    />
                                     <span className="text-[9px] text-gray-600 font-medium">
                                       {permission === "view" 
                                         ? "Xem" 
@@ -752,7 +818,7 @@ export default function Authorization({ children }: AuthorizationProps) {
                   Hủy
                 </Button>
                 <Button onClick={handleSaveRole} className="bg-blue-600 hover:bg-blue-700">
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <RefreshCw className="w-4 w-4 mr-2" />
                   Lưu thay đổi
                 </Button>
               </div>
