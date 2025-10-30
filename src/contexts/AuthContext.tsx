@@ -1,8 +1,8 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User, Session } from "@supabase/supabase-js";
+import { useNavigate } from "react-router-dom";  // Fix: Sử dụng react-router-dom thay vì next/router
 
 type AuthContextType = {
   user: User | null;
@@ -13,7 +13,7 @@ type AuthContextType = {
   setProfile: (p: any) => void;
   signUp: (email: string, password: string) => Promise<any>;
   updateProfile: (data: any) => Promise<any>;
-  checkSession: () => Promise<boolean>;
+  checkSession: () => Promise<boolean>; // Thêm hàm check
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,20 +22,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
-  const isNavigating = useRef(false);
+  const navigate = useNavigate(); // Fix: Sử dụng useNavigate thay vì useRouter
 
   // Helper function to fetch profile
   const fetchProfile = async (userId: string) => {
-    // Prevent concurrent fetches
-    if (fetchingProfile.current) {
-      return null;
-    }
-
     try {
-      fetchingProfile.current = true;
       console.log("📋 Fetching profile for user:", userId);
-      
       const { data: prof, error } = await supabase
         .from("cv_profiles")
         .select("*")
@@ -52,39 +44,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("❌ Profile fetch exception:", err);
       return null;
-    } finally {
-      fetchingProfile.current = false;
     }
   };
 
-  // Helper to navigate programmatically (only once)
-  const navigateToLogin = () => {
-    if (isNavigating.current) return;
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-      isNavigating.current = true;
-      window.location.href = '/login';
-    }
-  };
-
-  // Check session validity
+  // Thêm hàm check session và force logout nếu invalid
   const checkSession = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session) {
+        await signOut();
         return false;
       }
       return true;
     } catch {
+      await signOut();
       return false;
     }
   };
 
-  // Sign in function
+  // Hàm signIn đầy đủ (fix lỗi 'result')
   const signIn = async (email: string, password: string) => {
     console.log("🔑 Signing in:", email);
     
     try {
-      const result = await supabase.auth.signInWithPassword({ email, password });
+      const result = await supabase.auth.signInWithPassword({ email, password });  // Thêm const result
       
       if (result.error) {
         console.error("❌ Sign in error:", result.error);
@@ -98,18 +81,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(result.data.user);
         const prof = await fetchProfile(result.data.user.id);
         setProfile(prof);
+        setLoading(false); // Ensure loading is false
       }
       
       return result;
     } catch (err) {
       console.error("❌ Sign in exception:", err);
+      setLoading(false);
       throw err;
     } finally {
-      setLoading(false);
+      setLoading(false);  // Thêm finally để luôn false
     }
   };
 
-  // Sign out function
   const signOut = async () => {
     console.log("👋 Signing out");
     try {
@@ -120,11 +104,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setProfile(null);
       setLoading(false);
-      navigateToLogin();
+      navigate('/login'); // Fix: Sử dụng navigate thay vì router.push
     }
   };
 
-  // Sign up function
   const signUp = async (email: string, password: string) => {
     console.log("📝 Signing up:", email);
     
@@ -139,20 +122,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         console.log("✅ Sign up successful");
         setUser(data.user);
+        // Profile might not exist yet for new users
         const prof = await fetchProfile(data.user.id);
         setProfile(prof);
+        setLoading(false);
       }
       
       return data;
     } catch (err) {
       console.error("❌ Sign up exception:", err);
+      setLoading(false);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Update profile function
   const updateProfile = async (data: any) => {
     if (!user) throw new Error("No authenticated user");
     
@@ -177,12 +162,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("❌ Profile update exception:", err);
       throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (initialized) return; // Prevent re-initialization
-    
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
@@ -194,9 +179,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Set timeout to prevent infinite loading
         timeoutId = setTimeout(() => {
           if (mounted && loading) {
-            console.warn("⚠️ Auth initialization timeout");
-            setLoading(false);
-            setInitialized(true);
+            console.warn("⚠️ Auth initialization timeout - forcing sign out");
+            signOut();
           }
         }, 8000);
 
@@ -204,35 +188,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         clearTimeout(timeoutId);
         
+        if (error) {
+          console.error("❌ Session error:", error);
+          if (mounted) {
+            await signOut(); // Force logout on error
+          }
+          return;
+        }
+        
         if (!mounted) return;
 
         if (session?.user) {
           console.log("✅ Session found:", session.user.email);
           setUser(session.user);
+          setLoading(false);
           
           const prof = await fetchProfile(session.user.id);
           if (mounted) {
             setProfile(prof);
-            setLoading(false);
-            setInitialized(true);
           }
         } else {
-          console.log("ℹ️ No session found");
+          console.log("ℹ️ No session found - redirecting to login");
           if (mounted) {
+            navigate('/login'); // Fix: Sử dụng navigate
             setLoading(false);
-            setInitialized(true);
-            // Only redirect if not already on login page
-            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-              navigateToLogin();
-            }
           }
         }
       } catch (err) {
         console.error("❌ Auth init error:", err);
         clearTimeout(timeoutId);
         if (mounted) {
-          setLoading(false);
-          setInitialized(true);
+          signOut();
         }
       }
     };
@@ -242,27 +228,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("🔄 Auth state change:", event);
+        console.log("🔄 Auth state change:", event, session?.user?.email || "no user");
 
         if (!mounted) return;
 
         try {
           if (event === 'SIGNED_IN' && session?.user) {
             setUser(session.user);
+            setLoading(false);
             const prof = await fetchProfile(session.user.id);
             if (mounted) setProfile(prof);
-            setLoading(false);
-          } else if (event === 'SIGNED_OUT') {
+          } else if (event === 'SIGNED_OUT' || !session) {
             setUser(null);
             setProfile(null);
             setLoading(false);
-            navigateToLogin();
+            navigate('/login'); // Fix: Sử dụng navigate
           } else if (event === 'TOKEN_REFRESHED' && session?.user) {
             setUser(session.user);
             setLoading(false);
+          } else {
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            navigate('/login');
           }
         } catch (err) {
           console.error("❌ Auth state change error:", err);
+          if (mounted) {
+            signOut();
+          }
         }
       }
     );
@@ -272,7 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, [initialized]); // Only run once when initialized is false
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -283,7 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signIn,
         signOut,
         setProfile,
-        signUp,
+        signUp,  // Fix: Sử dụng signUp
         updateProfile,
         checkSession,
       }}
