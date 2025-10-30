@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -26,8 +27,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Helper function to fetch profile
   const fetchProfile = async (userId: string) => {
+    // Prevent concurrent fetches
+    if (fetchingProfile.current) {
+      return null;
+    }
+
     try {
+      fetchingProfile.current = true;
       console.log("📋 Fetching profile for user:", userId);
+      
       const { data: prof, error } = await supabase
         .from("cv_profiles")
         .select("*")
@@ -44,6 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("❌ Profile fetch exception:", err);
       return null;
+    } finally {
+      fetchingProfile.current = false;
     }
   };
 

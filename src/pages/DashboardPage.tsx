@@ -61,10 +61,11 @@ export function DashboardPage() {
     try {
       // Đếm tổng CV
       const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
-      // Đếm vị trí đang đăng (status = 'Đã đăng')
+      
+      // Đếm vị trí đang đăng
       const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
       
-      // Lấy thống kê lịch phỏng vấn (thông qua RPC nếu có)
+      // Lấy thống kê lịch phỏng vấn
       const { data: interviewStats, error: interviewError } = await supabase.rpc('get_interview_stats');
       if (interviewError) console.error("Error fetching interview stats:", interviewError);
       
@@ -82,11 +83,12 @@ export function DashboardPage() {
         interviewingChange: Number(interviewData.percentage_change) || 0
       });
 
-      // Gọi các hàm PostgreSQL đã tạo cho xu hướng và nguồn
+      // Xu hướng CV theo tháng
       const { data: trend, error: trendError } = await supabase.rpc('get_monthly_cv_trend');
       if (trendError) console.error("Error fetching trend:", trendError);
       if (trend) setTrendData(trend as TrendData[]);
 
+      // Nguồn ứng viên
       const { data: sources, error: sourcesError } = await supabase.rpc('get_candidate_sources');
       if (sourcesError) console.error("Error fetching sources:", sourcesError);
       if (sources && sources.length > 0) {
@@ -99,7 +101,7 @@ export function DashboardPage() {
         ]);
       }
 
-      // Lấy top vị trí tuyển dụng theo số ứng viên
+      // Top vị trí tuyển dụng
       const { data: jobs, error: jobsError } = await supabase
         .from('cv_jobs')
         .select(`
@@ -123,15 +125,11 @@ export function DashboardPage() {
         setTopJobs(sortedJobs.slice(0, 6));
       }
 
-      // Lấy hoạt động gần đây
-      // ======================= FIX HERE =======================
-      // Sửa tên tham số từ { limit_count: 6 } thành tên đúng trong hàm PostgreSQL của bạn.
-      // Dưới đây là một ví dụ phổ biến là `p_limit`.
+      // Hoạt động gần đây
       const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { p_limit: 6 });
-      // ========================================================
-      
       if (activitiesError) console.error("Error fetching activities:", activitiesError);
       if (activities) setRecentActivities(activities as ActivityData[]);
+      
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
     } finally {
@@ -141,7 +139,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, []); // Empty dependency - only fetch once on mount
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
