@@ -29,6 +29,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   // Prevent double initialization
   const initialized = useRef(false);
+  
+  // Keep track of current user to prevent duplicate updates on tab focus
+  const userRef = useRef<User | null>(null);
+
+  // Update ref whenever user changes
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // Helper function to fetch profile by auth_user_id
   const fetchProfile = async (authUserId: string) => {
@@ -87,8 +95,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Run only once
+    // Run only once - prevent double initialization
     if (initialized.current) {
+      console.log("⏭️ Auth already initialized, skipping");
       return;
     }
     initialized.current = true;
@@ -110,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           console.log("✅ Session found:", session.user.email);
           setUser(session.user);
+          userRef.current = session.user;
           
           // Fetch user's profile
           const prof = await fetchProfile(session.user.id);
@@ -120,6 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log("ℹ️ No session found");
           setUser(null);
           setProfile(null);
+          userRef.current = null;
         }
       } catch (err) {
         console.error("❌ Auth init error:", err);
@@ -141,8 +152,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!mounted) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log("✅ User signed in");
+          // CRITICAL FIX: Prevent duplicate updates when tab becomes active
+          if (userRef.current && userRef.current.id === session.user.id) {
+            console.log("⏭️ User already signed in, skipping duplicate SIGNED_IN event");
+            return;
+          }
+          
+          console.log("✅ User signed in (new or different user)");
           setUser(session.user);
+          userRef.current = session.user;
           
           const prof = await fetchProfile(session.user.id);
           if (mounted) {
@@ -152,35 +170,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log("👋 User signed out");
           setUser(null);
           setProfile(null);
+          userRef.current = null;
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log("🔄 Token refreshed (no state update needed)");
+          // Token refreshed, but don't update state - prevents unnecessary re-renders
+        } else if (event === 'USER_UPDATED') {
+          console.log("👤 User updated");
+          // User metadata updated, update user state but don't refetch profile
+          if (session?.user) {
+            setUser(session.user);
+            userRef.current = session.user;
+          }
         }
-        // Ignore other events like TOKEN_REFRESHED
       }
     );
 
     return () => {
+      console.log("🧹 Cleaning up AuthProvider");
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency - run once only
 
   const signIn = async (email: string, password: string) => {
     console.log("🔑 Signing in:", email);
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    if (result.error) {
-      console.error("❌ Sign in error:", result.error);
-      return { data: null, error: result.error };
-    } else {
+    
+    try {
+      const result = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (result.error) {
+        console.error("❌ Sign in error:", result.error);
+        return { data: null, error: result.error };
+      }
+      
       console.log("✅ Sign in successful");
-      // Profile will be loaded by onAuthStateChange
+      // onAuthStateChange will handle setting user and profile
       return { data: result.data, error: null };
+    } catch (err) {
+      console.error("❌ Sign in exception:", err);
+      return { 
+        data: null, 
+        error: err instanceof Error ? err : new Error("Unknown error") 
+      };
     }
   };
 
   const signOut = async () => {
     console.log("👋 Signing out");
-    setUser(null);
-    setProfile(null);
-    await supabase.auth.signOut();
+    
+    try {
+      // Clear state first
+      setUser(null);
+      setProfile(null);
+      userRef.current = null;
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("❌ Sign out error:", error);
+      } else {
+        console.log("✅ Signed out successfully");
+      }
+    } catch (err) {
+      console.error("❌ Sign out exception:", err);
+      // Still clear state even if error
+      setUser(null);
+      setProfile(null);
+      userRef.current = null;
+    }
   };
 
   const signUp = async (email: string, password: string, options?: SignUpOptions) => {
@@ -210,7 +268,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log("✅ Auth user created:", authData.user.id);
 
-      // Step 2: Check if profile already exists (in case of trigger)
+      // Step 2: Check if profile already exists (might be created by database trigger)
       let existingProfile = await fetchProfile(authData.user.id);
       
       if (!existingProfile) {
@@ -224,13 +282,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           existingProfile = newProfile;
         } catch (profileError) {
           console.error("❌ Profile creation failed:", profileError);
-          // Continue anyway, profile might be created by trigger
+          // Continue anyway - profile might be created by trigger with delay
         }
       }
 
       // Step 4: Update state
       setUser(authData.user);
       setProfile(existingProfile);
+      userRef.current = authData.user;
 
       console.log("✅ Sign up complete");
       return { data: authData, error: null };
@@ -252,21 +311,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     console.log("💾 Updating profile for user:", user.id);
     
-    const { error, data: updated } = await supabase
-      .from("cv_profiles")
-      .update(data)
-      .eq("auth_user_id", user.id)
-      .select()
-      .single();
-    
-    if (error) {
-      console.error("❌ Profile update error:", error);
-      throw error;
+    try {
+      const { error, data: updated } = await supabase
+        .from("cv_profiles")
+        .update(data)
+        .eq("auth_user_id", user.id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("❌ Profile update error:", error);
+        throw error;
+      }
+      
+      console.log("✅ Profile updated successfully");
+      setProfile(updated);
+      return updated;
+    } catch (err) {
+      console.error("❌ Profile update exception:", err);
+      throw err;
     }
-    
-    console.log("✅ Profile updated successfully");
-    setProfile(updated);
-    return updated;
   };
 
   return (
