@@ -1,4 +1,4 @@
-// src/utils/advancedCVParser.ts
+// src/utils/advancedCVParser.ts - FULL CODE
 import mammoth from 'mammoth';
 
 let pdfjsLib: any = null;

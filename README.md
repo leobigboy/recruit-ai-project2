@@ -96,6 +96,8 @@ cd frontend
 
 npm install react react-dom vite axios react-router-dom lucide-react tailwindcss autoprefixer postcss @headlessui/react @heroicons/react
 
+npm install i18next react-i18next i18next-browser-languagedetector
+
 
 #### (Optional Dev Dependencies)
 
@@ -207,7 +209,7 @@ OPENROUTER_API_KEY=sk-your-key
 
 **Võ Huỳnh Thái Bảo**
 **Nguyễn Trung Hậu**
-**Huỳnh Nhật QUang**
+**Huỳnh Nhật Quang**
 GitHub: [leobigboy](https://github.com/leobigboy)
 
 ---
