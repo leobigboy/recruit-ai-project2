@@ -1,14 +1,6 @@
 // src/pages/OffersPage.tsx
 import React, { useEffect, useMemo, useState, type JSX } from "react";
 
-/**
- * OffersPage
- * - Mock CRUD UI cho Offer Management
- * - Create / Edit / Delete / Send (simulate)
- *
- * Copy vào: src/pages/OffersPage.tsx
- */
-
 type OfferStatus = "Draft" | "Sent" | "Accepted" | "Rejected";
 
 type Offer = {

@@ -10,7 +10,6 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Send, Mail, Clock, FileText, Settings, ChevronDown, Search } from "lucide-react"
 
-// --- Bắt đầu: Code từ file stat-card.tsx ---
 interface StatCardProps {
   title: string
   value: string
@@ -31,10 +30,7 @@ function StatCard({ title, value, icon, iconBg }: StatCardProps) {
     </Card>
   )
 }
-// --- Kết thúc: Code từ file stat-card.tsx ---
 
-
-// --- Bắt đầu: Code từ file template-card.tsx ---
 interface Template {
   id: number
   title: string
@@ -64,15 +60,10 @@ function TemplateCard({ template }: TemplateCardProps) {
     </Card>
   )
 }
-// --- Kết thúc: Code từ file template-card.tsx ---
 
-
-// --- Bắt đầu: Code từ file email-dashboard.tsx ---
 const templates: Template[] = [
-  // ... (Dữ liệu mẫu bạn đã cung cấp) ...
   { id: 1, title: "Interview Invitation - Round 1", category: "Interview", categoryColor: "bg-pink-100 text-pink-700", preview: "Dear {{candidateName}}, We are pleased to invite you...", usedCount: 0, isDefault: true },
   { id: 2, title: "Pass Notice - Congratulations", category: "Offer", categoryColor: "bg-green-100 text-green-700", preview: "Dear {{candidateName}}, Congratulations! We are delighted...", usedCount: 0, isDefault: true },
-  // Thêm các template khác vào đây
 ];
 
 export function EmailPage() {
@@ -138,4 +129,3 @@ export function EmailPage() {
     </div>
   )
 }
-// --- Kết thúc: Code từ file email-dashboard.tsx ---

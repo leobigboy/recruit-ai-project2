@@ -115,11 +115,13 @@ export function CandidatesPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPosition, setFilterPosition] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterSource, setFilterSource] = useState<string>('all');
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [tempFilterStatus, setTempFilterStatus] = useState<string>('all');
   const [tempFilterPosition, setTempFilterPosition] = useState<string>('all');
   const [tempFilterLevel, setTempFilterLevel] = useState<string>('all');
+  const [tempFilterSource, setTempFilterSource] = useState<string>('all');
   
   const [isLoadingView, setIsLoadingView] = useState(false);
   const [isLoadingEdit, setIsLoadingEdit] = useState(false);
@@ -238,12 +240,12 @@ export function CandidatesPage() {
       const foundInfo = [];
 
       if (parsed.fullName) {
-        console.log('✅ Điền Họ và tên:', parsed.fullName);
+        console.log(' Điền Họ và tên:', parsed.fullName);
         handleInputChange('full_name', parsed.fullName);
         foundInfo.push(`👤 Họ tên: ${parsed.fullName}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Họ và tên');
+        console.log(' Không tìm thấy Họ và tên');
       }
 
       if (parsed.email) {
@@ -252,64 +254,64 @@ export function CandidatesPage() {
         foundInfo.push(`📧 Email: ${parsed.email}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Email');
+        console.log(' Không tìm thấy Email');
       }
 
       if (parsed.phone) {
-        console.log('✅ Điền SĐT:', parsed.phone);
+        console.log(' Điền SĐT:', parsed.phone);
         handleInputChange('phone_number', parsed.phone);
-        foundInfo.push(`📱 SĐT: ${parsed.phone}`);
+        foundInfo.push(` SĐT: ${parsed.phone}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy SĐT');
+        console.log(' Không tìm thấy SĐT');
       }
 
       if (parsed.address) {
-        console.log('✅ Điền Địa chỉ:', parsed.address);
+        console.log(' Điền Địa chỉ:', parsed.address);
         handleInputChange('address', parsed.address);
-        foundInfo.push(`📍 Địa chỉ: ${parsed.address}`);
+        foundInfo.push(` Địa chỉ: ${parsed.address}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Địa chỉ');
+        console.log('Không tìm thấy Địa chỉ');
       }
 
       if (parsed.university) {
-        console.log('✅ Điền Trường học:', parsed.university);
+        console.log('Điền Trường học:', parsed.university);
         handleInputChange('university', parsed.university);
         foundInfo.push(`🎓 Trường: ${parsed.university}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Trường học');
+        console.log('Không tìm thấy Trường học');
       }
 
       if (parsed.education) {
-        console.log('✅ Điền Học vấn:', parsed.education);
+        console.log('Điền Học vấn:', parsed.education);
         handleInputChange('education', parsed.education);
         foundInfo.push(`📚 Học vấn: ${parsed.education}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Học vấn');
+        console.log('Không tìm thấy Học vấn');
       }
 
       if (parsed.experience) {
-        console.log('✅ Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
+        console.log('Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
         handleInputChange('experience', parsed.experience);
         const expPreview = parsed.experience.length > 50 
           ? parsed.experience.substring(0, 50) + '...' 
           : parsed.experience;
-        foundInfo.push(`💼 Kinh nghiệm: ${expPreview}`);
+        foundInfo.push(`Kinh nghiệm: ${expPreview}`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Kinh nghiệm');
+        console.log('Không tìm thấy Kinh nghiệm');
       }
 
       if (parsed.skills && parsed.skills.length > 0) {
-        console.log('✅ Điền Skills:', parsed.skills);
+        console.log('Điền Skills:', parsed.skills);
         handleInputChange('skills', parsed.skills);
-        foundInfo.push(`🛠️ Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
+        foundInfo.push(`Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
         filledCount++;
       } else {
-        console.log('❌ Không tìm thấy Skills');
+        console.log('Không tìm thấy Skills');
       }
 
       console.log('=== TỔNG KẾT ===');
@@ -591,6 +593,7 @@ export function CandidatesPage() {
     setFilterStatus(tempFilterStatus);
     setFilterPosition(tempFilterPosition);
     setFilterLevel(tempFilterLevel);
+    setFilterSource(tempFilterSource);
     setIsFilterOpen(false);
   };
 
@@ -598,6 +601,7 @@ export function CandidatesPage() {
     setTempFilterStatus('all');
     setTempFilterPosition('all');
     setTempFilterLevel('all');
+    setTempFilterSource('all');
   };
 
   const exportCSV = () => {
@@ -640,9 +644,10 @@ export function CandidatesPage() {
     const matchesStatus = filterStatus === 'all' || candidate.status === filterStatus;
     const matchesPosition = filterPosition === 'all' || candidate.cv_jobs?.title === filterPosition;
     const matchesLevel = filterLevel === 'all' || candidate.cv_jobs?.level === filterLevel;
+    const matchesSource = filterSource === 'all' || candidate.source === filterSource;
 
-    return matchesSearch && matchesStatus && matchesPosition && matchesLevel;
-  });
+    return matchesSearch && matchesStatus && matchesPosition && matchesLevel && matchesSource;
+  }).slice(0, 100);
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
@@ -1233,6 +1238,23 @@ export function CandidatesPage() {
                   {uniqueLevels.map(level => (
                     <SelectItem key={level} value={level}>{level}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nguồn</label>
+              <Select value={tempFilterSource} onValueChange={setTempFilterSource}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tất cả nguồn" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả nguồn</SelectItem>
+                  <SelectItem value="Website">Website</SelectItem>
+                  <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                  <SelectItem value="Facebook">Facebook</SelectItem>
+                  <SelectItem value="TopCV">TopCV</SelectItem>
+                  <SelectItem value="Giới thiệu">Giới thiệu</SelectItem>
+                  <SelectItem value="Khác">Khác</SelectItem>
                 </SelectContent>
               </Select>
             </div>

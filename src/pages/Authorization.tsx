@@ -30,10 +30,6 @@ import {
   X,
 } from "lucide-react"
 
-// -----------------------------
-// Types
-// -----------------------------
-
 type Permission = "view" | "create" | "edit" | "delete"
 
 type RolePermissions = {
@@ -62,9 +58,6 @@ interface AuthorizationProps {
   children?: React.ReactNode
 }
 
-// -----------------------------
-// Helpers: map icon name (string) -> lucide component
-// -----------------------------
 const iconMap: Record<string, any> = {
   shield: Shield,
   users: Users,
@@ -108,7 +101,6 @@ export default function Authorization({ children }: AuthorizationProps) {
     setError(null)
 
     try {
-      // 1) Thử đọc bảng modules, nếu lỗi thì dùng mặc định
       let loadedModules = defaultModules
       const { data: modulesData, error: modulesErr } = await supabase.from("modules").select("id,name,icon")
       if (modulesErr) {
@@ -118,7 +110,6 @@ export default function Authorization({ children }: AuthorizationProps) {
       }
       setModules(loadedModules)
 
-      // 2) Đọc roles
       const { data: rolesData, error: rolesErr } = await supabase.from("roles").select("id,name,description,color,icon")
       let fetchedRoles: Role[] = []
       
@@ -139,7 +130,6 @@ export default function Authorization({ children }: AuthorizationProps) {
         fetchedRoles = getDefaultRoles(loadedModules)
       }
 
-      // Khởi tạo permissions cho tất cả roles và modules nếu chưa có
       fetchedRoles = fetchedRoles.map((r) => ({
         ...r,
         permissions: loadedModules.reduce((acc, m) => ({ 
@@ -148,7 +138,6 @@ export default function Authorization({ children }: AuthorizationProps) {
         }), {} as RolePermissions),
       }))
 
-      // 3) Đọc role_permissions
       const { data: permsData, error: permsErr } = await supabase
         .from("role_permissions")
         .select("id,role_id,module_id,can_view,can_create,can_edit,can_delete")
@@ -176,7 +165,6 @@ export default function Authorization({ children }: AuthorizationProps) {
         }))
       }
 
-      // 4) Tính userCount từ bảng users, nhưng nếu lỗi 404 thì bỏ qua và giữ 0
       const { data: usersData, error: usersErr } = await supabase.from("users").select("id,role_id")
       if (usersErr) {
         console.warn("Lỗi đọc users (có thể bảng không tồn tại), bỏ qua userCount:", usersErr.message)
@@ -198,7 +186,6 @@ export default function Authorization({ children }: AuthorizationProps) {
     }
   }
 
-  // Hàm lấy roles mặc định với permissions được phân quyền cụ thể
   function getDefaultRoles(modules: Module[]): Role[] {
     const allModules = modules.reduce((acc, m) => ({
       ...acc,
@@ -208,20 +195,20 @@ export default function Authorization({ children }: AuthorizationProps) {
     const hrPermissions = modules.reduce((acc, m) => ({
       ...acc,
       [m.id]: m.id === "settings" 
-        ? { view: false, create: false, edit: false, delete: false } // HR không chỉnh settings (admin only)
-        : { view: true, create: true, edit: true, delete: false } // HR có quyền cơ bản trừ xóa
+        ? { view: false, create: false, edit: false, delete: false }
+        : { view: true, create: true, edit: true, delete: false }
     }), {} as RolePermissions)
 
     const interviewerPermissions = modules.reduce((acc, m) => ({
       ...acc,
       [m.id]: ["interview", "evaluation"].includes(m.id)
-        ? { view: true, create: true, edit: true, delete: false } // Interviewer chỉ chỉnh interview và evaluation
-        : { view: true, create: false, edit: false, delete: false } // Chỉ xem các module khác
+        ? { view: true, create: true, edit: true, delete: false }
+        : { view: true, create: false, edit: false, delete: false }
     }), {} as RolePermissions)
 
     const userPermissions = modules.reduce((acc, m) => ({
       ...acc,
-      [m.id]: { view: true, create: false, edit: false, delete: false } // User chỉ xem
+      [m.id]: { view: true, create: false, edit: false, delete: false }
     }), {} as RolePermissions)
 
     return [
@@ -232,7 +219,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#7c3aed",
         icon: "shield",
         userCount: 0,
-        permissions: allModules, // Admin có tất cả quyền
+        permissions: allModules,
       },
       {
         id: "hr",
@@ -241,7 +228,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#2563eb",
         icon: "users",
         userCount: 0,
-        permissions: hrPermissions, // HR không chỉnh admin-only như settings
+        permissions: hrPermissions,
       },
       {
         id: "interviewer",
@@ -250,7 +237,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#059669",
         icon: "usercheck",
         userCount: 0,
-        permissions: interviewerPermissions, // Chỉ chỉnh interview và evaluation
+        permissions: interviewerPermissions,
       },
       {
         id: "user",
@@ -259,7 +246,7 @@ export default function Authorization({ children }: AuthorizationProps) {
         color: "#6b7280",
         icon: "users",
         userCount: 0,
-        permissions: userPermissions, // Chỉ xem
+        permissions: userPermissions,
       },
     ]
   }

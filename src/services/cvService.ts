@@ -169,7 +169,7 @@ export const cvService = {
       totalCVs,
       avgScore: Math.round(avgScore * 10) / 10,
       qualifiedCVs,
-      avgProcessTime: 2.3, // Mock value, có thể tính từ metadata
+      avgProcessTime: 2.3,
     };
   },
 };

@@ -26,9 +26,6 @@ export interface CVParserResponse {
 }
 
 export class CVParserService {
-  /**
-   * Check if the backend API is available
-   */
   static async checkHealth(): Promise<boolean> {
     try {
       const response = await fetch(`${API_BASE_URL}/health`, {
@@ -51,9 +48,6 @@ export class CVParserService {
     }
   }
 
-  /**
-   * Parse a single CV file using the backend API
-   */
   static async parseCV(file: File): Promise<ParsedCV> {
     try {
       const formData = new FormData();
@@ -103,9 +97,6 @@ export class CVParserService {
     }
   }
 
-  /**
-   * Parse multiple CV files at once
-   */
   static async batchParseCV(files: File[]): Promise<Array<{
     filename: string;
     success: boolean;

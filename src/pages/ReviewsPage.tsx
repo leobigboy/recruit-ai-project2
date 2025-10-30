@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { Badge } from "@/components/ui/badge"
 import { useTranslation } from 'react-i18next'
 
-// Helper Component để hiển thị sao
+// Helper Component
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-1">

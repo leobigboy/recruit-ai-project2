@@ -1,5 +1,4 @@
 /* src/styles/theme-colors.css */
-/* File này áp dụng màu sắc động cho toàn bộ hệ thống */
 
 /* ============================================
    SIDEBAR STYLING
@@ -61,7 +60,6 @@ nav::-webkit-scrollbar-thumb:hover {
    BUTTONS STYLING - FORCE VISIBLE TEXT
    ============================================ */
 
-/* CRITICAL: Đảm bảo TẤT CẢ button text luôn hiển thị */
 button,
 [role="button"],
 [type="button"],

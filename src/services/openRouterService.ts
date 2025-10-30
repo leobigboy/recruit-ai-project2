@@ -24,7 +24,7 @@ interface OpenRouterResponse {
       content: string;
     };
   }>;
-  // Thêm các fields khác nếu cần
+
 }
 
 export class OpenRouterService {
@@ -70,7 +70,7 @@ export class OpenRouterService {
   }
 }
 
-// Export instance sẵn (lấy API key từ env)
+// Export instance
 export const openRouterService = new OpenRouterService(
   import.meta.env.VITE_OPENROUTER_API_KEY || ''
 );
