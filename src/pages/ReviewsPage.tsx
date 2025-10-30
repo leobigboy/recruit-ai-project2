@@ -7,23 +7,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { RefreshCw, FileText, Star, TrendingUp, MoreHorizontal, X } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { useTranslation } from 'react-i18next'
 
-// Helper Component
+// Helper Component để hiển thị sao
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex items-center gap-1">
       {[...Array(5)].map((_, i) => (
-        <Star 
-          key={i} 
-          className={`h-4 w-4 ${i < Math.round(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`} 
-        />
+        <Star key={i} className={`h-4 w-4 ${i < Math.round(rating) ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`} />
       ))}
     </div>
   )
 }
 
+// Định nghĩa kiểu dữ liệu cho một 'review' từ database
 interface Review {
   id: string;
   rating: number;
@@ -48,22 +46,20 @@ interface Review {
 }
 
 export function ReviewsPage() {
-  const { t, i18n } = useTranslation();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ 
-    totalReviews: 0, 
-    averageRating: 0, 
-    recommendationRate: 0 
-  });
+  const [stats, setStats] = useState({ totalReviews: 0, averageRating: 0, recommendationRate: 0 });
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isReratingDialogOpen, setIsReratingDialogOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [newRating, setNewRating] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  // Hàm để fetch reviews
-  const fetchReviews = async () => {
+  useEffect(() => {
+    getReviews();
+  }, []);
+
+  async function getReviews() {
     setLoading(true);
     const { data, error } = await supabase
       .from('cv_interview_reviews')
@@ -83,9 +79,7 @@ export function ReviewsPage() {
       setReviews(data as Review[]);
       const total = data.length;
       const sumOfRatings = data.reduce((sum, review) => sum + review.rating, 0);
-      const recommendedCount = data.filter(review => 
-        review.outcome === 'Vòng tiếp theo' || review.outcome === 'Next Round' || review.outcome === 'Đạt'
-      ).length;
+      const recommendedCount = data.filter(review => review.outcome === 'Vòng tiếp theo' || review.outcome === 'Đạt').length;
       
       setStats({
         totalReviews: total,
@@ -95,11 +89,7 @@ export function ReviewsPage() {
     }
     if (error) console.error('Error fetching reviews:', error);
     setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchReviews();
-  }, []);
+  }
 
   // Hiển thị chi tiết
   const handleViewDetail = (review: Review) => {
@@ -131,7 +121,7 @@ export function ReviewsPage() {
       if (error) throw error;
 
       // Refresh data
-      await fetchReviews();
+      await getReviews();
 
       setIsReratingDialogOpen(false);
       setSelectedReview(null);
@@ -150,29 +140,29 @@ export function ReviewsPage() {
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{t('reviews.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('reviews.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Đánh giá phỏng vấn</h1>
+          <p className="text-sm text-muted-foreground">Quản lý và theo dõi đánh giá phỏng vấn</p>
         </div>
-        <Button variant="outline" onClick={fetchReviews}>
+        <Button variant="outline" onClick={getReviews}>
           <RefreshCw className="w-4 h-4 mr-2" />
-          {t('reviews.refresh')}
+          Làm mới
         </Button>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('reviews.stats.totalReviews')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Tổng số đánh giá</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground"/>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalReviews}</div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('reviews.stats.averageRating')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Đánh giá trung bình</CardTitle>
             <Star className="h-4 w-4 text-muted-foreground"/>
           </CardHeader>
           <CardContent>
@@ -182,10 +172,10 @@ export function ReviewsPage() {
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">{t('reviews.stats.recommendationRate')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Tỷ lệ khuyên nghị</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground"/>
           </CardHeader>
           <CardContent>
@@ -196,55 +186,39 @@ export function ReviewsPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle>{t('reviews.list.title')}</CardTitle>
+          <CardTitle>Danh sách đánh giá</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t('reviews.table.candidate')}</TableHead>
-                <TableHead>{t('reviews.table.position')}</TableHead>
-                <TableHead>{t('reviews.table.round')}</TableHead>
-                <TableHead>{t('reviews.table.interviewer')}</TableHead>
-                <TableHead>{t('reviews.table.interviewDate')}</TableHead>
-                <TableHead>{t('reviews.table.rating')}</TableHead>
-                <TableHead>{t('reviews.table.actions')}</TableHead>
+                <TableHead>Ứng viên</TableHead>
+                <TableHead>Vị trí</TableHead>
+                <TableHead>Vòng</TableHead>
+                <TableHead>Người PV</TableHead>
+                <TableHead>Ngày PV</TableHead>
+                <TableHead>Đánh giá</TableHead>
+                <TableHead>Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">
-                    {t('reviews.list.loading')}
-                  </TableCell>
+                  <TableCell colSpan={7} className="text-center h-24">Đang tải dữ liệu...</TableCell>
                 </TableRow>
               ) : reviews.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center h-24">
-                    {t('reviews.list.noData')}
-                  </TableCell>
+                  <TableCell colSpan={7} className="text-center h-24">Chưa có đánh giá nào</TableCell>
                 </TableRow>
               ) : (
                 reviews.map((review) => (
                   <TableRow key={review.id}>
-                    <TableCell className="font-medium">
-                      {review.cv_interviews?.cv_candidates?.full_name || 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      {review.cv_interviews?.cv_candidates?.cv_jobs?.title || 'N/A'}
-                    </TableCell>
+                    <TableCell className="font-medium">{review.cv_interviews?.cv_candidates?.full_name || 'N/A'}</TableCell>
+                    <TableCell>{review.cv_interviews?.cv_candidates?.cv_jobs?.title || 'N/A'}</TableCell>
                     <TableCell>{review.cv_interviews?.round || 'N/A'}</TableCell>
                     <TableCell>{review.cv_interviews?.interviewer || 'N/A'}</TableCell>
-                    <TableCell>
-                      {review.cv_interviews 
-                        ? new Date(review.cv_interviews.interview_date).toLocaleDateString(
-                            i18n.language === 'vi' ? 'vi-VN' : 'en-US'
-                          ) 
-                        : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <StarRating rating={review.rating} />
-                    </TableCell>
+                    <TableCell>{review.cv_interviews ? new Date(review.cv_interviews.interview_date).toLocaleDateString('vi-VN') : 'N/A'}</TableCell>
+                    <TableCell><StarRating rating={review.rating} /></TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -254,13 +228,10 @@ export function ReviewsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-white" style={{ zIndex: 50 }}>
                           <DropdownMenuItem onClick={() => handleViewDetail(review)}>
-                            {t('reviews.actions.viewDetails')}
+                            Hiển thị
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleRerating(review)}>
-                            {t('reviews.actions.edit')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            {t('reviews.actions.delete')}
+                            Đánh giá lại
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -508,5 +479,3 @@ export function ReviewsPage() {
     </div>
   )
 }
-
-export default ReviewsPage
