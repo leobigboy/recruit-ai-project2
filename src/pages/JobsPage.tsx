@@ -47,7 +47,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { supabase } from "@/lib/supabaseClient"
-import { generateJobDescription } from "@/lib/aiService"
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -78,6 +77,52 @@ interface Job {
   cv_candidates: { count: number }[];
 }
 
+// ==================== AI SERVICE FUNCTION ====================
+async function generateJobDescriptionAI(data: {
+  title: string;
+  level: string;
+  department: string;
+  work_location?: string;
+  job_type?: string;
+  language: string;
+  keywords?: string;
+}) {
+  try {
+    console.log('🎯 Calling backend to generate job description...');
+    
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    
+    const response = await fetch(`${API_URL}/api/generate-job-description`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    console.log('📥 Backend response status:', response.status);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Backend error:', errorData);
+      throw new Error(errorData.detail || `Backend error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Job description generated successfully');
+
+    if (result.success && result.data) {
+      return result.data;
+    }
+
+    throw new Error('Backend không trả về dữ liệu hợp lệ');
+
+  } catch (error) {
+    console.error('❌ Lỗi khi gọi backend:', error);
+    throw error;
+  }
+}
+
 export function JobsPage() {
   const { t, i18n } = useTranslation();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -105,7 +150,7 @@ export function JobsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
 
-  // States cho các chức năng mới
+  // States cho các chức năng khác
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -156,16 +201,17 @@ export function JobsPage() {
     setEditFormData((prev: any) => ({ ...prev, [field]: value }));
   };
 
+  // ==================== AI GENERATE FUNCTION ====================
   const handleAIGenerate = async () => {
     if (!formData.title || !formData.department) {
-      alert('Vui lòng điền đầy đủ: Tiêu đề vị trí và Phòng ban');
+      alert('❌ Vui lòng điền đầy đủ: Tiêu đề vị trí và Phòng ban');
       return;
     }
 
     setGeneratingAI(true);
 
     try {
-      const generatedContent = await generateJobDescription({
+      const generatedContent = await generateJobDescriptionAI({
         title: formData.title,
         level: formData.level,
         department: formData.department,
@@ -193,6 +239,7 @@ export function JobsPage() {
     }
   };
 
+  // ==================== SUBMIT FUNCTION (ĐÃ SỬA - BỎ created_by) ====================
   const handleSubmit = async () => {
     if (!formData.title || !formData.department) {
       alert('Vui lòng điền đầy đủ thông tin bắt buộc: Tiêu đề vị trí và Phòng ban');
@@ -208,6 +255,7 @@ export function JobsPage() {
 
     setIsSubmitting(true);
 
+    // ✅ CHỈ GỬI CÁC FIELD CÓ TRONG DATABASE
     const dataToInsert = {
       title: formData.title,
       department: formData.department,
@@ -231,7 +279,7 @@ export function JobsPage() {
       console.error('Error creating job:', error);
       alert(`Có lỗi xảy ra khi tạo JD: ${error.message}`);
     } else {
-      alert('Tạo JD thành công!');
+      alert('✅ Tạo JD thành công!');
       setIsDialogOpen(false);
       setFormData({
         title: '',
@@ -268,13 +316,11 @@ export function JobsPage() {
     });
   };
 
-  // Xem chi tiết
   const handleViewDetails = (job: Job) => {
     setSelectedJob(job);
     setIsViewDialogOpen(true);
   };
 
-  // Chỉnh sửa
   const handleEdit = (job: Job) => {
     setSelectedJob(job);
     setEditFormData({
@@ -330,7 +376,6 @@ export function JobsPage() {
     setIsSubmitting(false);
   };
 
-  // Sao chép
   const handleCopy = async (job: Job) => {
     const dataToInsert = {
       title: `${job.title} (Copy)`,
@@ -359,14 +404,12 @@ export function JobsPage() {
     }
   };
 
-  // Chia sẻ
   const handleShare = (job: Job) => {
     const jobUrl = `${window.location.origin}/jobs/${job.id}`;
     navigator.clipboard.writeText(jobUrl);
     alert('✅ Đã sao chép link chia sẻ vào clipboard!');
   };
 
-  // Tạo câu hỏi AI
   const handleGenerateAIQuestions = async (job: Job) => {
     setSelectedJob(job);
     setIsAIQuestionsDialogOpen(true);
@@ -410,7 +453,6 @@ export function JobsPage() {
     alert('✅ Đã sao chép câu hỏi vào clipboard!');
   };
 
-  // Xóa
   const handleDelete = (job: Job) => {
     setSelectedJob(job);
     setIsDeleteDialogOpen(true);
@@ -460,6 +502,7 @@ export function JobsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mô tả công việc</h1>
@@ -471,6 +514,7 @@ export function JobsPage() {
         </Button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card className="border-blue-100 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -530,6 +574,7 @@ export function JobsPage() {
           </Card>
       </div>
 
+      {/* Jobs Table */}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-gray-900">Danh sách JD ({filteredJobs.length})</CardTitle>
@@ -570,6 +615,7 @@ export function JobsPage() {
               </SelectContent>
             </Select>
           </div>
+
           <div className="border rounded-lg border-gray-200">
             <Table>
               <TableHeader className="bg-gray-50">
@@ -657,7 +703,7 @@ export function JobsPage() {
         </CardContent>
       </Card>
 
-      {/* Dialog Tạo JD mới */}
+      {/* ==================== DIALOG TẠO JD MỚI ==================== */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -669,6 +715,7 @@ export function JobsPage() {
             </div>
           </DialogHeader>
 
+          {/* Tab Selector */}
           <div className="flex gap-2 mt-4">
             <button
               onClick={() => setActiveTab('ai')}
@@ -697,6 +744,7 @@ export function JobsPage() {
           <div className="space-y-4 mt-4">
             {activeTab === 'ai' ? (
               <>
+                {/* AI Tab Content */}
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <Sparkles className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -813,6 +861,7 @@ export function JobsPage() {
               </>
             ) : (
               <>
+                {/* Manual Tab Content */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">

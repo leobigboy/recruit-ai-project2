@@ -352,6 +352,128 @@ Return JSON:
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error matching: {str(e)}")
+    
+# ==================== ADD THIS NEW ENDPOINT ====================
+
+class GenerateJobDescriptionRequest(BaseModel):
+    title: str
+    level: str
+    department: str
+    work_location: Optional[str] = None
+    job_type: Optional[str] = None
+    language: str = "vietnamese"
+    keywords: Optional[str] = None
+
+@app.post("/api/generate-job-description")
+async def generate_job_description(request: GenerateJobDescriptionRequest):
+    """
+    Generate job description using OpenRouter AI
+    """
+    try:
+        print(f"\n🎯 ===== GENERATING JOB DESCRIPTION =====")
+        print(f"📋 Title: {request.title}")
+        print(f"🏢 Department: {request.department}")
+        print(f"📊 Level: {request.level}")
+        
+        # Build context for AI
+        job_context = f"""Job Position: {request.title}
+Department: {request.department}
+Level: {request.level}
+Job Type: {request.job_type or 'Full-time'}
+Location: {request.work_location or 'Remote'}"""
+        
+        if request.keywords:
+            job_context += f"\nRequired Skills: {request.keywords}"
+        
+        # Determine language
+        lang_instruction = ""
+        if request.language == "vietnamese":
+            lang_instruction = "Write the job description in Vietnamese language."
+        else:
+            lang_instruction = "Write the job description in English language."
+        
+        # Prepare prompt
+        messages = [
+            {
+                "role": "system",
+                "content": f"""You are a professional HR specialist and job description writer. 
+Create comprehensive, engaging, and professional job descriptions.
+{lang_instruction}
+Return ONLY valid JSON without any additional text."""
+            },
+            {
+                "role": "user",
+                "content": f"""Create a detailed job description for this position:
+
+{job_context}
+
+Generate a professional job description with 3 sections:
+
+1. **Job Description**: Detailed overview of the role, responsibilities, and what the candidate will be doing (150-250 words)
+
+2. **Requirements**: List of required skills, qualifications, and experience (8-12 bullet points)
+
+3. **Benefits**: Attractive benefits and perks offered (6-10 bullet points)
+
+Return ONLY valid JSON in this exact format:
+{{
+  "description": "Detailed job description here...",
+  "requirements": "• Requirement 1\\n• Requirement 2\\n• Requirement 3\\n...",
+  "benefits": "• Benefit 1\\n• Benefit 2\\n• Benefit 3\\n..."
+}}
+
+Make it professional, engaging, and tailored to the {request.level} level in {request.department} department."""
+            }
+        ]
+        
+        print(f"🤖 Calling OpenRouter AI...")
+        
+        # Call OpenRouter API
+        result = call_openrouter_api(
+            messages=messages,
+            model="openai/gpt-4o-mini",
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        print(f"✅ OpenRouter responded")
+        
+        # Extract and parse response
+        content = result['choices'][0]['message']['content']
+        job_data = extract_json_from_response(content)
+        
+        # Validate response structure
+        if not all(key in job_data for key in ['description', 'requirements', 'benefits']):
+            raise HTTPException(
+                status_code=500,
+                detail="Invalid AI response structure. Missing required fields."
+            )
+        
+        print(f"✅ Generated job description successfully")
+        print(f"  - Description: {len(job_data['description'])} chars")
+        print(f"  - Requirements: {len(job_data['requirements'])} chars")
+        print(f"  - Benefits: {len(job_data['benefits'])} chars")
+        print(f"===== JOB DESCRIPTION GENERATION END =====\n")
+        
+        return {
+            "success": True,
+            "data": job_data,
+            "message": "Job description generated successfully",
+            "metadata": {
+                "model": "gpt-4o-mini",
+                "tokens_used": result.get('usage', {}),
+                "language": request.language
+            }
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error generating job description: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating job description: {str(e)}"
+        )    
 
 # ==================== MAIN ====================
 
