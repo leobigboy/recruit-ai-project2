@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -20,11 +20,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use ref to prevent multiple initializations
+  const initialized = useRef(false);
+  const fetchingProfile = useRef(false);
 
   // Helper function to fetch profile
   const fetchProfile = async (userId: string) => {
+    // Prevent concurrent fetches
+    if (fetchingProfile.current) {
+      return null;
+    }
+
     try {
+      fetchingProfile.current = true;
       console.log("📋 Fetching profile for user:", userId);
+      
       const { data: prof, error } = await supabase
         .from("cv_profiles")
         .select("*")
@@ -41,39 +52,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("❌ Profile fetch exception:", err);
       return null;
+    } finally {
+      fetchingProfile.current = false;
     }
   };
 
   useEffect(() => {
+    // Prevent double initialization in React StrictMode
+    if (initialized.current) {
+      console.log("⏭️ Auth already initialized, skipping");
+      return;
+    }
+    
+    initialized.current = true;
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
 
-    // Initialize auth state
     const initAuth = async () => {
       try {
         console.log("🔐 Initializing auth...");
         
-        // Set timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (mounted && loading) {
-            console.warn("⚠️ Auth initialization timeout - setting loading to false");
-            setLoading(false);
-          }
-        }, 8000); // 8 second timeout (increased for slow connections)
-
         const { data: { session }, error } = await supabase.auth.getSession();
-        
-        // Clear timeout if successful
-        clearTimeout(timeoutId);
         
         if (error) {
           console.error("❌ Session error:", error);
-          if (mounted) {
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          }
-          return;
         }
         
         if (!mounted) return;
@@ -81,25 +82,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           console.log("✅ Session found:", session.user.email);
           setUser(session.user);
-          setLoading(false); // Set loading false immediately when user found
           
-          // Fetch profile in background (non-blocking)
-          const prof = await fetchProfile(session.user.id);
-          if (mounted) {
-            setProfile(prof);
-          }
+          // Fetch profile without blocking
+          fetchProfile(session.user.id).then(prof => {
+            if (mounted) {
+              setProfile(prof);
+            }
+          });
         } else {
           console.log("ℹ️ No session found");
           setUser(null);
           setProfile(null);
-          setLoading(false);
         }
       } catch (err) {
         console.error("❌ Auth init error:", err);
-        clearTimeout(timeoutId);
         if (mounted) {
           setUser(null);
           setProfile(null);
+        }
+      } finally {
+        if (mounted) {
+          console.log("✅ Auth initialization complete");
           setLoading(false);
         }
       }
@@ -110,54 +113,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("🔄 Auth state change:", event, session?.user?.email || "no user");
+        console.log("🔄 Auth state change:", event);
 
         if (!mounted) return;
 
-        // Always ensure loading is false after auth state change
-        try {
-          if (event === 'SIGNED_IN' && session?.user) {
-            console.log("✅ User signed in");
-            setUser(session.user);
-            setLoading(false); // Set loading false immediately
-            
-            // Fetch profile in background
-            const prof = await fetchProfile(session.user.id);
-            if (mounted) {
-              setProfile(prof);
-            }
-          } else if (event === 'SIGNED_OUT') {
-            console.log("👋 User signed out");
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-            console.log("🔄 Token refreshed");
-            setUser(session.user);
-            setLoading(false);
-          } else if (session?.user) {
-            setUser(session.user);
-            setLoading(false);
-          } else {
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          }
-        } catch (err) {
-          console.error("❌ Auth state change error:", err);
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log("✅ User signed in:", session.user.email);
+          setUser(session.user);
+          
+          // Fetch profile
+          const prof = await fetchProfile(session.user.id);
           if (mounted) {
-            setLoading(false);
+            setProfile(prof);
           }
+        } else if (event === 'SIGNED_OUT') {
+          console.log("👋 User signed out");
+          setUser(null);
+          setProfile(null);
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log("🔄 Token refreshed");
+          // Don't update user, just log
+        }
+        
+        // Ensure loading is false
+        if (mounted && loading) {
+          setLoading(false);
         }
       }
     );
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []);
+  }, []); // Empty dependency array - only run once
 
   const signIn = async (email: string, password: string) => {
     console.log("🔑 Signing in:", email);
@@ -172,18 +161,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log("✅ Sign in successful");
       
-      // Fetch profile immediately
-      if (result.data?.user) {
-        setUser(result.data.user);
-        const prof = await fetchProfile(result.data.user.id);
-        setProfile(prof);
-        setLoading(false); // Ensure loading is false
-      }
-      
+      // onAuthStateChange will handle setting user and profile
       return result;
     } catch (err) {
       console.error("❌ Sign in exception:", err);
-      setLoading(false);
       throw err;
     }
   };
@@ -191,16 +172,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     console.log("👋 Signing out");
     try {
-      await supabase.auth.signOut();
+      // Clear local state first
       setUser(null);
       setProfile(null);
-      setLoading(false);
+      
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      console.log("✅ Signed out successfully");
     } catch (err) {
       console.error("❌ Sign out error:", err);
-      // Even if sign out fails, clear local state
+      // Even if error, clear local state
       setUser(null);
       setProfile(null);
-      setLoading(false);
     }
   };
 
@@ -218,16 +202,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data?.user) {
         console.log("✅ Sign up successful");
         setUser(data.user);
-        // Profile might not exist yet for new users
+        
         const prof = await fetchProfile(data.user.id);
         setProfile(prof);
-        setLoading(false);
       }
       
       return data;
     } catch (err) {
       console.error("❌ Sign up exception:", err);
-      setLoading(false);
       throw err;
     }
   };
