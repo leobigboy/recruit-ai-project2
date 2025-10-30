@@ -24,49 +24,39 @@ const tabs = [
 ];
 
 interface APIKeys {
-  gemini?: string;
-  openai?: string;
+  openrouter?: string;
 }
 
 export default function AIToolsPage() {
   const [active, setActive] = useState<string>("match");
   const [apiKeys, setApiKeys] = useState<APIKeys>({});
   const [tempKeys, setTempKeys] = useState<APIKeys>({});
-  const [showKeys, setShowKeys] = useState({ gemini: false, openai: false });
+  const [showKeys, setShowKeys] = useState({ openrouter: false });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   useEffect(() => {
-    const savedGemini = localStorage.getItem("gemini_api_key");
-    const savedOpenAI = localStorage.getItem("openai_api_key");
+    const savedOpenRouter = localStorage.getItem("openrouter_api_key");
     const keys: APIKeys = {};
     
-    if (savedGemini) keys.gemini = savedGemini;
-    if (savedOpenAI) keys.openai = savedOpenAI;
+    if (savedOpenRouter) keys.openrouter = savedOpenRouter;
     
     setApiKeys(keys);
     setTempKeys(keys);
   }, []);
 
-  const hasApiKey = !!(apiKeys.gemini || apiKeys.openai);
+  const hasApiKey = !!apiKeys.openrouter;
 
   const handleSaveApiKey = () => {
     setSaveStatus("saving");
     setTimeout(() => {
       const newKeys: APIKeys = {};
       
-      if (tempKeys.gemini?.trim()) {
-        newKeys.gemini = tempKeys.gemini.trim();
-        localStorage.setItem("gemini_api_key", tempKeys.gemini.trim());
+      if (tempKeys.openrouter?.trim()) {
+        newKeys.openrouter = tempKeys.openrouter.trim();
+        localStorage.setItem("openrouter_api_key", tempKeys.openrouter.trim());
       } else {
-        localStorage.removeItem("gemini_api_key");
-      }
-      
-      if (tempKeys.openai?.trim()) {
-        newKeys.openai = tempKeys.openai.trim();
-        localStorage.setItem("openai_api_key", tempKeys.openai.trim());
-      } else {
-        localStorage.removeItem("openai_api_key");
+        localStorage.removeItem("openrouter_api_key");
       }
       
       setApiKeys(newKeys);
@@ -82,8 +72,7 @@ export default function AIToolsPage() {
   const handleRemoveApiKey = () => {
     setApiKeys({});
     setTempKeys({});
-    localStorage.removeItem("gemini_api_key");
-    localStorage.removeItem("openai_api_key");
+    localStorage.removeItem("openrouter_api_key");
     setShowApiKeyModal(false);
   };
 
@@ -107,7 +96,7 @@ export default function AIToolsPage() {
         >
           <Key className="w-4 h-4" />
           <span className="text-sm font-medium">
-            {hasApiKey ? "API Keys đã cấu hình" : "Cần cấu hình API Keys"}
+            {hasApiKey ? "API Key đã cấu hình" : "Cần cấu hình API Key"}
           </span>
         </button>
       </div>
@@ -118,7 +107,7 @@ export default function AIToolsPage() {
           <div className="flex-1">
             <p className="text-sm text-amber-800 font-medium">Chưa cấu hình API Key</p>
             <p className="text-xs text-amber-700 mt-1">
-              Vui lòng nhập ít nhất 1 API Key (Gemini hoặc OpenAI) để sử dụng các chức năng AI. 
+              Vui lòng nhập OpenRouter API Key để sử dụng các chức năng AI. 
               <button 
                 onClick={() => setShowApiKeyModal(true)}
                 className="ml-1 underline font-medium"
@@ -137,16 +126,9 @@ export default function AIToolsPage() {
             <span className="font-medium text-blue-800">
               API đang hoạt động:
             </span>
-            {apiKeys.gemini && (
-              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                Gemini AI
-              </span>
-            )}
-            {apiKeys.openai && (
-              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                OpenAI
-              </span>
-            )}
+            <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 rounded text-xs font-medium">
+              OpenRouter AI (GPT-4o-mini)
+            </span>
           </div>
         </div>
       )}
@@ -197,88 +179,48 @@ export default function AIToolsPage() {
           <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Key className="w-5 h-5" />
-              Cấu hình API Keys
+              Cấu hình OpenRouter API Key
             </h2>
 
             <div className="space-y-6">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-                    <span className="text-white font-semibold text-xs">G</span>
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <label className="block text-sm font-medium text-gray-700">
-                    Gemini API Key
+                    OpenRouter API Key
                   </label>
                 </div>
                 <div className="relative">
                   <input
-                    type={showKeys.gemini ? "text" : "password"}
-                    value={tempKeys.gemini || ""}
-                    onChange={(e) => setTempKeys(prev => ({ ...prev, gemini: e.target.value }))}
-                    placeholder="AIzaSy..."
-                    className="w-full border rounded-md px-3 py-2 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <button
-                    onClick={() => setShowKeys(prev => ({ ...prev, gemini: !prev.gemini }))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  >
-                    {showKeys.gemini ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Lấy từ{" "}
-                  <a 
-                    href="https://aistudio.google.com/app/apikey" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 underline"
-                  >
-                    Google AI Studio
-                  </a>
-                </p>
-                {apiKeys.gemini && (
-                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    ✓ Key hiện tại: {getMaskedKey(apiKeys.gemini)}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <label className="block text-sm font-medium text-gray-700">
-                    OpenAI API Key
-                  </label>
-                </div>
-                <div className="relative">
-                  <input
-                    type={showKeys.openai ? "text" : "password"}
-                    value={tempKeys.openai || ""}
-                    onChange={(e) => setTempKeys(prev => ({ ...prev, openai: e.target.value }))}
-                    placeholder="sk-proj-..."
+                    type={showKeys.openrouter ? "text" : "password"}
+                    value={tempKeys.openrouter || ""}
+                    onChange={(e) => setTempKeys(prev => ({ ...prev, openrouter: e.target.value }))}
+                    placeholder="sk-or-v1-..."
                     className="w-full border rounded-md px-3 py-2 pr-10 focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   />
                   <button
-                    onClick={() => setShowKeys(prev => ({ ...prev, openai: !prev.openai }))}
+                    onClick={() => setShowKeys(prev => ({ ...prev, openrouter: !prev.openrouter }))}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
-                    {showKeys.openai ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showKeys.openrouter ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Lấy từ{" "}
                   <a 
-                    href="https://platform.openai.com/api-keys" 
+                    href="https://openrouter.ai/keys" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-purple-600 underline"
                   >
-                    OpenAI Platform
+                    OpenRouter Dashboard
                   </a>
                 </p>
-                {apiKeys.openai && (
+                {apiKeys.openrouter && (
                   <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    ✓ Key hiện tại: {getMaskedKey(apiKeys.openai)}
+                    ✓ Key hiện tại: {getMaskedKey(apiKeys.openrouter)}
                   </div>
                 )}
               </div>
@@ -301,16 +243,16 @@ export default function AIToolsPage() {
                       Đã lưu
                     </span>
                   ) : (
-                    "Lưu API Keys"
+                    "Lưu API Key"
                   )}
                 </button>
                 
-                {(apiKeys.gemini || apiKeys.openai) && (
+                {apiKeys.openrouter && (
                   <button
                     onClick={handleRemoveApiKey}
                     className="px-4 py-2 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
                   >
-                    Xóa tất cả
+                    Xóa
                   </button>
                 )}
                 
@@ -329,8 +271,8 @@ export default function AIToolsPage() {
 
             <div className="mt-4 p-3 bg-blue-50 rounded-md">
               <p className="text-xs text-blue-800">
-                <strong>💡 Lưu ý:</strong> Bạn có thể cấu hình cả 2 API keys hoặc chỉ 1 trong 2. 
-                API keys sẽ được lưu cục bộ trên trình duyệt của bạn.
+                <strong>💡 Lưu ý:</strong> OpenRouter hỗ trợ nhiều AI models (GPT-4, Claude, Gemini...). 
+                API key sẽ được lưu cục bộ trên trình duyệt của bạn.
               </p>
             </div>
           </div>
@@ -378,7 +320,6 @@ function CandidateMatchUI({ apiKeys }: TabUIProps) {
 
     setLoading(true);
     try {
-      // Fetch CVs từ bảng cv_candidates
       const { data: cvData, error } = await supabase
         .from('cv_candidates')
         .select('*')
@@ -392,15 +333,12 @@ function CandidateMatchUI({ apiKeys }: TabUIProps) {
         return;
       }
 
-      // Get job details
       let jobInfo = jobDescription;
       if (selectedJob) {
         const job = jobs.find(j => j.id === selectedJob);
         jobInfo = `${job?.title || ''}\n${job?.description || ''}`;
       }
 
-      // Call AI API to match candidates
-      const activeAPI = apiKeys.gemini ? 'gemini' : 'openai';
       const prompt = `Bạn là AI chuyên phân tích CV và tuyển dụng.
 
 Job Description:
@@ -408,7 +346,7 @@ ${jobInfo}
 
 Danh sách ứng viên (${cvData.length} CVs):
 ${cvData.map((cv: any, idx: number) => 
-  `${idx + 1}. ${cv.full_name} - ${cv.university || 'N/A'} - ${cv.email}`
+  `${idx + 1}. ${cv.full_name} - ${cv.university || 'N/A'} - ${cv.email} - Kinh nghiệm: ${cv.experience || 'N/A'}`
 ).join('\n')}
 
 Nhiệm vụ: Phân tích và trả về top 5 ứng viên phù hợp nhất với job này.
@@ -425,14 +363,8 @@ Trả về JSON format:
   ]
 }`;
 
-      let aiResponse;
-      if (activeAPI === 'gemini') {
-        aiResponse = await callGeminiAPI(prompt, apiKeys.gemini!);
-      } else {
-        aiResponse = await callOpenAIAPI(prompt, apiKeys.openai!);
-      }
+      const aiResponse = await callOpenRouterAPI(prompt, apiKeys.openrouter!);
 
-      // Parse AI response
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -564,22 +496,16 @@ Thông tin CV:
 - Trường: ${cv.university || 'N/A'}
 - Học vấn: ${cv.education || 'N/A'}
 - Kinh nghiệm: ${cv.experience || 'N/A'}
+- Kỹ năng: ${cv.skills || 'N/A'}
 
-Nhiệm vụ: Tóm tắt CV này thành 3-5 bullet points ngắn gọn, súc tích.
+Nhiệm vụ: Tóm tắt CV này thành 3-5 bullet points ngắn gọn, súc tích, highlight điểm mạnh.
 
 Trả về JSON format:
 {
   "summary": ["bullet 1", "bullet 2", "bullet 3"]
 }`;
 
-      const activeAPI = apiKeys.gemini ? 'gemini' : 'openai';
-      let aiResponse;
-      
-      if (activeAPI === 'gemini') {
-        aiResponse = await callGeminiAPI(prompt, apiKeys.gemini!);
-      } else {
-        aiResponse = await callOpenAIAPI(prompt, apiKeys.openai!);
-      }
+      const aiResponse = await callOpenRouterAPI(prompt, apiKeys.openrouter!);
 
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -643,32 +569,71 @@ Trả về JSON format:
 function InterviewAnalysisUI({ apiKeys }: TabUIProps) {
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [transcript, setTranscript] = useState("");
 
   const handleAnalyze = async () => {
+    if (!transcript.trim()) {
+      alert('Vui lòng nhập transcript phỏng vấn');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setAnalysis({
-        confidence: 7,
-        sentiment: "Neutral → Positive",
-        keywords: ["teamwork", "deadline", "leadership"],
-      });
+    try {
+      const prompt = `Bạn là AI chuyên phân tích phỏng vấn.
+
+Transcript phỏng vấn:
+${transcript}
+
+Nhiệm vụ: Phân tích transcript này và đánh giá:
+1. Confidence level (1-10)
+2. Sentiment (Positive/Neutral/Negative)
+3. Key phrases quan trọng
+4. Overall impression
+
+Trả về JSON format:
+{
+  "confidence": 7,
+  "sentiment": "Positive",
+  "keywords": ["keyword1", "keyword2", "keyword3"],
+  "impression": "Tổng quan đánh giá ngắn gọn"
+}`;
+
+      const aiResponse = await callOpenRouterAPI(prompt, apiKeys.openrouter!);
+
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setAnalysis(parsed);
+      } else {
+        throw new Error('Invalid AI response format');
+      }
+    } catch (err: any) {
+      console.error('Error analyzing interview:', err);
+      alert('Lỗi: ' + err.message);
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-2">AI — Phân tích phỏng vấn</h2>
       <p className="text-sm text-gray-600 mb-4">
-        Upload transcript hoặc audio — AI phân tích tone, confidence, sentiment.
+        Nhập transcript phỏng vấn — AI phân tích tone, confidence, sentiment.
       </p>
 
       <div className="space-y-3">
-        <input type="file" accept="audio/*,text/plain" className="text-sm" />
+        <textarea
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          className="w-full border rounded p-3 h-40"
+          placeholder="Paste transcript cuộc phỏng vấn tại đây..."
+        />
+
         <div className="mt-2">
           <button 
             onClick={handleAnalyze}
-            disabled={loading}
+            disabled={loading || !transcript.trim()}
             className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
           >
             {loading ? "Đang phân tích..." : "Phân tích"}
@@ -677,12 +642,37 @@ function InterviewAnalysisUI({ apiKeys }: TabUIProps) {
 
         {analysis && (
           <div className="mt-4 p-4 border rounded bg-gray-50">
-            <div className="text-sm text-gray-500">Báo cáo:</div>
-            <ul className="mt-2 space-y-1">
-              <li>Confidence: {analysis.confidence}/10</li>
-              <li>Sentiment: {analysis.sentiment}</li>
-              <li>Key phrases: {analysis.keywords.join(", ")}</li>
-            </ul>
+            <div className="text-sm font-medium text-gray-700 mb-3">Báo cáo phân tích:</div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-2 bg-white rounded">
+                <span className="text-sm text-gray-600">Confidence Level:</span>
+                <span className="font-bold text-blue-600">{analysis.confidence}/10</span>
+              </div>
+              <div className="flex items-center justify-between p-2 bg-white rounded">
+                <span className="text-sm text-gray-600">Sentiment:</span>
+                <span className={`font-medium ${
+                  analysis.sentiment.toLowerCase().includes('positive') ? 'text-green-600' :
+                  analysis.sentiment.toLowerCase().includes('negative') ? 'text-red-600' :
+                  'text-yellow-600'
+                }`}>{analysis.sentiment}</span>
+              </div>
+              <div className="p-2 bg-white rounded">
+                <span className="text-sm text-gray-600">Key Phrases:</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {analysis.keywords?.map((kw: string, i: number) => (
+                    <span key={i} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {analysis.impression && (
+                <div className="p-2 bg-white rounded">
+                  <span className="text-sm text-gray-600">Overall Impression:</span>
+                  <p className="text-sm mt-1">{analysis.impression}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -697,13 +687,6 @@ function ChatbotUI({ apiKeys }: TabUIProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [usingAPI, setUsingAPI] = useState<"gemini" | "openai" | null>(null);
-
-  const getActiveAPI = () => {
-    if (apiKeys.gemini) return "gemini";
-    if (apiKeys.openai) return "openai";
-    return null;
-  };
 
   const fetchCVData = async () => {
     try {
@@ -906,12 +889,6 @@ ${stats}
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    
-    const activeAPI = getActiveAPI();
-    if (!activeAPI) {
-      setError("Không có API key nào được cấu hình");
-      return;
-    }
 
     const userMsg = { role: "user", content: input };
     setMessages(prev => [...prev, userMsg]);
@@ -919,7 +896,6 @@ ${stats}
     setInput("");
     setLoading(true);
     setError("");
-    setUsingAPI(activeAPI);
 
     try {
       const intent = analyzeIntent(currentInput);
@@ -936,31 +912,23 @@ ${messages.map(m => `${m.role === 'user' ? 'Admin' : 'AI'}: ${m.content}`).join(
 
 Admin: ${currentInput}
 
-Trả lời chuyên nghiệp, hữu ích:`;
+Trả lời chuyên nghiệp, hữu ích bằng tiếng Việt:`;
 
-        let botResponse: string;
-
-        if (activeAPI === "gemini") {
-          botResponse = await callGeminiAPI(prompt, apiKeys.gemini!);
-        } else {
-          botResponse = await callOpenAIAPI(prompt, apiKeys.openai!);
-        }
-
+        const botResponse = await callOpenRouterAPI(prompt, apiKeys.openrouter!);
         const botMsg = { role: "bot", content: botResponse };
         setMessages(prev => [...prev, botMsg]);
       }
     } catch (err: any) {
-      console.error(`${activeAPI?.toUpperCase()} API error:`, err);
+      console.error('OpenRouter API error:', err);
       setError(err.message || 'Có lỗi xảy ra');
       
       const errorMsg = { 
         role: "bot", 
-        content: `⚠️ Lỗi ${activeAPI?.toUpperCase()}: ${err.message}. Vui lòng kiểm tra API key.` 
+        content: `⚠️ Lỗi OpenRouter: ${err.message}. Vui lòng kiểm tra API key.` 
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setLoading(false);
-      setUsingAPI(null);
     }
   };
 
@@ -968,15 +936,9 @@ Trả lời chuyên nghiệp, hữu ích:`;
     <div>
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-medium">AI — Admin Assistant</h2>
-        {getActiveAPI() && (
-          <span className={`text-xs px-2 py-1 rounded ${
-            getActiveAPI() === "gemini" 
-              ? "bg-blue-100 text-blue-700" 
-              : "bg-purple-100 text-purple-700"
-          }`}>
-            Đang dùng: {getActiveAPI() === "gemini" ? "Gemini" : "OpenAI"}
-          </span>
-        )}
+        <span className="text-xs px-2 py-1 rounded bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700">
+          OpenRouter AI
+        </span>
       </div>
       <p className="text-sm text-gray-600 mb-4">
         AI Assistant hỗ trợ quản lý CV, phân tích ứng viên và gửi email tự động.
@@ -1002,11 +964,7 @@ Trả lời chuyên nghiệp, hữu ích:`;
               <div className="animate-pulse">●</div>
               <div className="animate-pulse">●</div>
               <div className="animate-pulse">●</div>
-              {usingAPI && (
-                <span className="text-xs">
-                  ({usingAPI === "gemini" ? "Gemini" : "OpenAI"})
-                </span>
-              )}
+              <span className="text-xs">(OpenRouter)</span>
             </div>
           )}
         </div>
@@ -1067,7 +1025,7 @@ Trả lời chuyên nghiệp, hữu ích:`;
 
 function RecruitPredictUI({ apiKeys }: TabUIProps) {
   const [loading, setLoading] = useState(false);
-  const [prediction, setPrediction] = useState<number | null>(null);
+  const [prediction, setPrediction] = useState<any>(null);
   const [cvs, setCvs] = useState<any[]>([]);
   const [selectedCV, setSelectedCV] = useState("");
 
@@ -1109,31 +1067,28 @@ Thông tin ứng viên:
 - Trường: ${cv.university || 'N/A'}
 - Học vấn: ${cv.education || 'N/A'}
 - Kinh nghiệm: ${cv.experience || 'N/A'}
+- Kỹ năng: ${cv.skills || 'N/A'}
 - Trạng thái: ${cv.status}
 
-Nhiệm vụ: Dự đoán xác suất tuyển dụng thành công (0-100%) dựa trên profile.
+Nhiệm vụ: Dự đoán xác suất tuyển dụng thành công (0-100%) dựa trên profile và phân tích chi tiết.
 
 Trả về JSON format:
 {
   "probability": 75,
-  "reason": "Lý do đánh giá"
+  "reason": "Lý do chi tiết đánh giá",
+  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2"],
+  "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
+  "recommendation": "Khuyến nghị tuyển dụng"
 }`;
 
-      const activeAPI = apiKeys.gemini ? 'gemini' : 'openai';
-      let aiResponse;
-      
-      if (activeAPI === 'gemini') {
-        aiResponse = await callGeminiAPI(prompt, apiKeys.gemini!);
-      } else {
-        aiResponse = await callOpenAIAPI(prompt, apiKeys.openai!);
-      }
+      const aiResponse = await callOpenRouterAPI(prompt, apiKeys.openrouter!);
 
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        setPrediction(parsed.probability || 50);
+        setPrediction(parsed);
       } else {
-        setPrediction(Math.floor(Math.random() * 40) + 50);
+        throw new Error('Invalid AI response format');
       }
     } catch (err: any) {
       console.error('Error predicting:', err);
@@ -1150,8 +1105,7 @@ Trả về JSON format:
         Dự đoán xác suất tuyển thành công dựa trên profile ứng viên.
       </p>
 
-      <div className="p-4 border rounded bg-gray-50">
-        <div className="text-sm text-gray-500 mb-3">Chọn ứng viên để dự đoán</div>
+      <div className="space-y-3">
         <div className="flex gap-2">
           <select 
             value={selectedCV}
@@ -1174,31 +1128,66 @@ Trả về JSON format:
           </button>
         </div>
 
-        {prediction !== null && (
-          <div className="mt-4">
-            <div className="text-sm mb-2">Kết quả dự đoán:</div>
-            <div className="p-3 bg-white rounded shadow-sm">
-              <div className="flex items-center justify-between">
-                <span>Xác suất tuyển dụng thành công:</span>
-                <strong className={`text-lg ${
-                  prediction >= 70 ? "text-green-600" : 
-                  prediction >= 50 ? "text-yellow-600" : "text-red-600"
+        {prediction && (
+          <div className="mt-4 p-4 border rounded bg-gray-50">
+            <div className="text-sm font-medium text-gray-700 mb-3">Kết quả dự đoán:</div>
+            
+            <div className="p-3 bg-white rounded shadow-sm mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium">Xác suất tuyển dụng thành công:</span>
+                <strong className={`text-2xl ${
+                  prediction.probability >= 70 ? "text-green-600" : 
+                  prediction.probability >= 50 ? "text-yellow-600" : "text-red-600"
                 }`}>
-                  {prediction}%
+                  {prediction.probability}%
                 </strong>
               </div>
-              <div className="mt-2">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all ${
-                      prediction >= 70 ? "bg-green-500" : 
-                      prediction >= 50 ? "bg-yellow-500" : "bg-red-500"
-                    }`}
-                    style={{ width: `${prediction}%` }}
-                  />
-                </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className={`h-3 rounded-full transition-all ${
+                    prediction.probability >= 70 ? "bg-green-500" : 
+                    prediction.probability >= 50 ? "bg-yellow-500" : "bg-red-500"
+                  }`}
+                  style={{ width: `${prediction.probability}%` }}
+                />
               </div>
             </div>
+
+            {prediction.reason && (
+              <div className="p-3 bg-white rounded shadow-sm mb-3">
+                <div className="text-sm font-medium text-gray-700 mb-1">Phân tích:</div>
+                <p className="text-sm text-gray-600">{prediction.reason}</p>
+              </div>
+            )}
+
+            {prediction.strengths && prediction.strengths.length > 0 && (
+              <div className="p-3 bg-white rounded shadow-sm mb-3">
+                <div className="text-sm font-medium text-green-700 mb-2">✓ Điểm mạnh:</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  {prediction.strengths.map((s: string, i: number) => (
+                    <li key={i} className="text-sm text-gray-600">{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {prediction.weaknesses && prediction.weaknesses.length > 0 && (
+              <div className="p-3 bg-white rounded shadow-sm mb-3">
+                <div className="text-sm font-medium text-red-700 mb-2">⚠ Điểm cần cải thiện:</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  {prediction.weaknesses.map((w: string, i: number) => (
+                    <li key={i} className="text-sm text-gray-600">{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {prediction.recommendation && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm font-medium text-blue-800 mb-1">💡 Khuyến nghị:</div>
+                <p className="text-sm text-blue-700">{prediction.recommendation}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1206,59 +1195,41 @@ Trả về JSON format:
   );
 }
 
-// Helper functions for AI API calls
-async function callGeminiAPI(prompt: string, apiKey: string): Promise<string> {
+// Helper function for OpenRouter API calls
+async function callOpenRouterAPI(prompt: string, apiKey: string): Promise<string> {
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+    'https://openrouter.ai/api/v1/chat/completions',
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'CV Recruitment System'
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        model: 'openai/gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'Bạn là AI Assistant chuyên nghiệp hỗ trợ tuyển dụng. Trả lời chính xác, ngắn gọn bằng tiếng Việt.' 
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
       })
     }
   );
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Gemini API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-    return data.candidates[0].content.parts[0].text;
-  }
-  throw new Error('Invalid Gemini response format');
-}
-
-async function callOpenAIAPI(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'Bạn là AI Assistant hỗ trợ tuyển dụng. Trả lời chuyên nghiệp và ngắn gọn.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 1000
-      })
-    }
-  );
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error?.message || `OpenAI API error: ${response.status}`);
+    throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
   }
 
   const data = await response.json();
   if (data.choices?.[0]?.message?.content) {
     return data.choices[0].message.content;
   }
-  throw new Error('Invalid OpenAI response format');
+  throw new Error('Invalid OpenRouter response format');
 }

@@ -69,12 +69,10 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    // Chỉ lưu cho tab Company, các tab khác có nút lưu riêng
     if (activeTab !== "company") {
       return;
     }
 
-    // Validation
     if (!profile.company_name || profile.company_name.trim() === '') {
       toast.error(t('settings.messages.nameRequired'));
       return;
@@ -97,7 +95,6 @@ export default function SettingsPage() {
       } else {
         toast.success(t('settings.messages.saveSuccess'));
         
-        // Reload lại profile để đảm bảo data mới nhất
         const { data: updatedData } = await supabase
           .from('cv_company_profile')
           .select('*')
@@ -112,6 +109,33 @@ export default function SettingsPage() {
       toast.error(t('settings.messages.unexpectedError') + ' ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    try {
+      const { data, error } = await supabase.from('cv_email_settings').select('resend_api_key').single();
+      if (error) throw error;
+      if (!data || !data.resend_api_key) {
+        toast.error('Không tìm thấy API Key hoặc lỗi khi lấy');
+        return;
+      }
+
+      const response = await fetch('/api/test-resend-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: data.resend_api_key })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`API Key hợp lệ! ${result.message}`);
+      } else {
+        const err = await response.json();
+        toast.error(`Kiểm tra API Key thất bại: ${err.message}`);
+      }
+    } catch (err: any) {
+      toast.error(`Lỗi: ${err.message}`);
     }
   };
 
@@ -151,18 +175,23 @@ export default function SettingsPage() {
 
           {activeTab === "notifications" && <NotificationSettings />}
 
-          {activeTab === "email" && <EmailSettings />}
+          {activeTab === "email" && (
+            <div>
+              <EmailSettings />
+              <div className="pt-4 flex justify-end">
+                <Button onClick={handleTestApiKey}>Kiểm tra API Key Resend</Button>
+              </div>
+            </div>
+          )}
 
           {activeTab === "category" && <CategorySettingsPage />}
 
-          {/* Người dùng */}
           {activeTab === "users" && (
             <div className="pt-6">
               <UsersPage />
             </div>
           )}
 
-          {/* Phân quyền: render Authorization page UI */}
           {activeTab === "permissions" && (
             <div className="pt-6">
               <Authorization />
@@ -170,7 +199,6 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Chỉ hiển thị nút Save cho tab Company */}
         {activeTab === "company" && (
           <div className="flex justify-end gap-3 pt-4">
             <Button 
@@ -190,6 +218,6 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
-    </div>
+    </div>  
   );
 }
