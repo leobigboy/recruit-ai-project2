@@ -40,18 +40,30 @@ export const RegisterPage = () => {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password);
-    setLoading(false);
+    
+    try {
+      // Pass fullName as metadata to signUp
+      const { error } = await signUp(email, password, {
+        data: {
+          full_name: fullName
+        }
+      });
 
-    if (error) {
-      setError(error.message === 'User already registered' 
-        ? 'Email này đã được đăng ký' 
-        : error.message);
-    } else {
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      if (error) {
+        setError(error.message === 'User already registered' 
+          ? 'Email này đã được đăng ký' 
+          : error.message);
+      } else {
+        setSuccess(true);
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
+    } catch (err) {
+      setError('Đã xảy ra lỗi. Vui lòng thử lại.');
+      console.error('Registration error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 

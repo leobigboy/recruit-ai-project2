@@ -3,6 +3,12 @@ import React, { createContext, useContext, useEffect, useState, useRef } from "r
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+type SignUpOptions = {
+  data?: {
+    full_name?: string;
+  }
+};
+
 type AuthContextType = {
   user: User | null;
   profile: any | null;
@@ -10,7 +16,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   setProfile: (p: any) => void;
-  signUp: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string, options?: SignUpOptions) => Promise<any>;
   updateProfile: (data: any) => Promise<any>;
 };
 
@@ -24,15 +30,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Prevent double initialization
   const initialized = useRef(false);
 
-  // Helper function to fetch profile (chỉ profile user, không phải system data)
-  const fetchProfile = async (userId: string) => {
+  // Helper function to fetch profile by auth_user_id
+  const fetchProfile = async (authUserId: string) => {
     try {
-      console.log("📋 Fetching user profile for:", userId);
+      console.log("📋 Fetching user profile for auth_user_id:", authUserId);
       
       const { data: prof, error } = await supabase
         .from("cv_profiles")
         .select("*")
-        .eq("id", userId)
+        .eq("auth_user_id", authUserId)
         .single();
       
       if (error && error.code !== 'PGRST116') {
@@ -45,6 +51,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err) {
       console.error("❌ Profile fetch exception:", err);
       return null;
+    }
+  };
+
+  // Helper function to create profile
+  const createProfile = async (authUserId: string, email: string, fullName?: string) => {
+    try {
+      console.log("📝 Creating new profile for:", email);
+      
+      const { data: newProfile, error } = await supabase
+        .from("cv_profiles")
+        .insert([
+          {
+            auth_user_id: authUserId,
+            email: email,
+            full_name: fullName || '',
+            role: 'candidate',
+            status: 'active'
+          }
+        ])
+        .select()
+        .single();
+      
+      if (error) {
+        console.error("❌ Profile creation error:", error);
+        throw error;
+      }
+      
+      console.log("✅ Profile created successfully");
+      return newProfile;
+    } catch (err) {
+      console.error("❌ Profile creation exception:", err);
+      throw err;
     }
   };
 
@@ -73,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log("✅ Session found:", session.user.email);
           setUser(session.user);
           
-          // Fetch user's profile (personal info only)
+          // Fetch user's profile
           const prof = await fetchProfile(session.user.id);
           if (mounted) {
             setProfile(prof);
@@ -130,10 +168,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const result = await supabase.auth.signInWithPassword({ email, password });
     if (result.error) {
       console.error("❌ Sign in error:", result.error);
+      return { data: null, error: result.error };
     } else {
       console.log("✅ Sign in successful");
+      // Profile will be loaded by onAuthStateChange
+      return { data: result.data, error: null };
     }
-    return result;
   };
 
   const signOut = async () => {
@@ -143,37 +183,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
   };
 
-  const signUp = async (email: string, password: string) => {
-    console.log("📝 Signing up:", email);
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-    
-    if (data?.user) {
-      setUser(data.user);
-      const prof = await fetchProfile(data.user.id);
-      setProfile(prof);
+  const signUp = async (email: string, password: string, options?: SignUpOptions) => {
+    try {
+      console.log("📝 Signing up:", email);
+      
+      // Step 1: Create auth user with metadata
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: options?.data?.full_name || ''
+          }
+        }
+      });
+
+      if (authError) {
+        console.error("❌ Auth sign up error:", authError);
+        return { data: null, error: authError };
+      }
+
+      if (!authData.user) {
+        console.error("❌ No user returned from sign up");
+        return { data: null, error: new Error("No user returned") };
+      }
+
+      console.log("✅ Auth user created:", authData.user.id);
+
+      // Step 2: Check if profile already exists (in case of trigger)
+      let existingProfile = await fetchProfile(authData.user.id);
+      
+      if (!existingProfile) {
+        // Step 3: Create profile manually if not exists
+        try {
+          const newProfile = await createProfile(
+            authData.user.id,
+            email,
+            options?.data?.full_name
+          );
+          existingProfile = newProfile;
+        } catch (profileError) {
+          console.error("❌ Profile creation failed:", profileError);
+          // Continue anyway, profile might be created by trigger
+        }
+      }
+
+      // Step 4: Update state
+      setUser(authData.user);
+      setProfile(existingProfile);
+
+      console.log("✅ Sign up complete");
+      return { data: authData, error: null };
+      
+    } catch (err) {
+      console.error("❌ Sign up exception:", err);
+      return { 
+        data: null, 
+        error: err instanceof Error ? err : new Error("Unknown error") 
+      };
     }
-    return data;
   };
 
   const updateProfile = async (data: any) => {
-    if (!user) throw new Error("No authenticated user");
+    if (!user) {
+      console.error("❌ No authenticated user");
+      throw new Error("No authenticated user");
+    }
     
-    console.log("💾 Updating profile");
+    console.log("💾 Updating profile for user:", user.id);
+    
     const { error, data: updated } = await supabase
       .from("cv_profiles")
       .update(data)
-      .eq("id", user.id)
+      .eq("auth_user_id", user.id)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Profile update error:", error);
+      throw error;
+    }
+    
+    console.log("✅ Profile updated successfully");
     setProfile(updated);
     return updated;
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, setProfile, signUp, updateProfile }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        profile, 
+        loading, 
+        signIn, 
+        signOut, 
+        setProfile, 
+        signUp, 
+        updateProfile 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
