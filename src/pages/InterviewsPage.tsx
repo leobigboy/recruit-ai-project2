@@ -476,7 +476,7 @@ cv_jobs!job_id ( title )
           <SelectTrigger className="w-[180px] bg-white">
             <SelectValue placeholder="Tất cả trạng thái" />
           </SelectTrigger>
-          <SelectContent className="bg-white" style={{ zIndex: 50 }}>
+          <SelectContent className="bg-white">
             <SelectItem value="all">Tất cả trạng thái</SelectItem>
             <SelectItem value="Đang chờ">Đang chờ</SelectItem>
             <SelectItem value="Hoàn thành">Hoàn thành</SelectItem>
@@ -575,7 +575,7 @@ cv_jobs!job_id ( title )
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-white" style={{ zIndex: 50 }}>
+                        <DropdownMenuContent align="end" className="bg-white">
                           <DropdownMenuItem onClick={() => handleViewDetail(interview)}>
                             Xem chi tiết
                           </DropdownMenuItem>

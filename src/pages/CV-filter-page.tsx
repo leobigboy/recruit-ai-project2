@@ -598,11 +598,11 @@ export default function PotentialCandidatesPage() {
                     <Target className="h-5 w-5" />
                     Điểm tổng thể
                   </h4>
-                  <span className={`text-2xl font-bold ${getScoreColor(selectedCandidate.overall_score)}`}>
-                    {selectedCandidate.overall_score}/100
+                  <span className={`text-2xl font-bold ${getScoreColor(selectedCandidate.overall_score || 0)}`}>
+                    {selectedCandidate.overall_score || 0}/100
                   </span>
                 </div>
-                <Progress value={selectedCandidate.overall_score} className="h-3" />
+                <Progress value={selectedCandidate.overall_score || 0} className="h-3" />
               </div>
 
               {selectedCandidate.analysis_result?.best_match && (
@@ -642,12 +642,16 @@ export default function PotentialCandidatesPage() {
                         Điểm mạnh
                       </h4>
                       <ul className="space-y-2">
-                        {selectedCandidate.analysis_result.best_match?.strengths.map((strength: string, index: number) => (
+                        {selectedCandidate.analysis_result.best_match?.strengths?.map((strength: string, index: number) => (
                           <li key={index} className="text-sm flex items-start gap-2 text-emerald-800">
                             <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                             {strength}
                           </li>
                         ))}
+                        {(!selectedCandidate.analysis_result.best_match?.strengths || 
+                          selectedCandidate.analysis_result.best_match.strengths.length === 0) && (
+                          <p className="text-sm text-gray-500">Không có thông tin điểm mạnh</p>
+                        )}
                       </ul>
                     </div>
                   </TabsContent>
@@ -659,59 +663,75 @@ export default function PotentialCandidatesPage() {
                         Điểm yếu
                       </h4>
                       <ul className="space-y-2">
-                        {selectedCandidate.analysis_result.best_match?.weaknesses.map((weakness: string, index: number) => (
+                        {selectedCandidate.analysis_result.best_match?.weaknesses?.map((weakness: string, index: number) => (
                           <li key={index} className="text-sm flex items-start gap-2 text-amber-800">
                             <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
                             {weakness}
                           </li>
                         ))}
+                        {(!selectedCandidate.analysis_result.best_match?.weaknesses || 
+                          selectedCandidate.analysis_result.best_match.weaknesses.length === 0) && (
+                          <p className="text-sm text-gray-500">Không có thông tin điểm yếu</p>
+                        )}
                       </ul>
                     </div>
                   </TabsContent>
 
                   <TabsContent value="matches" className="space-y-3">
-                    {selectedCandidate.analysis_result.all_matches.map((match: JobMatchResult, index: number) => (
-                      <Card
-                        key={index}
-                        className={`${getScoreBg(match.match_score)} border-2`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <h5 className="font-semibold text-gray-900">{match.job_title}</h5>
-                            <Badge className={`${getScoreBg(match.match_score)}`}>
-                              <span className={`font-bold ${getScoreColor(match.match_score)}`}>
-                                {match.match_score}%
-                              </span>
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-3">{match.recommendation}</p>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 mb-2">Điểm mạnh:</p>
-                              <ul className="space-y-1">
-                                {match.strengths.slice(0, 3).map((s, i) => (
-                                  <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
-                                    <CheckCircle className="h-3 w-3 text-emerald-600 mt-0.5 flex-shrink-0" />
-                                    {s}
-                                  </li>
-                                ))}
-                              </ul>
+                    {selectedCandidate.analysis_result?.all_matches?.length > 0 ? (
+                      selectedCandidate.analysis_result.all_matches.map((match: JobMatchResult, index: number) => (
+                        <Card
+                          key={index}
+                          className={`${getScoreBg(match.match_score)} border-2`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h5 className="font-semibold text-gray-900">{match.job_title}</h5>
+                              <Badge className={`${getScoreBg(match.match_score)}`}>
+                                <span className={`font-bold ${getScoreColor(match.match_score)}`}>
+                                  {match.match_score}%
+                                </span>
+                              </Badge>
                             </div>
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 mb-2">Điểm yếu:</p>
-                              <ul className="space-y-1">
-                                {match.weaknesses.slice(0, 2).map((w, i) => (
-                                  <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
-                                    <AlertCircle className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                                    {w}
-                                  </li>
-                                ))}
-                              </ul>
+                            <p className="text-sm text-gray-700 mb-3">{match.recommendation}</p>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-2">Điểm mạnh:</p>
+                                <ul className="space-y-1">
+                                  {match.strengths?.slice(0, 3).map((s, i) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
+                                      <CheckCircle className="h-3 w-3 text-emerald-600 mt-0.5 flex-shrink-0" />
+                                      {s}
+                                    </li>
+                                  ))}
+                                  {(!match.strengths || match.strengths.length === 0) && (
+                                    <p className="text-xs text-gray-500">N/A</p>
+                                  )}
+                                </ul>
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-2">Điểm yếu:</p>
+                                <ul className="space-y-1">
+                                  {match.weaknesses?.slice(0, 2).map((w, i) => (
+                                    <li key={i} className="text-xs text-gray-700 flex items-start gap-1">
+                                      <AlertCircle className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                                      {w}
+                                    </li>
+                                  ))}
+                                  {(!match.weaknesses || match.weaknesses.length === 0) && (
+                                    <p className="text-xs text-gray-500">N/A</p>
+                                  )}
+                                </ul>
+                              </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                          </CardContent>
+                        </Card>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">Không có dữ liệu matching</p>
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               )}
