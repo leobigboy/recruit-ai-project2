@@ -4,13 +4,47 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { User, Briefcase, ClipboardList, Clock, RefreshCw, Database, Flame, MessageCircle, X, Send, Sparkles, Key, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
+import { User, Briefcase, ClipboardList, Clock, RefreshCw, Database, Flame, MessageCircle, X, Send, Sparkles, Key, Eye, EyeOff, Check, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useTranslation } from 'react-i18next';
 
 interface APIKeys {
   openrouter?: string;
+}
+
+interface SourceData {
+  source: string;
+  count: number;
+}
+
+interface TrendData {
+  month: string;
+  count: number;
+}
+
+interface StatsData {
+  totalCV: number;
+  cvChange: number;
+  openJobs: number;
+  jobsChange: number;
+  interviewingCV: number;
+  interviewingChange: number;
+}
+
+interface ActivityData {
+  id: string;
+  user_name: string;
+  action: string;
+  details: string | null;
+  created_at: string;
+}
+
+interface TopJobData {
+  id: string;
+  title: string;
+  candidate_count: number;
+  status: string;
 }
 
 export function DashboardPage() {
@@ -21,41 +55,11 @@ export function DashboardPage() {
     return savedKey ? { openrouter: savedKey } : {};
   });
 
-  interface SourceData {
-    source: string;
-    count: number;
-  }
-
-  interface TrendData {
-    month: string;
-    count: number;
-  }
-
-  interface StatsData {
-    totalCV: number;
-    openJobs: number;
-    interviewingCV: number;
-    interviewingChange: number;
-  }
-
-  interface ActivityData {
-    id: string;
-    user_name: string;
-    action: string;
-    details: string | null;
-    created_at: string;
-  }
-
-  interface TopJobData {
-    id: string;
-    title: string;
-    candidate_count: number;
-    status: string;
-  }
-
   const [stats, setStats] = useState<StatsData>({ 
-    totalCV: 0, 
-    openJobs: 0, 
+    totalCV: 0,
+    cvChange: 0,
+    openJobs: 0,
+    jobsChange: 0,
     interviewingCV: 0,
     interviewingChange: 0 
   });
@@ -68,9 +72,33 @@ export function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const { count: totalCV } = await supabase.from('cv_candidates').select('*', { count: 'exact', head: true });
-      const { count: openJobs } = await supabase.from('cv_jobs').select('*', { count: 'exact', head: true }).eq('status', 'Đã đăng');
+      // Lấy thống kê CV với tăng trưởng
+      const { data: cvStats, error: cvError } = await supabase.rpc('get_cv_growth_stats');
+      if (cvError) {
+        console.error("Error fetching CV stats:", cvError);
+      }
       
+      const cvData = cvStats?.[0] || { 
+        total_cv: 0,
+        this_month_count: 0,
+        last_month_count: 0,
+        percentage_change: 0 
+      };
+      
+      // Lấy thống kê công việc với tăng trưởng
+      const { data: jobsStats, error: jobsError } = await supabase.rpc('get_jobs_growth_stats');
+      if (jobsError) {
+        console.error("Error fetching jobs stats:", jobsError);
+      }
+      
+      const jobsData = jobsStats?.[0] || { 
+        total_open_jobs: 0,
+        this_month_count: 0,
+        last_month_count: 0,
+        percentage_change: 0 
+      };
+      
+      // Lấy thống kê lịch phỏng vấn
       const { data: interviewStats, error: interviewError } = await supabase.rpc('get_interview_stats');
       if (interviewError) console.error("Error fetching interview stats:", interviewError);
       
@@ -82,16 +110,20 @@ export function DashboardPage() {
       };
       
       setStats({ 
-        totalCV: totalCV || 0, 
-        openJobs: openJobs || 0, 
+        totalCV: Number(cvData.total_cv) || 0,
+        cvChange: Number(cvData.percentage_change) || 0,
+        openJobs: Number(jobsData.total_open_jobs) || 0,
+        jobsChange: Number(jobsData.percentage_change) || 0,
         interviewingCV: Number(interviewData.total_interviews) || 0,
         interviewingChange: Number(interviewData.percentage_change) || 0
       });
 
+      // Xu hướng CV theo tháng
       const { data: trend, error: trendError } = await supabase.rpc('get_monthly_cv_trend');
       if (trendError) console.error("Error fetching trend:", trendError);
       if (trend) setTrendData(trend as TrendData[]);
 
+      // Nguồn ứng viên
       const { data: sources, error: sourcesError } = await supabase.rpc('get_candidate_sources');
       if (sourcesError) console.error("Error fetching sources:", sourcesError);
       if (sources && sources.length > 0) {
@@ -104,7 +136,8 @@ export function DashboardPage() {
         ]);
       }
 
-      const { data: jobs, error: jobsError } = await supabase
+      // Top vị trí tuyển dụng
+      const { data: jobs, error: jobsError2 } = await supabase
         .from('cv_jobs')
         .select(`
           id,
@@ -113,8 +146,8 @@ export function DashboardPage() {
           cv_candidates(count)
         `);
       
-      if (jobsError) {
-        console.error("Error fetching top jobs:", jobsError);
+      if (jobsError2) {
+        console.error("Error fetching top jobs:", jobsError2);
       } else if (jobs) {
         const jobsWithCount = jobs.map(job => ({
           id: job.id,
@@ -127,6 +160,7 @@ export function DashboardPage() {
         setTopJobs(sortedJobs.slice(0, 6));
       }
 
+      // Hoạt động gần đây
       const { data: activities, error: activitiesError } = await supabase.rpc('get_recent_activities', { p_limit: 6 });
       if (activitiesError) console.error("Error fetching activities:", activitiesError);
       if (activities) setRecentActivities(activities as ActivityData[]);
@@ -152,6 +186,26 @@ export function DashboardPage() {
     if (action.includes('Cập nhật')) return 'bg-yellow-500';
     if (action.includes('Email') || action.includes('email')) return 'bg-pink-500';
     return 'bg-gray-500';
+  };
+
+  const renderChangeIndicator = (change: number) => {
+    if (change > 0) {
+      return (
+        <span className="text-green-600 flex items-center gap-1">
+          <TrendingUp className="w-3 h-3" />
+          +{change}%
+        </span>
+      );
+    } else if (change < 0) {
+      return (
+        <span className="text-red-600 flex items-center gap-1">
+          <TrendingDown className="w-3 h-3" />
+          {change}%
+        </span>
+      );
+    } else {
+      return <span className="text-gray-500">0%</span>;
+    }
   };
 
   const CustomTooltip = ({ active, payload }: any) => {
@@ -195,7 +249,9 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalCV}</div>
-            <p className="text-xs text-muted-foreground">+0% {t('dashboard.stats.comparedToLastMonth')}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {renderChangeIndicator(stats.cvChange)} {t('dashboard.stats.comparedToLastMonth')}
+            </p>
           </CardContent>
         </Card>
 
@@ -206,7 +262,9 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.openJobs}</div>
-            <p className="text-xs text-muted-foreground">+0 {t('dashboard.stats.comparedToLastMonth')}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {renderChangeIndicator(stats.jobsChange)} {t('dashboard.stats.comparedToLastMonth')}
+            </p>
           </CardContent>
         </Card>
 
@@ -217,14 +275,8 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.interviewingCV}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.interviewingChange > 0 ? (
-                <span className="text-green-600">+{stats.interviewingChange}%</span>
-              ) : stats.interviewingChange < 0 ? (
-                <span className="text-red-600">{stats.interviewingChange}%</span>
-              ) : (
-                <span>0%</span>
-              )} {t('dashboard.stats.comparedToLastMonth')}
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {renderChangeIndicator(stats.interviewingChange)} {t('dashboard.stats.comparedToLastMonth')}
             </p>
           </CardContent>
         </Card>

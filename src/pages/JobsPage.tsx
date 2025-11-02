@@ -74,6 +74,7 @@ interface Job {
   description?: string;
   requirements?: string;
   benefits?: string;
+  mandatory_requirements?: string;
   cv_candidates: { count: number }[];
 }
 
@@ -141,6 +142,7 @@ export function JobsPage() {
     description: '',
     requirements: '',
     benefits: '',
+    mandatory_requirements: '',
     posted_date: new Date().toISOString().split('T')[0]
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -225,7 +227,8 @@ export function JobsPage() {
         ...prev,
         description: generatedContent.description,
         requirements: generatedContent.requirements,
-        benefits: generatedContent.benefits
+        benefits: generatedContent.benefits,
+        mandatory_requirements: generatedContent.mandatory_requirements || ''
       }));
 
       setActiveTab('manual');
@@ -267,6 +270,7 @@ export function JobsPage() {
       description: formData.description || null,
       requirements: formData.requirements || null,
       benefits: formData.benefits || null,
+      mandatory_requirements: formData.mandatory_requirements || null,
       posted_date: formData.posted_date
     };
 
@@ -292,6 +296,7 @@ export function JobsPage() {
         description: '',
         requirements: '',
         benefits: '',
+        mandatory_requirements: '',
         posted_date: new Date().toISOString().split('T')[0]
       });
       fetchJobs();
@@ -312,6 +317,7 @@ export function JobsPage() {
       description: '',
       requirements: '',
       benefits: '',
+      mandatory_requirements: '',
       posted_date: new Date().toISOString().split('T')[0]
     });
   };
@@ -334,7 +340,8 @@ export function JobsPage() {
       status: job.status,
       description: job.description || '',
       requirements: job.requirements || '',
-      benefits: job.benefits || ''
+      benefits: job.benefits || '',
+      mandatory_requirements: job.mandatory_requirements || ''
     });
     setIsEditDialogOpen(true);
   };
@@ -359,7 +366,8 @@ export function JobsPage() {
         status: editFormData.status,
         description: editFormData.description || null,
         requirements: editFormData.requirements || null,
-        benefits: editFormData.benefits || null
+        benefits: editFormData.benefits || null,
+        mandatory_requirements: editFormData.mandatory_requirements || null
       })
       .eq('id', editFormData.id);
 
@@ -388,6 +396,7 @@ export function JobsPage() {
       description: job.description || null,
       requirements: job.requirements || null,
       benefits: job.benefits || null,
+      mandatory_requirements: job.mandatory_requirements || null,
       posted_date: new Date().toISOString().split('T')[0]
     };
 
@@ -839,6 +848,21 @@ export function JobsPage() {
                   </p>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Yêu cầu bắt buộc (tùy chọn)
+                  </label>
+                  <Textarea
+                    placeholder="Ví dụ: Bằng đại học chuyên ngành CNTT, Tiếng Anh giao tiếp tốt, Có kinh nghiệm tối thiểu 2 năm..."
+                    className="min-h-[80px] resize-none"
+                    value={formData.mandatory_requirements}
+                    onChange={(e) => handleInputChange('mandatory_requirements', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    🎯 Các yêu cầu bắt buộc mà ứng viên phải đáp ứng khi ứng tuyển
+                  </p>
+                </div>
+
                 <div className="flex gap-3 mt-6 pt-4 border-t">
                   <Button
                     className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
@@ -996,6 +1020,21 @@ export function JobsPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Yêu cầu bắt buộc
+                  </label>
+                  <Textarea
+                    placeholder="Ví dụ: Bằng đại học chuyên ngành CNTT, Tiếng Anh giao tiếp tốt, Có kinh nghiệm tối thiểu 2 năm..."
+                    className="min-h-[100px] resize-none"
+                    value={formData.mandatory_requirements}
+                    onChange={(e) => handleInputChange('mandatory_requirements', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    🎯 Các điều kiện bắt buộc mà ứng viên phải đáp ứng khi ứng tuyển
+                  </p>
+                </div>
+
                 <div className="flex gap-3 mt-6 pt-4 border-t">
                   <Button
                     variant="outline"
@@ -1088,6 +1127,15 @@ export function JobsPage() {
                 <h3 className="font-semibold text-base mb-2">Quyền lợi</h3>
                 <div className="p-3 bg-gray-50 rounded-lg text-sm whitespace-pre-wrap">
                   {selectedJob.benefits}
+                </div>
+              </div>
+            )}
+
+            {selectedJob?.mandatory_requirements && (
+              <div>
+                <h3 className="font-semibold text-base mb-2">Yêu cầu bắt buộc</h3>
+                <div className="p-3 bg-amber-50 rounded-lg text-sm whitespace-pre-wrap border border-amber-200">
+                  {selectedJob.mandatory_requirements}
                 </div>
               </div>
             )}
@@ -1230,6 +1278,19 @@ export function JobsPage() {
                   value={editFormData.benefits}
                   onChange={(e) => handleEditInputChange('benefits', e.target.value)}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Yêu cầu bắt buộc</label>
+                <Textarea
+                  placeholder="Ví dụ: Bằng đại học chuyên ngành CNTT, Tiếng Anh giao tiếp tốt..."
+                  className="min-h-[100px] resize-none"
+                  value={editFormData.mandatory_requirements}
+                  onChange={(e) => handleEditInputChange('mandatory_requirements', e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  🎯 Các điều kiện bắt buộc mà ứng viên phải đáp ứng khi ứng tuyển
+                </p>
               </div>
 
               <div className="flex gap-3 mt-6 pt-4 border-t">

@@ -1,4 +1,3 @@
-// src/pages/User.tsx - FIXED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
@@ -25,7 +24,10 @@ import {
   EyeOff,
   Copy,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Shield,
+  Mail,
+  UserCircle
 } from "lucide-react"
 
 type User = {
@@ -42,6 +44,7 @@ type User = {
 type Role = {
   roles: number
   name: string
+  description?: string
 }
 
 type ActivityLog = {
@@ -55,6 +58,7 @@ type ActivityLog = {
 
 export default function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [users, setUsers] = useState<User[]>([])
@@ -64,6 +68,7 @@ export default function UsersPage() {
   const [activityLoading, setActivityLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [updating, setUpdating] = useState(false)
   const [lastSync, setLastSync] = useState<string>("")
   const [showPassword, setShowPassword] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
@@ -73,11 +78,18 @@ export default function UsersPage() {
     password: string
     name: string
   } | null>(null)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
+    role_id: "",
+    status: "ACTIVE",
+  })
+
+  const [editFormData, setEditFormData] = useState({
+    name: "",
     role_id: "",
     status: "ACTIVE",
   })
@@ -95,19 +107,17 @@ export default function UsersPage() {
         .select('*')
         .order('roles', { ascending: true })
 
-      console.log('📊 Roles response:', { data, error })
-
       if (error) {
         console.error('❌ Error fetching roles:', error)
         if (error.message.includes('policy')) {
-          setError('Không có quyền đọc danh sách vai trò. Vui lòng kiểm tra RLS policies trong Supabase.')
+          setError('Không có quyền đọc danh sách vai trò. Vui lòng kiểm tra RLS policies.')
         }
         throw error
       }
 
       if (!data || data.length === 0) {
         console.warn('⚠️ No roles found in cv_roles table')
-        setError('Không tìm thấy vai trò nào trong hệ thống. Vui lòng thêm vai trò vào bảng cv_roles.')
+        setError('Không tìm thấy vai trò nào. Vui lòng thêm vai trò vào bảng cv_roles.')
         setRoles([])
         return
       }
@@ -118,7 +128,6 @@ export default function UsersPage() {
       if (data && data.length > 0) {
         const defaultRole = data.find(r => r.name.toLowerCase() === 'user')
         const defaultRoleId = defaultRole ? defaultRole.roles.toString() : data[0].roles.toString()
-        console.log('🎯 Setting default role:', defaultRoleId)
         setFormData(prev => ({ ...prev, role_id: defaultRoleId }))
       }
     } catch (error: any) {
@@ -132,7 +141,6 @@ export default function UsersPage() {
       setLoading(true)
       setError(null)
 
-      console.log('🔥 Fetching users from cv_profiles...')
       const { data: usersData, error: usersError } = await supabase
         .from('cv_profiles')
         .select(`
@@ -144,19 +152,11 @@ export default function UsersPage() {
             )
           )
         `)
-
-      console.log('📊 Users response:', { data: usersData, error: usersError })
+        .order('created_at', { ascending: false })
 
       if (usersError) {
         console.error('❌ Error fetching users:', usersError)
         throw usersError
-      }
-
-      if (!usersData || usersData.length === 0) {
-        console.warn('⚠️ No users found')
-        setUsers([])
-        setLastSync(new Date().toLocaleString('vi-VN'))
-        return
       }
 
       const formattedUsers = (usersData || []).map((user: any) => {
@@ -175,14 +175,11 @@ export default function UsersPage() {
         }
       })
 
-      formattedUsers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-      console.log('✅ Successfully formatted users:', formattedUsers)
       setUsers(formattedUsers)
       setLastSync(new Date().toLocaleString('vi-VN'))
     } catch (error: any) {
       console.error('❌ Error in fetchUsers:', error)
-      setError(`Không thể tải danh sách người dùng: ${error.message || 'Lỗi không xác định'}`)
+      setError(`Không thể tải danh sách người dùng: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -234,19 +231,9 @@ export default function UsersPage() {
     return password
   }
 
-  const logActivity = async (userId: string, userName: string, action: string, details: string) => {
-    try {
-      await supabase.from('activity_logs').insert([
-        {
-          user_id: userId,
-          user_name: userName,
-          action: action,
-          details: details,
-        }
-      ])
-    } catch (error) {
-      console.error('Error logging activity:', error)
-    }
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
   }
 
   const handleCreateUser = async () => {
@@ -256,61 +243,47 @@ export default function UsersPage() {
 
       // Validation
       if (!formData.name.trim()) {
-        setError("Vui lòng nhập họ tên.")
-        setCreating(false)
+        setError("❌ Vui lòng nhập họ tên")
         return
       }
+      
       if (!formData.email.trim()) {
-        setError("Vui lòng nhập email.")
-        setCreating(false)
+        setError("❌ Vui lòng nhập email")
         return
       }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(formData.email)) {
-        setError("Email không hợp lệ.")
-        setCreating(false)
+      
+      if (!validateEmail(formData.email.trim())) {
+        setError("❌ Email không hợp lệ")
         return
       }
       
       if (!formData.role_id) {
-        setError("Vui lòng chọn vai trò.")
-        setCreating(false)
+        setError("❌ Vui lòng chọn vai trò")
         return
       }
 
       const password = formData.password.trim() || generatePassword()
+      
       if (password.length < 6) {
-        setError("Mật khẩu phải có ít nhất 6 ký tự.")
-        setCreating(false)
+        setError("❌ Mật khẩu phải có ít nhất 6 ký tự")
         return
       }
 
-      // Kiểm tra email trùng lặp trước khi gọi RPC
-      console.log('🔍 Checking if email already exists...')
+      // Kiểm tra email trùng lặp
       const { data: existingUsers, error: checkError } = await supabase
         .from('cv_profiles')
         .select('email')
         .ilike('email', formData.email.trim())
         .limit(1)
 
-      if (checkError) {
-        console.error('❌ Error checking email:', checkError)
-        // Không throw, vẫn tiếp tục tạo user
-      }
-
       if (existingUsers && existingUsers.length > 0) {
-        setError("Email này đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.")
-        setCreating(false)
+        setError("❌ Email này đã tồn tại trong hệ thống")
         return
       }
 
-      console.log('🚀 Calling RPC function "create_cv_user"...', {
-        p_email: formData.email.trim(),
-        p_full_name: formData.name.trim(),
-        p_role_id: parseInt(formData.role_id),
-        p_status: formData.status.toLowerCase(),
-      })
-
+      console.log('🚀 Creating user with RPC function...')
+      
+      // Gọi RPC function
       const { data, error: rpcError } = await supabase.rpc('create_cv_user', {
         p_email: formData.email.trim(),
         p_password: password,
@@ -321,47 +294,31 @@ export default function UsersPage() {
 
       if (rpcError) {
         console.error('❌ RPC error:', rpcError)
-        console.error('Full error object:', JSON.stringify(rpcError, null, 2))
         
-        // Xử lý các loại lỗi cụ thể
         const errorMessage = rpcError.message || ''
         
         if (errorMessage.includes('Email đã tồn tại')) {
-          setError("Email này đã tồn tại trong hệ thống.")
+          setError("❌ Email này đã được sử dụng")
         } else if (errorMessage.includes('gen_salt') || errorMessage.includes('pgcrypto')) {
-          setError("Lỗi mã hóa mật khẩu. Vui lòng chạy: CREATE EXTENSION IF NOT EXISTS pgcrypto; trong Supabase SQL Editor.")
+          setError("❌ Lỗi hệ thống: Thiếu extension pgcrypto. Vui lòng chạy SQL trong artifact.")
         } else if (errorMessage.includes('undefined_function') || rpcError.code === '42883') {
-          setError("Function create_cv_user không tồn tại. Vui lòng tạo function trong Supabase SQL Editor (xem artifact SQL).")
-        } else if (rpcError.code === '23502') {
-          setError("Lỗi dữ liệu không được để trống. Vui lòng kiểm tra form.")
-        } else if (errorMessage.includes('permission denied') || errorMessage.includes('policy')) {
-          setError("Không có quyền thực hiện thao tác này. Vui lòng kiểm tra RLS policies trong Supabase.")
+          setError("❌ Function create_cv_user chưa được tạo. Vui lòng chạy SQL trong artifact.")
+        } else if (errorMessage.includes('permission denied')) {
+          setError("❌ Không có quyền thực hiện. Vui lòng kiểm tra RLS policies.")
         } else {
-          setError(`Lỗi tạo người dùng: ${errorMessage || 'Không xác định'}`)
+          setError(`❌ Lỗi: ${errorMessage}`)
         }
-        setCreating(false)
         return
       }
 
       if (!data) {
-        setError("Không nhận được ID người dùng từ server. Vui lòng kiểm tra lại.")
-        setCreating(false)
+        setError("❌ Không nhận được phản hồi từ server")
         return
       }
 
       console.log('✅ User created successfully with ID:', data)
 
-      // Log activity
-      await logActivity(
-        data,
-        formData.name.trim(),
-        'CREATE_USER',
-        `Tạo người dùng mới: ${formData.name.trim()} (${formData.email.trim()}) - Vai trò: ${roles.find(r => r.roles.toString() === formData.role_id)?.name}`
-      )
-
-      console.log('🎉 User creation completed successfully!')
-
-      // Show success dialog with credentials
+      // Hiển thị thông tin đăng nhập
       setCreatedCredentials({
         email: formData.email.trim(),
         password: password,
@@ -379,26 +336,84 @@ export default function UsersPage() {
         status: "ACTIVE",
       })
       
-      // Refresh users list
+      // Refresh danh sách
       await fetchUsers()
 
     } catch (error: any) {
-      console.error('❌ Unexpected error creating user:', error)
-      setError(`Lỗi không xác định: ${error.message || JSON.stringify(error)}`)
+      console.error('❌ Unexpected error:', error)
+      setError(`❌ Lỗi không xác định: ${error.message}`)
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    setEditFormData({
+      name: user.name,
+      role_id: roles.find(r => r.name.toUpperCase() === user.role)?.roles.toString() || "",
+      status: user.status,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateUser = async () => {
+    if (!editingUser) return
+
+    try {
+      setUpdating(true)
+      setError(null)
+
+      if (!editFormData.name.trim()) {
+        setError("❌ Vui lòng nhập họ tên")
+        return
+      }
+
+      if (!editFormData.role_id) {
+        setError("❌ Vui lòng chọn vai trò")
+        return
+      }
+
+      console.log('🔄 Updating user...')
+
+      const { data, error: rpcError } = await supabase.rpc('update_cv_user', {
+        p_user_id: editingUser.id,
+        p_full_name: editFormData.name.trim(),
+        p_role_id: parseInt(editFormData.role_id),
+        p_status: editFormData.status.toLowerCase(),
+      })
+
+      if (rpcError) {
+        console.error('❌ Update error:', rpcError)
+        setError(`❌ Lỗi cập nhật: ${rpcError.message}`)
+        return
+      }
+
+      console.log('✅ User updated successfully')
+
+      setIsEditDialogOpen(false)
+      setEditingUser(null)
+      await fetchUsers()
+
+      alert("✅ Đã cập nhật thông tin người dùng thành công!")
+
+    } catch (error: any) {
+      console.error('❌ Unexpected error:', error)
+      setError(`❌ Lỗi: ${error.message}`)
+    } finally {
+      setUpdating(false)
     }
   }
 
   const handleDeleteUser = async (userId: string) => {
     const user = users.find(u => u.id === userId)
 
-    if (!confirm(`Bạn có chắc chắn muốn xóa người dùng "${user?.name}"?\n\nLưu ý: Thao tác này không thể hoàn tác.`)) {
+    if (!confirm(`⚠️ Bạn có chắc chắn muốn xóa người dùng "${user?.name}"?\n\nLưu ý: Thao tác này không thể hoàn tác.`)) {
       return
     }
 
     try {
-      // Xóa user roles trước
+      // Xóa user roles
       await supabase
         .from('cv_user_roles')
         .delete()
@@ -417,25 +432,15 @@ export default function UsersPage() {
         try {
           await supabase.auth.admin.deleteUser(user.auth_user_id)
         } catch (authDeleteError) {
-          console.log('Could not delete auth user (requires service role):', authDeleteError)
+          console.log('Could not delete auth user:', authDeleteError)
         }
       }
 
-      // Log activity
-      if (user) {
-        await logActivity(
-          userId,
-          user.name,
-          'DELETE_USER',
-          `Xóa người dùng: ${user.name} (${user.email})`
-        )
-      }
-
       await fetchUsers()
-      alert("Đã xóa người dùng thành công!")
+      alert("✅ Đã xóa người dùng thành công!")
     } catch (error: any) {
       console.error('Error deleting user:', error)
-      alert(`Không thể xóa người dùng: ${error.message || 'Lỗi không xác định'}`)
+      alert(`❌ Không thể xóa người dùng: ${error.message}`)
     }
   }
 
@@ -464,6 +469,19 @@ export default function UsersPage() {
     }
   }
 
+  const getRoleIcon = (role: string) => {
+    switch (role.toUpperCase()) {
+      case "ADMIN":
+        return <Shield className="h-3 w-3" />
+      case "INTERVIEWER":
+        return <UserCircle className="h-3 w-3" />
+      case "HR":
+        return <Users className="h-3 w-3" />
+      default:
+        return <UserCircle className="h-3 w-3" />
+    }
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleString('vi-VN', {
@@ -478,32 +496,42 @@ export default function UsersPage() {
   const getActionLabel = (action: string) => {
     const labels: { [key: string]: string } = {
       'CREATE_USER': 'Tạo người dùng',
+      'UPDATE_USER': 'Cập nhật người dùng',
       'DELETE_USER': 'Xóa người dùng',
     }
     return labels[action] || action
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Quản lý người dùng</h1>
+    <div className="container mx-auto py-10 px-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Users className="h-8 w-8 text-blue-600" />
+            Quản lý người dùng
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Quản lý tài khoản và phân quyền người dùng trong hệ thống
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button variant="outline" size="icon" onClick={handleSync} disabled={syncing}>
             <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
           </Button>
-          <Button onClick={() => setIsDialogOpen(true)}>
+          <Button onClick={() => setIsDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
             <Plus className="h-4 w-4 mr-2" /> Thêm người dùng
           </Button>
           <Button variant="outline" onClick={fetchActivityLogs}>
-            <Activity className="h-4 w-4 mr-2" /> Hoạt động
+            <Activity className="h-4 w-4 mr-2" /> Lịch sử
           </Button>
         </div>
       </div>
 
       {lastSync && (
-        <p className="text-sm text-muted-foreground mb-4">
-          Lần đồng bộ cuối: {lastSync}
-        </p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+          <span>Đồng bộ lần cuối: {lastSync}</span>
+        </div>
       )}
 
       {error && (
@@ -513,57 +541,86 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div className="rounded-md border">
+      <div className="rounded-lg border bg-white shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-gray-50">
               <TableHead className="w-[50px]"></TableHead>
-              <TableHead>Họ tên</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Vai trò</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
+              <TableHead className="font-semibold">Họ tên</TableHead>
+              <TableHead className="font-semibold">Email</TableHead>
+              <TableHead className="font-semibold">Vai trò</TableHead>
+              <TableHead className="font-semibold">Trạng thái</TableHead>
+              <TableHead className="font-semibold">Ngày tạo</TableHead>
+              <TableHead className="w-[120px] text-center font-semibold">Thao tác</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4">
-                  <RefreshCw className="h-6 w-6 animate-spin mx-auto" />
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex flex-col items-center gap-2">
+                    <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+                    <p className="text-sm text-muted-foreground">Đang tải...</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
-                  Không có người dùng nào
+                <TableCell colSpan={7} className="text-center py-8">
+                  <div className="flex flex-col items-center gap-2">
+                    <Users className="h-12 w-12 text-gray-300" />
+                    <p className="text-muted-foreground">Chưa có người dùng nào</p>
+                    <Button onClick={() => setIsDialogOpen(true)} variant="outline" size="sm" className="mt-2">
+                      <Plus className="h-4 w-4 mr-2" /> Tạo người dùng đầu tiên
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
               users.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className="hover:bg-gray-50">
                   <TableCell>
-                    <Avatar>
-                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+                    <Avatar className="h-9 w-9">
+                      <AvatarFallback className="bg-blue-100 text-blue-700 font-semibold">
+                        {user.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                   </TableCell>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell className="font-medium">{user.name}</TableCell>
                   <TableCell>
-                    <Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      {user.email}
+                    </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={user.status === "ACTIVE" ? "default" : "secondary"}>
-                      {user.status}
+                    <Badge className={`${getRoleBadgeColor(user.role)} flex items-center gap-1 w-fit`}>
+                      {getRoleIcon(user.role)}
+                      {user.role}
                     </Badge>
                   </TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon">
+                    <Badge variant={user.status === "ACTIVE" ? "default" : "secondary"} className="w-fit">
+                      {user.status === "ACTIVE" ? "Hoạt động" : "Không hoạt động"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-600">{formatDate(user.created_at)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 justify-center">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 hover:bg-blue-100 hover:text-blue-700"
+                        onClick={() => handleEditUser(user)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="icon" onClick={() => handleDeleteUser(user.id)}>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 hover:bg-red-100 hover:text-red-700"
+                        onClick={() => handleDeleteUser(user.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -575,12 +632,18 @@ export default function UsersPage() {
         </Table>
       </div>
 
+      {/* Dialog Thêm người dùng */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]" aria-describedby="dialog-description">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
-            <DialogTitle className="text-xl">Thêm người dùng mới</DialogTitle>
-            <p id="dialog-description" className="text-sm text-muted-foreground mt-1">
-              Tạo tài khoản mới cho người dùng. Hệ thống sẽ tự động tạo mật khẩu nếu bạn không nhập.
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Plus className="h-5 w-5 text-blue-600" />
+              </div>
+              Thêm người dùng mới
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Tạo tài khoản mới để người dùng có thể đăng nhập vào hệ thống
             </p>
           </DialogHeader>
 
@@ -591,35 +654,38 @@ export default function UsersPage() {
             </div>
           )}
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">
-                Họ tên <span className="text-destructive">*</span>
+              <Label htmlFor="name" className="flex items-center gap-1">
+                Họ và tên <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
-                placeholder="Nhập họ tên"
+                placeholder="Nguyễn Văn A"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="bg-muted/50"
+                className="h-11"
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="email">
-                Email <span className="text-destructive">*</span>
+              <Label htmlFor="email" className="flex items-center gap-1">
+                Email <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Nhập địa chỉ email"
+                placeholder="example@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-muted/50"
+                className="h-11"
               />
+              <p className="text-xs text-muted-foreground">Email sẽ được dùng để đăng nhập</p>
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">
-                Mật khẩu <span className="text-muted-foreground text-xs">(Tùy chọn - Tự động tạo nếu để trống)</span>
+                Mật khẩu <span className="text-xs text-muted-foreground">(Tùy chọn)</span>
               </Label>
               <div className="relative">
                 <Input
@@ -628,168 +694,413 @@ export default function UsersPage() {
                   placeholder="Để trống để tạo tự động"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="bg-muted/50 pr-10"
+                  className="h-11 pr-10"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="absolute right-0 top-0 h-full"
+                  className="absolute right-0 top-0 h-full hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Hệ thống sẽ tự động tạo mật khẩu mạnh nếu bạn để trống
+              </p>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="role">Vai trò <span className="text-destructive">*</span></Label>
+              <Label htmlFor="role" className="flex items-center gap-1">
+                Vai trò <span className="text-red-500">*</span>
+              </Label>
               <Select 
                 value={formData.role_id} 
                 onValueChange={(value) => setFormData({ ...formData, role_id: value })}
               >
-                <SelectTrigger id="role" className="w-full bg-white">
+                <SelectTrigger className="h-11">
                   <SelectValue placeholder="Chọn vai trò">
-                    {formData.role_id && roles.length > 0
-                      ? roles.find(r => r.roles.toString() === formData.role_id)?.name || "Chọn vai trò"
-                      : "Chọn vai trò"}
+                    {formData.role_id && roles.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon(roles.find(r => r.roles.toString() === formData.role_id)?.name || '')}
+                        <span>{roles.find(r => r.roles.toString() === formData.role_id)?.name}</span>
+                      </div>
+                    ) : (
+                      "Chọn vai trò"
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent 
-                  position="popper" 
-                  className="bg-white border shadow-md max-h-[200px] overflow-auto"
-                  style={{ zIndex: 99999 }}
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={5}
+                  className="z-[9999] bg-white border shadow-lg max-h-[300px] overflow-y-auto"
                 >
                   {roles.map((role) => (
                     <SelectItem 
                       key={role.roles} 
                       value={role.roles.toString()}
-                      className="cursor-pointer hover:bg-accent"
+                      className="cursor-pointer hover:bg-accent focus:bg-accent"
                     >
-                      {role.name}
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon(role.name)}
+                        <span>{role.name}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {roles.length > 0 ? `${roles.length} vai trò khả dụng` : 'Đang tải vai trò...'}
-              </p>
+              {roles.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {roles.length} vai trò khả dụng
+                </p>
+              )}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="status">Trạng thái</Label>
               <Select 
                 value={formData.status} 
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
               >
-                <SelectTrigger id="status" className="w-full bg-white">
+                <SelectTrigger className="h-11">
                   <SelectValue>
-                    {formData.status === "ACTIVE" ? "Active" : "Inactive"}
+                    {formData.status === "ACTIVE" ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                        Hoạt động
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+                        Không hoạt động
+                      </div>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent 
-                  position="popper" 
-                  className="bg-white border shadow-md"
-                  style={{ zIndex: 99999 }}
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={5}
+                  className="z-[9999] bg-white border shadow-lg"
                 >
-                  <SelectItem value="ACTIVE" className="cursor-pointer">Active</SelectItem>
-                  <SelectItem value="INACTIVE" className="cursor-pointer">Inactive</SelectItem>
+                  <SelectItem value="ACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      Hoạt động
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="INACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+                      Không hoạt động
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={creating}>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsDialogOpen(false)
+                setError(null)
+              }} 
+              disabled={creating}
+            >
               Hủy
             </Button>
-            <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleCreateUser} disabled={creating}>
-              {creating ? 'Đang tạo...' : 'Tạo tài khoản'}
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700" 
+              onClick={handleCreateUser} 
+              disabled={creating}
+            >
+              {creating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Đang tạo...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Tạo tài khoản
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Chỉnh sửa người dùng */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl flex items-center gap-2">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Edit className="h-5 w-5 text-orange-600" />
+              </div>
+              Chỉnh sửa người dùng
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Cập nhật thông tin người dùng: {editingUser?.name}
+            </p>
+          </DialogHeader>
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800">{error}</p>
+            </div>
+          )}
+
+          <div className="space-y-5 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name" className="flex items-center gap-1">
+                Họ và tên <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-name"
+                placeholder="Nguyễn Văn A"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                className="h-11"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <div className="h-11 px-3 py-2 bg-gray-50 border rounded-md flex items-center text-gray-500">
+                <Mail className="h-4 w-4 mr-2" />
+                {editingUser?.email}
+              </div>
+              <p className="text-xs text-muted-foreground">Email không thể thay đổi</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-role" className="flex items-center gap-1">
+                Vai trò <span className="text-red-500">*</span>
+              </Label>
+              <Select 
+                value={editFormData.role_id} 
+                onValueChange={(value) => setEditFormData({ ...editFormData, role_id: value })}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Chọn vai trò">
+                    {editFormData.role_id && roles.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon(roles.find(r => r.roles.toString() === editFormData.role_id)?.name || '')}
+                        <span>{roles.find(r => r.roles.toString() === editFormData.role_id)?.name}</span>
+                      </div>
+                    ) : (
+                      "Chọn vai trò"
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={5}
+                  className="z-[9999] bg-white border shadow-lg max-h-[300px] overflow-y-auto w-[var(--radix-select-trigger-width)]"
+                >
+                  {roles.map((role) => (
+                    <SelectItem 
+                      key={role.roles} 
+                      value={role.roles.toString()}
+                      className="cursor-pointer hover:bg-accent focus:bg-accent"
+                    >
+                      <div className="flex items-center gap-2">
+                        {getRoleIcon(role.name)}
+                        <span>{role.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-status">Trạng thái</Label>
+              <Select 
+                value={editFormData.status} 
+                onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue>
+                    {editFormData.status === "ACTIVE" ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                        Hoạt động
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+                        Không hoạt động
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  side="bottom"
+                  align="start"
+                  sideOffset={5}
+                  className="z-[9999] bg-white border shadow-lg w-[var(--radix-select-trigger-width)]"
+                >
+                  <SelectItem value="ACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                      Hoạt động
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="INACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-gray-400"></div>
+                      Không hoạt động
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsEditDialogOpen(false)
+                setEditingUser(null)
+                setError(null)
+              }} 
+              disabled={updating}
+            >
+              Hủy
+            </Button>
+            <Button 
+              className="bg-orange-600 hover:bg-orange-700" 
+              onClick={handleUpdateUser} 
+              disabled={updating}
+            >
+              {updating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Đang cập nhật...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Cập nhật
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Thành công */}
       <Dialog open={isSuccessDialogOpen} onOpenChange={setIsSuccessDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-green-100 rounded-full">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="p-3 bg-green-100 rounded-full">
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
               </div>
-              <DialogTitle className="text-xl">Tạo tài khoản thành công!</DialogTitle>
+              <div>
+                <DialogTitle className="text-2xl">Tạo tài khoản thành công!</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Thông tin đăng nhập đã được tạo
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Tài khoản đã được tạo. Vui lòng lưu thông tin đăng nhập và gửi cho người dùng.
-            </p>
           </DialogHeader>
 
           {createdCredentials && (
             <div className="space-y-4 py-4">
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm font-medium text-blue-900 mb-3">Thông tin đăng nhập:</p>
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <Shield className="h-5 w-5 text-blue-600" />
+                  <p className="text-sm font-semibold text-blue-900">Thông tin đăng nhập</p>
+                </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-blue-700">Họ tên</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        value={createdCredentials.name}
-                        readOnly
-                        className="bg-white border-blue-200"
-                      />
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-blue-700 uppercase">Họ tên</Label>
+                    <div className="p-3 bg-white rounded-md border border-blue-200">
+                      <p className="font-medium text-gray-900">{createdCredentials.name}</p>
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-xs text-blue-700">Email</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        value={createdCredentials.email}
-                        readOnly
-                        className="bg-white border-blue-200"
-                      />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-blue-700 uppercase">Email</Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 p-3 bg-white rounded-md border border-blue-200 flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-gray-400" />
+                        <p className="font-medium text-gray-900">{createdCredentials.email}</p>
+                      </div>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => copyToClipboard(createdCredentials.email, 'email')}
-                        className="flex-shrink-0"
+                        className="h-11 w-11 border-blue-200 hover:bg-blue-50"
                       >
-                        {copiedField === 'email' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        {copiedField === 'email' ? 
+                          <Check className="h-4 w-4 text-green-600" /> : 
+                          <Copy className="h-4 w-4 text-blue-600" />
+                        }
                       </Button>
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-xs text-blue-700">Mật khẩu</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Input
-                        value={createdCredentials.password}
-                        readOnly
-                        type={showPassword ? "text" : "password"}
-                        className="bg-white border-blue-200 font-mono"
-                      />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-blue-700 uppercase">Mật khẩu</Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 p-3 bg-white rounded-md border border-blue-200">
+                        <p className="font-mono text-sm font-semibold text-gray-900">
+                          {showPassword ? createdCredentials.password : '••••••••••••'}
+                        </p>
+                      </div>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="flex-shrink-0"
+                        className="h-11 w-11 border-blue-200 hover:bg-blue-50"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? 
+                          <EyeOff className="h-4 w-4 text-blue-600" /> : 
+                          <Eye className="h-4 w-4 text-blue-600" />
+                        }
                       </Button>
                       <Button
                         variant="outline"
                         size="icon"
                         onClick={() => copyToClipboard(createdCredentials.password, 'password')}
-                        className="flex-shrink-0"
+                        className="h-11 w-11 border-blue-200 hover:bg-blue-50"
                       >
-                        {copiedField === 'password' ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                        {copiedField === 'password' ? 
+                          <Check className="h-4 w-4 text-green-600" /> : 
+                          <Copy className="h-4 w-4 text-blue-600" />
+                        }
                       </Button>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <p className="text-xs text-yellow-800">
-                    ⚠️ Lưu ý: Thông tin này chỉ hiển thị một lần. Vui lòng sao chép và gửi cho người dùng ngay.
-                  </p>
+              <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-lg">
+                <div className="flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900 mb-1">Lưu ý quan trọng</p>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Thông tin này chỉ hiển thị <strong>một lần duy nhất</strong>. Vui lòng sao chép và gửi cho người dùng ngay. 
+                      Người dùng có thể đổi mật khẩu sau khi đăng nhập lần đầu.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -797,30 +1108,41 @@ export default function UsersPage() {
 
           <DialogFooter>
             <Button 
-              className="bg-blue-600 hover:bg-blue-700 w-full" 
+              className="bg-blue-600 hover:bg-blue-700 w-full h-11" 
               onClick={() => {
                 setIsSuccessDialogOpen(false)
                 setCreatedCredentials(null)
                 setShowPassword(false)
               }}
             >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
               Đã lưu thông tin
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Lịch sử hoạt động */}
       <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-hidden flex flex-col">
           <div className="flex items-center justify-between border-b pb-4">
             <div className="flex items-center gap-3">
-              <Activity className="h-5 w-5 text-foreground" />
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Activity className="h-5 w-5 text-purple-600" />
+              </div>
               <div>
-                <h3 className="text-xl">Lịch sử hoạt động</h3>
-                <p className="text-sm text-muted-foreground mt-1">Theo dõi các hoạt động quản lý người dùng gần đây</p>
+                <h3 className="text-xl font-bold">Lịch sử hoạt động</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Theo dõi các thao tác quản lý người dùng gần đây
+                </p>
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsActivityDialogOpen(false)}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8" 
+              onClick={() => setIsActivityDialogOpen(false)}
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -829,28 +1151,41 @@ export default function UsersPage() {
             {activityLoading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <RefreshCw className="h-8 w-8 text-muted-foreground animate-spin mb-3" />
-                <p className="text-sm text-muted-foreground">Đang tải...</p>
+                <p className="text-sm text-muted-foreground">Đang tải lịch sử...</p>
               </div>
             ) : activities.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Activity className="h-16 w-16 text-muted-foreground/30 mb-4" />
                 <p className="text-base text-foreground font-medium">Chưa có hoạt động nào</p>
-                <p className="text-sm text-muted-foreground mt-1">Các hoạt động quản lý người dùng sẽ được hiển thị ở đây</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Các thao tác quản lý người dùng sẽ được ghi lại tại đây
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {activities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
-                    <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                      <Activity className="h-4 w-4 text-blue-600" />
+                  <div 
+                    key={activity.id} 
+                    className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                      <Activity className="h-4 w-4 text-purple-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-foreground">{activity.user_name || 'Hệ thống'}</p>
-                        <Badge variant="secondary" className="text-xs">{getActionLabel(activity.action)}</Badge>
+                        <p className="font-semibold text-foreground">
+                          {activity.user_name || 'Hệ thống'}
+                        </p>
+                        <Badge variant="secondary" className="text-xs">
+                          {getActionLabel(activity.action)}
+                        </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2">{activity.details}</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(activity.created_at)}</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {activity.details}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(activity.created_at)}
+                      </p>
                     </div>
                   </div>
                 ))}
