@@ -312,14 +312,6 @@ export function Sidebar() {
           isActive={location.pathname === '/loc-cv'}
         />
 
-        {/* Single AI parent link (opens AIToolsPage) */}
-        <NavItem
-          to="/ai"
-          icon={Bot}
-          label="AI thông minh"
-          isActive={location.pathname === '/ai'}
-        />
-
         {/* Extra tools */}
         <NavItem
           to="/offers"

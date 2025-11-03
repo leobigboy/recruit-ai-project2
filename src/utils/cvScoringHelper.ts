@@ -123,14 +123,11 @@ export const calculateCVScore = (
     breakdown.position = 5;
   }
 
-  // Tính tổng
   let total = Object.values(breakdown).reduce((sum, val) => sum + val, 0);
 
-  // Thêm yếu tố ngẫu nhiên nhỏ (±5 điểm) để tránh điểm trùng
   const randomFactor = Math.floor(Math.random() * 11) - 5;
   total = Math.max(0, Math.min(100, total + randomFactor));
 
-  // Xác định rating
   let rating: ScoreResult['rating'];
   let color: string;
   
@@ -156,9 +153,6 @@ export const calculateCVScore = (
   };
 };
 
-/**
- * Tính điểm cho nhiều ứng viên cùng lúc
- */
 export const calculateBulkScores = (
   candidates: any[],
   jobRequirements?: Map<string, { title: string; level: string }>
@@ -174,9 +168,7 @@ export const calculateBulkScores = (
   return scores;
 };
 
-/**
- * Lấy badge color theo điểm
- */
+
 export const getScoreBadgeClass = (score: number): string => {
   if (score >= 85) return 'bg-green-100 text-green-700 border-green-300';
   if (score >= 70) return 'bg-blue-100 text-blue-700 border-blue-300';
@@ -184,9 +176,6 @@ export const getScoreBadgeClass = (score: number): string => {
   return 'bg-red-100 text-red-700 border-red-300';
 };
 
-/**
- * Lấy icon theo điểm
- */
 export const getScoreIcon = (score: number): string => {
   if (score >= 85) return '🏆'; // Trophy
   if (score >= 70) return '⭐'; // Star
