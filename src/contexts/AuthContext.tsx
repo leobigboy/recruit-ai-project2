@@ -47,9 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from("cv_profiles")
         .select("*")
         .eq("auth_user_id", authUserId)
-        .single();
+        .maybeSingle();
       
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error("❌ Profile fetch error:", error);
         return null;
       }
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Run only once - prevent double initialization
     if (initialized.current) {
       console.log("⏭️ Auth already initialized, skipping");
-return;
+      return;
     }
     initialized.current = true;
 
@@ -152,7 +152,7 @@ return;
         if (!mounted) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
-          // CRITICAL FIX: Prevent duplicate updates when tab becomes active
+          // Prevent duplicate updates when tab becomes active
           if (userRef.current && userRef.current.id === session.user.id) {
             console.log("⏭️ User already signed in, skipping duplicate SIGNED_IN event");
             return;
@@ -173,10 +173,8 @@ return;
           userRef.current = null;
         } else if (event === 'TOKEN_REFRESHED') {
           console.log("🔄 Token refreshed (no state update needed)");
-          // Token refreshed, but don't update state - prevents unnecessary re-renders
         } else if (event === 'USER_UPDATED') {
           console.log("👤 User updated");
-          // User metadata updated, update user state but don't refetch profile
           if (session?.user) {
             setUser(session.user);
             userRef.current = session.user;
@@ -190,13 +188,13 @@ return;
       mounted = false;
       subscription?.unsubscribe();
     };
-  }, []); // Empty dependency - run once only
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     console.log("🔑 Signing in:", email);
     
     try {
-const result = await supabase.auth.signInWithPassword({ email, password });
+      const result = await supabase.auth.signInWithPassword({ email, password });
       
       if (result.error) {
         console.error("❌ Sign in error:", result.error);
@@ -204,7 +202,6 @@ const result = await supabase.auth.signInWithPassword({ email, password });
       }
       
       console.log("✅ Sign in successful");
-      // onAuthStateChange will handle setting user and profile
       return { data: result.data, error: null };
     } catch (err) {
       console.error("❌ Sign in exception:", err);
@@ -219,12 +216,10 @@ const result = await supabase.auth.signInWithPassword({ email, password });
     console.log("👋 Signing out");
     
     try {
-      // Clear state first
       setUser(null);
       setProfile(null);
       userRef.current = null;
       
-      // Then sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
@@ -234,7 +229,6 @@ const result = await supabase.auth.signInWithPassword({ email, password });
       }
     } catch (err) {
       console.error("❌ Sign out exception:", err);
-      // Still clear state even if error
       setUser(null);
       setProfile(null);
       userRef.current = null;
@@ -245,7 +239,6 @@ const result = await supabase.auth.signInWithPassword({ email, password });
     try {
       console.log("📝 Signing up:", email);
       
-      // Step 1: Create auth user with metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -268,11 +261,9 @@ const result = await supabase.auth.signInWithPassword({ email, password });
 
       console.log("✅ Auth user created:", authData.user.id);
 
-      // Step 2: Check if profile already exists (might be created by database trigger)
       let existingProfile = await fetchProfile(authData.user.id);
       
       if (!existingProfile) {
-        // Step 3: Create profile manually if not exists
         try {
           const newProfile = await createProfile(
             authData.user.id,
@@ -282,11 +273,9 @@ const result = await supabase.auth.signInWithPassword({ email, password });
           existingProfile = newProfile;
         } catch (profileError) {
           console.error("❌ Profile creation failed:", profileError);
-          // Continue anyway - profile might be created by trigger with delay
         }
       }
 
-      // Step 4: Update state
       setUser(authData.user);
       setProfile(existingProfile);
       userRef.current = authData.user;
@@ -296,40 +285,71 @@ const result = await supabase.auth.signInWithPassword({ email, password });
       
     } catch (err) {
       console.error("❌ Sign up exception:", err);
-return { 
+      return { 
         data: null, 
         error: err instanceof Error ? err : new Error("Unknown error") 
       };
     }
   };
 
+  // CRITICAL FIX: Update profile with proper data merging
   const updateProfile = async (data: any) => {
     if (!user) {
       console.error("❌ No authenticated user");
-      throw new Error("No authenticated user");
+      return { error: new Error("No authenticated user") };
     }
     
     console.log("💾 Updating profile for user:", user.id);
+    console.log("📦 Update payload:", data);
+    console.log("📦 Current profile:", profile);
     
     try {
-      const { error, data: updated } = await supabase
+      // CRITICAL: Merge with existing profile data to avoid null constraint violations
+      const mergedData = {
+        auth_user_id: user.id,
+        email: user.email || '',
+        full_name: data.full_name !== undefined 
+          ? data.full_name 
+          : (profile?.full_name || user.user_metadata?.full_name || ''),
+        phone: data.phone !== undefined 
+          ? data.phone 
+          : (profile?.phone || ''),
+        avatar_url: data.avatar_url !== undefined 
+          ? data.avatar_url 
+          : (profile?.avatar_url || ''),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log("📦 Merged data for upsert:", mergedData);
+
+      // Use upsert to handle both insert and update
+      const { data: result, error } = await supabase
         .from("cv_profiles")
-        .update(data)
-        .eq("auth_user_id", user.id)
+        .upsert(
+          mergedData,
+          {
+            onConflict: 'auth_user_id',
+            ignoreDuplicates: false
+          }
+        )
         .select()
         .single();
-      
+
       if (error) {
-        console.error("❌ Profile update error:", error);
+        console.error("❌ Upsert error:", error);
         throw error;
       }
+
+      console.log("✅ Profile updated/created successfully:", result);
+      setProfile(result);
+      return { data: result, error: null };
       
-      console.log("✅ Profile updated successfully");
-      setProfile(updated);
-      return updated;
     } catch (err) {
-      console.error("❌ Profile update exception:", err);
-      throw err;
+      console.error("❌ Update failed:", err);
+      return { 
+        data: null, 
+        error: err instanceof Error ? err : new Error("Unknown error") 
+      };
     }
   };
 
