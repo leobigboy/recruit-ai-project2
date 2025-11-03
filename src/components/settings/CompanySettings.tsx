@@ -97,6 +97,8 @@ const loadColors = () => {
 
 // Fixed UUID cho company profile (chung cho toàn hệ thống)
 const COMPANY_PROFILE_ID = '00000000-0000-0000-0000-000000000001';
+const BUCKET_NAME = 'logos';
+const LOGO_PATH = 'company_logo';
 
 export function CompanySettings({ profile, handleInputChange }: CompanySettingsProps) {
   const { t, i18n } = useTranslation();
@@ -134,46 +136,100 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
       if (data?.logo_url) {
         setLogo(data.logo_url);
         localStorage.setItem('company-logo', data.logo_url);
+      } else {
+        setLogo(null);
+        localStorage.removeItem('company-logo');
       }
     } catch (error) {
       console.error("Error loading logo:", error);
     }
   };
 
-  const saveLogoToSupabase = async (logoDataUrl: string) => {
+  const saveLogoToSupabase = async (file: File) => {
     try {
-      // CHỈ UPDATE - Không INSERT
-      // Row đã được tạo sẵn trong SQL setup
-      const { error } = await supabase
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(LOGO_PATH, file, { upsert: true });
+      
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: publicData } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(LOGO_PATH);
+      
+      const publicUrl = publicData.publicUrl;
+
+      // Save URL to database
+      const { data: updateData, error: updateError, count } = await supabase
         .from('cv_company_profile')
-        .update({ logo_url: logoDataUrl })
-        .eq('id', COMPANY_PROFILE_ID);
+        .update({ logo_url: publicUrl })
+        .eq('id', COMPANY_PROFILE_ID)
+        .select()
+        .single();
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      if (count === 0 || !updateData) {
+        const companyName = profile?.company_name || 'Recruit AI';
+        const { error: insertError } = await supabase
+          .from('cv_company_profile')
+          .insert({
+            id: COMPANY_PROFILE_ID,
+            company_name: companyName,
+            logo_url: publicUrl
+          });
+        
+        if (insertError) throw insertError;
+      }
       
-      localStorage.setItem('company-logo', logoDataUrl);
+      localStorage.setItem('company-logo', publicUrl);
       window.dispatchEvent(new Event('logo-updated'));
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'company-logo',
-        newValue: logoDataUrl,
+        newValue: publicUrl,
         url: window.location.href
       }));
       
-      return true;
+      return publicUrl;
     } catch (error) {
       console.error("Error saving logo:", error);
-      return false;
+      return null;
     }
   };
 
   const removeLogoFromSupabase = async () => {
     try {
-      const { error } = await supabase
+      // Remove from storage
+      const { error: storageError } = await supabase.storage
+        .from(BUCKET_NAME)
+        .remove([LOGO_PATH]);
+      
+      if (storageError) console.warn("Error removing logo from storage:", storageError);
+
+      // Update database
+      const { data: updateData, error: updateError, count } = await supabase
         .from('cv_company_profile')
         .update({ logo_url: null })
-        .eq('id', COMPANY_PROFILE_ID);
+        .eq('id', COMPANY_PROFILE_ID)
+        .select()
+        .single();
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      if (count === 0 || !updateData) {
+        const companyName = profile?.company_name || 'Recruit AI';
+        const { error: insertError } = await supabase
+          .from('cv_company_profile')
+          .insert({
+            id: COMPANY_PROFILE_ID,
+            company_name: companyName,
+            logo_url: null
+          });
+        
+        if (insertError) throw insertError;
+      }
       
       localStorage.removeItem('company-logo');
       window.dispatchEvent(new Event('logo-updated'));
@@ -210,7 +266,7 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     const defaultButtonColor = '#222831';
     const defaultMenuColor = '#e8f4fa';
     setButtonColor(defaultButtonColor);
-    setMenuColor(defaultMenuColor);
+    setMenuColor(defaultMenuColor); 
     applyThemeColors(defaultButtonColor, defaultMenuColor);
     saveColors(defaultButtonColor, defaultMenuColor);
   };
@@ -246,14 +302,16 @@ export function CompanySettings({ profile, handleInputChange }: CompanySettingsP
     const reader = new FileReader();
     reader.onloadend = async () => {
       const result = reader.result as string;
-      setLogo(result);
+      setLogo(result); // for local preview
       setIsUploading(false);
       
       setIsSavingLogo(true);
-      const success = await saveLogoToSupabase(result);
+      const publicUrl = await saveLogoToSupabase(file);
       setIsSavingLogo(false);
       
-      if (!success) {
+      if (publicUrl) {
+        setLogo(publicUrl);
+      } else {
         setLogoError(
           i18n.language === 'vi' 
             ? 'Không thể lưu logo vào hệ thống. Vui lòng thử lại.' 

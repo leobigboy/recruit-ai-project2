@@ -73,8 +73,8 @@ function CompanyLogo({ companyName }: { companyName: string }) {
         if (data?.logo_url) {
           setLogo(data.logo_url);
           localStorage.setItem('company-logo', data.logo_url);
-        } else if (!data?.logo_url) {
-          // Nếu logo = null trong DB, xóa cache
+        } else {
+          // No logo or no row, clear
           setLogo(null);
           localStorage.removeItem('company-logo');
         }
@@ -221,11 +221,11 @@ export function Sidebar() {
         .eq('id', COMPANY_PROFILE_ID)
         .single();
       
-      if (data && (data as any).company_name) {
-        setCompanyName((data as any).company_name);
+      if (data && data.company_name) {
+        setCompanyName(data.company_name);
       }
       
-      if (error && (error as any).code !== 'PGRST116') {
+      if (error && error.code !== 'PGRST116') {
         console.error("Error loading company name:", error);
       }
       
@@ -246,21 +246,15 @@ export function Sidebar() {
           filter: `id=eq.${COMPANY_PROFILE_ID}`
         },
         (payload) => {
-          if (payload.new && (payload.new as any).company_name) {
-            setCompanyName((payload.new as any).company_name);
+          if (payload.new && payload.new.company_name) {
+            setCompanyName(payload.new.company_name);
           }
         }
       )
       .subscribe();
 
     return () => {
-      try {
-        // @ts-ignore
-        if (supabase.removeChannel) supabase.removeChannel(channel);
-      } catch (e) {
-        // @ts-ignore
-        if (channel && channel.unsubscribe) channel.unsubscribe();
-      }
+      supabase.removeChannel(channel);
     };
   }, []);
 
