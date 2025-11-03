@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button"
 import { saveCandidateSkills, getCandidateSkills, type Skill } from "@/utils/skillsHelper"
 import { SkillsInput } from "@/components/ui/skills-input"
 import { Input } from "@/components/ui/input"
+
+// ✅ THÊM IMPORT MỚI - Activity Logger
+import { ActivityLogger } from '@/lib/activityLogger';
+
 // Checkbox component inline definition (nếu chưa có trong project)
 const Checkbox = ({ id, checked, onCheckedChange, className }: { 
   id?: string; 
@@ -21,6 +25,7 @@ const Checkbox = ({ id, checked, onCheckedChange, className }: {
     className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${className || ''}`}
   />
 );
+
 import {
   Select,
   SelectContent,
@@ -387,6 +392,7 @@ export function CandidatesPage() {
     setParsedData(null);
   };
 
+  // ✅ CẬP NHẬT: handleSubmit - Thêm logging
   const handleSubmit = async () => {
     if (!formData.full_name || !formData.email || !formData.job_id) {
       alert('Vui lòng điền đầy đủ thông tin bắt buộc (Họ tên, Email, Vị trí ứng tuyển)');
@@ -443,8 +449,23 @@ export function CandidatesPage() {
 
       if (error) throw error;
 
+      // Save skills
       await saveCandidateSkills(data.id, formData.skills);
 
+      // ✅ LOG ACTIVITY - Thêm ứng viên mới
+      try {
+        const jobTitle = jobs.find(j => j.id === formData.job_id)?.title;
+        await ActivityLogger.logCVSubmitted(
+          formData.full_name,
+          data.id,
+          jobTitle
+        );
+      } catch (logError) {
+        console.error('Failed to log activity:', logError);
+        // Không throw để không ảnh hưởng UX
+      }
+
+      // Fetch full data
       const { data: fullData } = await supabase
         .from('cv_candidates')
         .select(`
@@ -465,12 +486,14 @@ export function CandidatesPage() {
         alert('✓ Thêm ứng viên thành công!');
       }
     } catch (err: any) {
+      console.error('Error creating candidate:', err);
       alert('Lỗi: ' + (err.message || 'Không thể thêm ứng viên'));
     } finally {
       setIsSaving(false);
     }
   };
 
+  // ✅ CẬP NHẬT: handleUpdateCandidate - Thêm logging
   const handleUpdateCandidate = async () => {
     if (!editCandidate) return;
     setIsSaving(true);
@@ -496,8 +519,22 @@ export function CandidatesPage() {
 
       if (error) throw error;
 
+      // Save skills
       await saveCandidateSkills(editCandidate.id, formData.skills);
 
+      // ✅ LOG ACTIVITY - Cập nhật ứng viên
+      try {
+        await ActivityLogger.logCustomActivity(
+          'Cập nhật thông tin ứng viên',
+          `Cập nhật thông tin ứng viên ${formData.full_name}`,
+          'cv',
+          editCandidate.id
+        );
+      } catch (logError) {
+        console.error('Failed to log activity:', logError);
+      }
+
+      // Fetch complete data
       const { data: completeData } = await supabase
         .from('cv_candidates')
         .select(`
@@ -521,6 +558,7 @@ export function CandidatesPage() {
         alert('✓ Cập nhật thông tin thành công!');
       }
     } catch (err: any) {
+      console.error('Error updating candidate:', err);
       alert('Lỗi: ' + (err.message || 'Không thể cập nhật'));
     } finally {
       setIsSaving(false);
@@ -570,6 +608,13 @@ export function CandidatesPage() {
           return;
         }
         setViewCVCandidate(data as Candidate);
+        
+        // ✅ LOG ACTIVITY - Xem CV (optional)
+        try {
+          await ActivityLogger.logCVViewed(candidate.full_name, candidate.id);
+        } catch (logError) {
+          console.error('Failed to log activity:', logError);
+        }
       }
     } catch (err) {
       console.error('Error:', err);
@@ -613,10 +658,14 @@ export function CandidatesPage() {
     setDeleteCandidate(candidate);
   };
 
+  // ✅ CẬP NHẬT: confirmDelete - Thêm logging
   const confirmDelete = async () => {
     if (!deleteCandidate) return;
 
+    const candidateName = deleteCandidate.full_name; // ✅ Lưu tên trước khi xóa
+
     try {
+      // Delete CV file if exists
       if (deleteCandidate.cv_url) {
         const fileName = deleteCandidate.cv_url.split('/').pop();
         if (fileName) {
@@ -624,6 +673,7 @@ export function CandidatesPage() {
         }
       }
 
+      // Delete candidate
       const { error } = await supabase
         .from('cv_candidates')
         .delete()
@@ -631,10 +681,19 @@ export function CandidatesPage() {
 
       if (error) throw error;
 
+      // ✅ LOG ACTIVITY - Xóa ứng viên
+      try {
+        await ActivityLogger.logCVDeleted(candidateName);
+      } catch (logError) {
+        console.error('Failed to log activity:', logError);
+      }
+
+      // Update UI
       setCandidates(prev => prev.filter(c => c.id !== deleteCandidate.id));
       setDeleteCandidate(null);
       alert('✓ Đã xóa ứng viên thành công!');
     } catch (err: any) {
+      console.error('Error deleting candidate:', err);
       alert('Lỗi khi xóa: ' + (err.message || 'Không xác định'));
     }
   };
