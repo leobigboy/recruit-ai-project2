@@ -1,6 +1,6 @@
 // src/components/layout/Sidebar.tsx
 import { useState, useEffect } from 'react';
-import { Link, NavLink, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Briefcase,
@@ -10,7 +10,6 @@ import {
   Mail,
   Settings,
   Building2,
-  Bot,
   FileText,
   Filter,
 } from "lucide-react";
@@ -176,7 +175,7 @@ function CompanyLogo({ companyName }: { companyName: string }) {
         )}
       </div>
 
-      {/* Company Name - CẢI TIẾN ĐỂ NỔI BẬT HỠN */}
+      {/* Company Name */}
       <div className="flex flex-col flex-1 min-w-0">
         <h1 
           className="text-2xl font-extrabold text-white tracking-tight truncate" 
@@ -321,7 +320,7 @@ export function Sidebar() {
         />
       </nav>
 
-      {/* User Profile Section */}
+      {/* User Profile Section - UPDATED TO SHOW AVATAR */}
       <div className="mt-auto pt-4 border-t border-white/20">
         <UserMenu />
       </div>

@@ -8,7 +8,7 @@ import { Settings, LogOut, ChevronUp } from 'lucide-react';
 export const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
   // Đóng menu khi click bên ngoài
@@ -33,10 +33,11 @@ export const UserMenu = () => {
     setIsOpen(false);
   };
 
-  // Lấy tên viết tắt từ email hoặc tên đầy đủ
+  // Lấy tên viết tắt từ profile hoặc user metadata
   const getInitials = () => {
-    if (user?.user_metadata?.full_name) {
-      const names = user.user_metadata.full_name.split(' ');
+    const fullName = profile?.full_name || user?.user_metadata?.full_name;
+    if (fullName) {
+      const names = fullName.split(' ').filter((n: string | any[]) => n.length > 0);
       return names.length > 1 
         ? `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
         : names[0][0].toUpperCase();
@@ -44,7 +45,9 @@ export const UserMenu = () => {
     return user?.email?.[0].toUpperCase() || 'A';
   };
 
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Admin';
+  // CRITICAL: Get avatar from profile first, then fallback to user metadata
+  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
+  const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Admin';
   const displayEmail = user?.email || 'admin@example.com';
 
   return (
@@ -52,15 +55,19 @@ export const UserMenu = () => {
       {/* User Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors border border-gray-200"
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
       >
-        {/* Avatar */}
-        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
-          {user?.user_metadata?.avatar_url ? (
+        {/* Avatar with profile support */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm overflow-hidden ring-2 ring-white/20">
+          {avatarUrl ? (
             <img 
-              src={user.user_metadata.avatar_url} 
+              src={avatarUrl} 
               alt={displayName}
-              className="w-full h-full rounded-full object-cover"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error('Avatar failed to load:', avatarUrl);
+                e.currentTarget.style.display = 'none';
+              }}
             />
           ) : (
             getInitials()
@@ -69,17 +76,17 @@ export const UserMenu = () => {
 
         {/* User Info */}
         <div className="flex-1 text-left min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">
+          <p className="text-sm font-semibold text-white truncate">
             {displayName}
           </p>
-          <p className="text-xs text-gray-500 truncate">
+          <p className="text-xs text-white/70 truncate">
             {displayEmail}
           </p>
         </div>
 
         {/* Chevron Icon */}
         <ChevronUp 
-          className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} 
+          className={`w-4 h-4 text-white/60 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} 
         />
       </button>
 
