@@ -1,11 +1,26 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Bot, Download, ListChecks, TriangleAlert, FileText, Brain, X } from 'lucide-react'
+import { Search, Plus, Eye, Edit, Trash2, Users, UserCheck, TrendingUp, Filter, Download, FileText, Brain, X, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { saveCandidateSkills, getCandidateSkills, type Skill } from "@/utils/skillsHelper"
 import { SkillsInput } from "@/components/ui/skills-input"
 import { Input } from "@/components/ui/input"
+// Checkbox component inline definition (nếu chưa có trong project)
+const Checkbox = ({ id, checked, onCheckedChange, className }: { 
+  id?: string; 
+  checked: boolean; 
+  onCheckedChange: (checked: boolean) => void;
+  className?: string;
+}) => (
+  <input
+    type="checkbox"
+    id={id}
+    checked={checked}
+    onChange={(e) => onCheckedChange(e.target.checked)}
+    className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${className || ''}`}
+  />
+);
 import {
   Select,
   SelectContent,
@@ -68,6 +83,8 @@ interface Candidate {
   cv_url?: string;
   cv_file_name?: string;
   cv_parsed_data?: any;
+  mandatory_requirements_met?: boolean;
+  mandatory_requirements_notes?: string;
   cv_jobs: {
     title: string;
     level: string;
@@ -89,6 +106,7 @@ interface Job {
   description: string;
   requirements: string;
   benefits: string;
+  mandatory_requirements?: string;
   job_type: string;
   work_location: string;
   location: string;
@@ -99,7 +117,7 @@ export function CandidatesPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'basic' | 'cv'>('basic');
+  const [currentTab, setCurrentTab] = useState<'basic' | 'cv' | 'requirements'>('basic');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -128,6 +146,11 @@ export function CandidatesPage() {
   const [isLoadingCV, setIsLoadingCV] = useState(false);
   const [isLoadingAnalyze, setIsLoadingAnalyze] = useState(false);
   
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [mandatoryRequirementsMet, setMandatoryRequirementsMet] = useState(false);
+  const [mandatoryRequirementsNotes, setMandatoryRequirementsNotes] = useState('');
+  const [showRequirementsWarning, setShowRequirementsWarning] = useState(false);
+  
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -147,23 +170,38 @@ export function CandidatesPage() {
   }, []);
 
   useEffect(() => {
-  async function getJobs() {
-    const { data, error } = await supabase
-      .from('cv_jobs')
-      .select('id, title, level, department, description, requirements, benefits, job_type, work_location, location')  // ✅ Lấy ĐẦY ĐỦ 10 trường
-      .order('title');
+    async function getJobs() {
+      const { data, error } = await supabase
+        .from('cv_jobs')
+        .select('id, title, level, department, description, requirements, benefits, mandatory_requirements, job_type, work_location, location')
+        .order('title');
 
-    if (data) {
-      console.log('Fetched jobs with full data:', data.length, 'jobs');
-      console.log('Sample job data:', data[0]); // Log để verify
-      setJobs(data);
+      if (data) {
+        console.log('Fetched jobs with full data:', data.length, 'jobs');
+        console.log('Sample job data:', data[0]);
+        setJobs(data);
+      }
+      if (error) {
+        console.error('Error fetching jobs:', error);
+      }
     }
-    if (error) {
-      console.error('Error fetching jobs:', error);
+    getJobs();
+  }, []);
+
+  useEffect(() => {
+    if (formData.job_id) {
+      const job = jobs.find(j => j.id === formData.job_id);
+      setSelectedJob(job || null);
+      
+      if (job?.mandatory_requirements) {
+        setCurrentTab('requirements');
+      }
+    } else {
+      setSelectedJob(null);
+      setMandatoryRequirementsMet(false);
+      setMandatoryRequirementsNotes('');
     }
-  }
-  getJobs();
-}, []);
+  }, [formData.job_id, jobs]);
 
   const fetchCandidates = async () => {
     setLoading(true);
@@ -212,6 +250,10 @@ export function CandidatesPage() {
     setCurrentTab('basic');
     setSelectedFile(null);
     setParsedData(null);
+    setSelectedJob(null);
+    setMandatoryRequirementsMet(false);
+    setMandatoryRequirementsNotes('');
+    setShowRequirementsWarning(false);
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,12 +282,12 @@ export function CandidatesPage() {
       const foundInfo = [];
 
       if (parsed.fullName) {
-        console.log(' Điền Họ và tên:', parsed.fullName);
+        console.log('✅ Điền Họ và tên:', parsed.fullName);
         handleInputChange('full_name', parsed.fullName);
         foundInfo.push(`👤 Họ tên: ${parsed.fullName}`);
         filledCount++;
       } else {
-        console.log(' Không tìm thấy Họ và tên');
+        console.log('❌ Không tìm thấy Họ và tên');
       }
 
       if (parsed.email) {
@@ -254,64 +296,64 @@ export function CandidatesPage() {
         foundInfo.push(`📧 Email: ${parsed.email}`);
         filledCount++;
       } else {
-        console.log(' Không tìm thấy Email');
+        console.log('❌ Không tìm thấy Email');
       }
 
       if (parsed.phone) {
-        console.log(' Điền SĐT:', parsed.phone);
+        console.log('✅ Điền SĐT:', parsed.phone);
         handleInputChange('phone_number', parsed.phone);
-        foundInfo.push(` SĐT: ${parsed.phone}`);
+        foundInfo.push(`📱 SĐT: ${parsed.phone}`);
         filledCount++;
       } else {
-        console.log(' Không tìm thấy SĐT');
+        console.log('❌ Không tìm thấy SĐT');
       }
 
       if (parsed.address) {
-        console.log(' Điền Địa chỉ:', parsed.address);
+        console.log('✅ Điền Địa chỉ:', parsed.address);
         handleInputChange('address', parsed.address);
-        foundInfo.push(` Địa chỉ: ${parsed.address}`);
+        foundInfo.push(`📍 Địa chỉ: ${parsed.address}`);
         filledCount++;
       } else {
-        console.log('Không tìm thấy Địa chỉ');
+        console.log('❌ Không tìm thấy Địa chỉ');
       }
 
       if (parsed.university) {
-        console.log('Điền Trường học:', parsed.university);
+        console.log('✅ Điền Trường học:', parsed.university);
         handleInputChange('university', parsed.university);
         foundInfo.push(`🎓 Trường: ${parsed.university}`);
         filledCount++;
       } else {
-        console.log('Không tìm thấy Trường học');
+        console.log('❌ Không tìm thấy Trường học');
       }
 
       if (parsed.education) {
-        console.log('Điền Học vấn:', parsed.education);
+        console.log('✅ Điền Học vấn:', parsed.education);
         handleInputChange('education', parsed.education);
         foundInfo.push(`📚 Học vấn: ${parsed.education}`);
         filledCount++;
       } else {
-        console.log('Không tìm thấy Học vấn');
+        console.log('❌ Không tìm thấy Học vấn');
       }
 
       if (parsed.experience) {
-        console.log('Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
+        console.log('✅ Điền Kinh nghiệm:', parsed.experience.substring(0, 100));
         handleInputChange('experience', parsed.experience);
         const expPreview = parsed.experience.length > 50 
           ? parsed.experience.substring(0, 50) + '...' 
           : parsed.experience;
-        foundInfo.push(`Kinh nghiệm: ${expPreview}`);
+        foundInfo.push(`💼 Kinh nghiệm: ${expPreview}`);
         filledCount++;
       } else {
-        console.log('Không tìm thấy Kinh nghiệm');
+        console.log('❌ Không tìm thấy Kinh nghiệm');
       }
 
       if (parsed.skills && parsed.skills.length > 0) {
-        console.log('Điền Skills:', parsed.skills);
+        console.log('✅ Điền Skills:', parsed.skills);
         handleInputChange('skills', parsed.skills);
-        foundInfo.push(`Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
+        foundInfo.push(`🔧 Kỹ năng: ${parsed.skills.length} kỹ năng (${parsed.skills.slice(0, 5).join(', ')}${parsed.skills.length > 5 ? '...' : ''})`);
         filledCount++;
       } else {
-        console.log('Không tìm thấy Skills');
+        console.log('❌ Không tìm thấy Skills');
       }
 
       console.log('=== TỔNG KẾT ===');
@@ -334,7 +376,7 @@ export function CandidatesPage() {
 
     } catch (error: any) {
       console.error('❌ Lỗi parse CV:', error);
-      alert('⚠ Không thể phân tích CV:\n' + (error.message || 'Lỗi không xác định'));
+      alert('⚠️ Không thể phân tích CV:\n' + (error.message || 'Lỗi không xác định'));
     } finally {
       setIsUploading(false);
     }
@@ -346,13 +388,19 @@ export function CandidatesPage() {
   };
 
   const handleSubmit = async () => {
+    if (!formData.full_name || !formData.email || !formData.job_id) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc (Họ tên, Email, Vị trí ứng tuyển)');
+      return;
+    }
+
+    if (selectedJob?.mandatory_requirements && !mandatoryRequirementsMet) {
+      setShowRequirementsWarning(true);
+      setCurrentTab('requirements');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      if (!formData.full_name || !formData.email || !formData.job_id) {
-        alert('Vui lòng điền đầy đủ thông tin bắt buộc (Họ tên, Email, Vị trí ứng tuyển)');
-        return;
-      }
-
       let cvUrl = null;
       let cvFileName = null;
       let parsedCV = null;
@@ -387,6 +435,8 @@ export function CandidatesPage() {
           cv_url: cvUrl,
           cv_file_name: cvFileName,
           cv_parsed_data: parsedCV,
+          mandatory_requirements_met: mandatoryRequirementsMet,
+          mandatory_requirements_notes: mandatoryRequirementsNotes || null,
         })
         .select()
         .single();
@@ -534,7 +584,7 @@ export function CandidatesPage() {
     try {
       const { data, error } = await supabase
         .from('cv_candidates')
-        .select('id, full_name, cv_url, cv_parsed_data, status, cv_candidate_skills ( cv_skills ( id, name, category ) )')
+        .select('id, full_name, cv_url, cv_parsed_data, status, mandatory_requirements_met, mandatory_requirements_notes, cv_candidate_skills ( cv_skills ( id, name, category ) )')
         .eq('id', candidate.id)
         .single();
 
@@ -605,7 +655,7 @@ export function CandidatesPage() {
   };
 
   const exportCSV = () => {
-    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Status', 'Source', 'Position', 'Level'];
+    const headers = ['ID', 'Full Name', 'Email', 'Phone', 'Status', 'Source', 'Position', 'Level', 'Requirements Met'];
     const csvContent = [
       headers.join(','),
       ...filteredCandidates.map(c => {
@@ -617,7 +667,8 @@ export function CandidatesPage() {
           c.status,
           c.source,
           c.cv_jobs?.title || '',
-          c.cv_jobs?.level || ''
+          c.cv_jobs?.level || '',
+          c.mandatory_requirements_met ? 'Yes' : 'No'
         ].join(',');
       })
     ].join('\n');
@@ -703,6 +754,21 @@ export function CandidatesPage() {
             >
               CV & Tài liệu
             </button>
+            {selectedJob?.mandatory_requirements && (
+              <button
+                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors rounded-lg relative ${
+                  currentTab === 'requirements'
+                    ? 'bg-amber-50 text-amber-700 border-2 border-amber-300'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                onClick={() => setCurrentTab('requirements')}
+              >
+                Yêu cầu bắt buộc
+                {!mandatoryRequirementsMet && (
+                  <AlertTriangle className="w-4 h-4 absolute -top-1 -right-1 text-red-500" />
+                )}
+              </button>
+            )}
           </div>
 
           <div className="mt-6 space-y-4">
@@ -756,12 +822,27 @@ export function CandidatesPage() {
                         {jobs.map((job) => (
                           <SelectItem key={job.id} value={job.id}>
                             {job.title} - {job.level}
+                            {job.mandatory_requirements && <span className="ml-2 text-amber-600">⚠️</span>}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
+                {selectedJob?.mandatory_requirements && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-900">Vị trí này có yêu cầu bắt buộc</p>
+                        <p className="text-amber-700 text-xs mt-1">
+                          Vui lòng kiểm tra tab "Yêu cầu bắt buộc" để xác nhận ứng viên đáp ứng đủ điều kiện
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Địa chỉ</label>
@@ -851,7 +932,7 @@ export function CandidatesPage() {
                   />
                 </div>
               </>
-            ) : (
+            ) : currentTab === 'cv' ? (
               <div className="space-y-4">
                 <div className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                   selectedFile ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-blue-400'
@@ -925,7 +1006,85 @@ export function CandidatesPage() {
                   </div>
                 )}
               </div>
-            )}
+            ) : currentTab === 'requirements' ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-amber-900 mb-1">
+                        Yêu cầu bắt buộc cho vị trí: {selectedJob?.title}
+                      </h4>
+                      <p className="text-sm text-amber-800 mb-3">
+                        Ứng viên cần đáp ứng các yêu cầu bắt buộc sau để có thể ứng tuyển vào vị trí này:
+                      </p>
+                      <div className="bg-white rounded-lg p-3 text-sm text-gray-700 whitespace-pre-wrap border border-amber-200">
+                        {selectedJob?.mandatory_requirements}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Checkbox 
+                      id="requirements-met"
+                      checked={mandatoryRequirementsMet}
+                      onCheckedChange={(checked: boolean) => {
+                        setMandatoryRequirementsMet(checked);
+                        setShowRequirementsWarning(false);
+                      }}
+                      className="mt-1"
+                    />
+                    <label htmlFor="requirements-met" className="text-sm cursor-pointer flex-1">
+                      <span className="font-medium text-gray-900">
+                        Xác nhận ứng viên đáp ứng đầy đủ các yêu cầu bắt buộc trên
+                      </span>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Vui lòng đọc kỹ và xác nhận rằng ứng viên có đủ điều kiện theo yêu cầu bắt buộc
+                      </p>
+                    </label>
+                  </div>
+
+                  {showRequirementsWarning && !mandatoryRequirementsMet && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                        <p className="text-sm text-red-700">
+                          <strong>Không thể thêm ứng viên!</strong> Vui lòng xác nhận rằng ứng viên đáp ứng đầy đủ các yêu cầu bắt buộc.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Ghi chú về yêu cầu bắt buộc (tùy chọn)
+                    </label>
+                    <Textarea
+                      placeholder="VD: Ứng viên có bằng Cử nhân CNTT từ ĐH Bách Khoa, TOEIC 850 điểm, 3 năm kinh nghiệm React..."
+                      className="min-h-[100px] resize-none"
+                      value={mandatoryRequirementsNotes}
+                      onChange={(e) => setMandatoryRequirementsNotes(e.target.value)}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Ghi chú chi tiết về cách ứng viên đáp ứng các yêu cầu bắt buộc
+                    </p>
+                  </div>
+                </div>
+
+                {mandatoryRequirementsMet && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <p className="text-sm font-medium text-green-800">
+                        ✓ Đã xác nhận ứng viên đáp ứng yêu cầu bắt buộc
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex gap-3 mt-6 pt-4 border-t">
@@ -967,6 +1126,12 @@ export function CandidatesPage() {
                   <p className="text-sm text-gray-500">{viewCandidate.cv_jobs?.title || 'N/A'}</p>
                   <div className="flex items-center gap-2 mt-1">
                     {getStatusBadge(viewCandidate.status)}
+                    {viewCandidate.mandatory_requirements_met && (
+                      <Badge className="bg-green-100 text-green-700 border-green-300">
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        Đáp ứng yêu cầu
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -982,6 +1147,15 @@ export function CandidatesPage() {
 
               <div><label className="text-sm font-medium text-gray-500">Kinh nghiệm</label><p className="text-gray-900 mt-1">{viewCandidate.experience || 'Chưa có thông tin'}</p></div>
               <div><label className="text-sm font-medium text-gray-500">Học vấn</label><p className="text-gray-900 mt-1">{viewCandidate.education || 'Chưa có thông tin'}</p></div>
+              
+              {viewCandidate.mandatory_requirements_notes && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <label className="text-sm font-medium text-amber-900 block mb-1">
+                    Ghi chú yêu cầu bắt buộc
+                  </label>
+                  <p className="text-sm text-amber-800">{viewCandidate.mandatory_requirements_notes}</p>
+                </div>
+              )}
               
               <div>
                 <label className="text-sm font-medium text-gray-500">Kỹ năng</label>
@@ -1153,6 +1327,38 @@ export function CandidatesPage() {
                 </div>
               </div>
 
+              {analyzeCVCandidate.mandatory_requirements_met !== undefined && (
+                <div className={`p-4 border-2 rounded-lg ${
+                  analyzeCVCandidate.mandatory_requirements_met 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {analyzeCVCandidate.mandatory_requirements_met ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    )}
+                    <div>
+                      <h4 className={`font-semibold mb-1 ${
+                        analyzeCVCandidate.mandatory_requirements_met 
+                          ? 'text-green-900' 
+                          : 'text-amber-900'
+                      }`}>
+                        {analyzeCVCandidate.mandatory_requirements_met 
+                          ? 'Ứng viên đáp ứng yêu cầu bắt buộc' 
+                          : 'Chưa xác nhận yêu cầu bắt buộc'}
+                      </h4>
+                      {analyzeCVCandidate.mandatory_requirements_notes && (
+                        <p className="text-sm text-gray-700 mt-1">
+                          {analyzeCVCandidate.mandatory_requirements_notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {analyzeCVCandidate.cv_candidate_skills && analyzeCVCandidate.cv_candidate_skills.length > 0 && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <h4 className="font-semibold text-green-900 mb-2">Kỹ năng đã lưu trong hệ thống</h4>
@@ -1172,6 +1378,7 @@ export function CandidatesPage() {
                   <p>• Độ hoàn thiện thông tin: {analyzeCVCandidate.cv_parsed_data.email && analyzeCVCandidate.cv_parsed_data.phone ? 'Tốt' : 'Cần bổ sung'}</p>
                   <p>• Số kỹ năng phát hiện: {analyzeCVCandidate.cv_parsed_data.skills?.length || 0}</p>
                   <p>• Số kỹ năng đã lưu: {analyzeCVCandidate.cv_candidate_skills?.length || 0}</p>
+                  <p>• Yêu cầu bắt buộc: {analyzeCVCandidate.mandatory_requirements_met ? '✓ Đã đáp ứng' : '⚠️ Chưa xác nhận'}</p>
                   <p>• Trạng thái hiện tại: {analyzeCVCandidate.status}</p>
                 </div>
               </div>
@@ -1294,13 +1501,15 @@ export function CandidatesPage() {
         </Card>
         <Card className="shadow-sm border-2 border-gray-100">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">Tỷ lệ chấp nhận</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-500">Đáp ứng yêu cầu</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">24%</div>
+            <div className="text-2xl font-bold">
+              {candidates.filter(c => c.mandatory_requirements_met).length}
+            </div>
             <p className="text-xs text-muted-foreground">
-              <UserCheck className="inline h-4 w-4 mr-1 text-purple-500" />
-              Từ 120 ứng viên
+              <UserCheck className="inline h-4 w-4 mr-1 text-green-500" />
+              Ứng viên phù hợp
             </p>
           </CardContent>
         </Card>
@@ -1366,7 +1575,12 @@ export function CandidatesPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium text-gray-900">{candidate.full_name}</div>
+                        <div className="font-medium text-gray-900 flex items-center gap-2">
+                          {candidate.full_name}
+                          {candidate.mandatory_requirements_met && (
+                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          )}
+                        </div>
                         <div className="text-sm text-gray-500">{candidate.email}</div>
                       </div>
                     </div>

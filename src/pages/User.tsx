@@ -536,7 +536,7 @@ export default function UsersPage() {
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 mb-4">
-          <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+          <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
           <p className="text-sm text-red-800">{error}</p>
         </div>
       )}
@@ -649,7 +649,7 @@ export default function UsersPage() {
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
@@ -731,12 +731,13 @@ export default function UsersPage() {
                     )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent 
+                <SelectContent
                   position="popper"
                   side="bottom"
                   align="start"
                   sideOffset={5}
-                  className="z-[9999] bg-white border shadow-lg max-h-[300px] overflow-y-auto"
+                  className="bg-white border shadow-lg max-h-80 overflow-y-auto"
+                  style={{ zIndex: 9999, width: 'var(--radix-select-trigger-width)' }}
                 >
                   {roles.map((role) => (
                     <SelectItem 
@@ -785,7 +786,8 @@ export default function UsersPage() {
                   side="bottom"
                   align="start"
                   sideOffset={5}
-                  className="z-[9999] bg-white border shadow-lg"
+                  className="bg-white border shadow-lg"
+                  style={{ zIndex: 9999, width: 'var(--radix-select-trigger-width)' }}
                 >
                   <SelectItem value="ACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
                     <div className="flex items-center gap-2">
@@ -853,7 +855,7 @@ export default function UsersPage() {
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
               <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
@@ -906,7 +908,8 @@ export default function UsersPage() {
                   side="bottom"
                   align="start"
                   sideOffset={5}
-                  className="z-[9999] bg-white border shadow-lg max-h-[300px] overflow-y-auto w-[var(--radix-select-trigger-width)]"
+                  className="bg-white border shadow-lg max-h-80 overflow-y-auto"
+                  style={{ zIndex: 9999, width: 'var(--radix-select-trigger-width)' }}
                 >
                   {roles.map((role) => (
                     <SelectItem 
@@ -950,7 +953,8 @@ export default function UsersPage() {
                   side="bottom"
                   align="start"
                   sideOffset={5}
-                  className="z-[9999] bg-white border shadow-lg w-[var(--radix-select-trigger-width)]"
+                  className="bg-white border shadow-lg"
+                  style={{ zIndex: 9999, width: 'var(--radix-select-trigger-width)' }}
                 >
                   <SelectItem value="ACTIVE" className="cursor-pointer hover:bg-accent focus:bg-accent">
                     <div className="flex items-center gap-2">
@@ -1093,7 +1097,7 @@ export default function UsersPage() {
 
               <div className="p-4 bg-amber-50 border-2 border-amber-200 rounded-lg">
                 <div className="flex gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-amber-900 mb-1">Lưu ý quan trọng</p>
                     <p className="text-xs text-amber-800 leading-relaxed">
