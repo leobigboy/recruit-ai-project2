@@ -9,6 +9,7 @@ import { RefreshCw, FileText, Star, TrendingUp, MoreHorizontal, X } from "lucide
 import { supabase } from "@/lib/supabaseClient"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 
 // Helper Component để hiển thị sao
 function StarRating({ rating }: { rating: number }) {
@@ -53,6 +54,7 @@ export function ReviewsPage() {
   const [isReratingDialogOpen, setIsReratingDialogOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [newRating, setNewRating] = useState(0);
+  const [newNote, setNewNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -101,6 +103,7 @@ export function ReviewsPage() {
   const handleRerating = (review: Review) => {
     setSelectedReview(review);
     setNewRating(review.rating);
+    setNewNote(review.notes || '');
     setIsReratingDialogOpen(true);
   };
 
@@ -115,7 +118,10 @@ export function ReviewsPage() {
     try {
       const { error } = await supabase
         .from('cv_interview_reviews')
-        .update({ rating: newRating })
+        .update({ 
+          rating: newRating,
+          notes: newNote
+        })
         .eq('id', selectedReview.id);
 
       if (error) throw error;
@@ -126,6 +132,7 @@ export function ReviewsPage() {
       setIsReratingDialogOpen(false);
       setSelectedReview(null);
       setNewRating(0);
+      setNewNote('');
       
       alert('Cập nhật đánh giá thành công!');
     } catch (error) {
@@ -385,11 +392,12 @@ export function ReviewsPage() {
             onClick={() => {
               setIsReratingDialogOpen(false);
               setNewRating(0);
+              setNewNote('');
             }}
           />
           
           <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1000000 }}>
-            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-lg m-4 pointer-events-auto">
+            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 pointer-events-auto">
               <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500" />
@@ -399,6 +407,7 @@ export function ReviewsPage() {
                   onClick={() => {
                     setIsReratingDialogOpen(false);
                     setNewRating(0);
+                    setNewNote('');
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -417,10 +426,16 @@ export function ReviewsPage() {
                 {/* Đánh giá hiện tại */}
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <p className="text-sm text-blue-700 mb-2">Đánh giá hiện tại</p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <StarRating rating={selectedReview.rating} />
                     <span className="font-bold text-blue-900">{selectedReview.rating}/5</span>
                   </div>
+                  {selectedReview.notes && (
+                    <div>
+                      <p className="text-sm text-blue-700 mb-1">Ghi chú cũ</p>
+                      <p className="text-sm text-blue-900 bg-white rounded p-2 border border-blue-200">{selectedReview.notes}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Rating mới */}
@@ -450,6 +465,23 @@ export function ReviewsPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Ghi chú mới */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">
+                    Ghi chú đánh giá
+                  </label>
+                  <Textarea
+                    placeholder="Nhập ghi chú về đánh giá của bạn (ví dụ: kỹ năng cần cải thiện, điểm mạnh, lý do thay đổi đánh giá...)"
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    rows={5}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-gray-500">
+                    {newNote.length}/500 ký tự
+                  </p>
+                </div>
               </div>
 
               <div className="border-t px-6 py-4 flex justify-end gap-2">
@@ -458,6 +490,7 @@ export function ReviewsPage() {
                   onClick={() => {
                     setIsReratingDialogOpen(false);
                     setNewRating(0);
+                    setNewNote('');
                   }}
                   disabled={submitting}
                 >
